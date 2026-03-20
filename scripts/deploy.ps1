@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Deploys the Azure SRE Agent Demo Lab infrastructure using Bicep.
+    Deploys the Azure SRE Agent Energy Grid Demo Lab infrastructure using Bicep.
 
 .DESCRIPTION
     This script deploys all Azure infrastructure needed for the SRE Agent demo,
@@ -31,7 +31,7 @@
     .\deploy.ps1 -Location eastus2 -WhatIf
 
 .NOTES
-    Author: Azure SRE Agent Demo Lab
+    Author: Azure SRE Agent Energy Grid Demo Lab
     Prerequisites: Azure CLI, Bicep CLI
 #>
 
@@ -396,10 +396,10 @@ function Get-SreAgentProviderStatus {
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    Azure SRE Agent Demo Lab Deployment                       ║
+║                    Azure Energy Grid SRE Demo Lab Deployment                 ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  This script deploys:                                                        ║
-║  • Azure Kubernetes Service (AKS) with multi-service demo app               ║
+║  • Azure Kubernetes Service (AKS) with energy grid platform                 ║
 ║  • Azure Container Registry                                                  ║
 ║  • Observability stack (Log Analytics, App Insights, Grafana)               ║
 ║  • Key Vault for secrets management                                         ║
@@ -709,26 +709,26 @@ if (Test-Path $k8sPath) {
     Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
     
     Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
-    $deploymentNamesRaw = kubectl get deployment -n pets -o jsonpath='{.items[*].metadata.name}' 2>$null
+    $deploymentNamesRaw = kubectl get deployment -n energy -o jsonpath='{.items[*].metadata.name}' 2>$null
     $deploymentNames = @()
     if ($deploymentNamesRaw) {
         $deploymentNames = $deploymentNamesRaw -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     }
 
     foreach ($deploymentName in $deploymentNames) {
-        kubectl rollout status "deployment/$deploymentName" -n pets --timeout=300s 2>$null
+        kubectl rollout status "deployment/$deploymentName" -n energy --timeout=300s 2>$null
         if ($LASTEXITCODE -ne 0) {
             Write-Host "  ⚠️  Rollout still in progress for deployment/$deploymentName" -ForegroundColor Yellow
         }
     }
     
     # Wait for LoadBalancer IP
-    Write-Host "⏳ Waiting for store-front external IP..." -ForegroundColor Yellow
+    Write-Host "⏳ Waiting for grid-dashboard external IP..." -ForegroundColor Yellow
     $maxWait = 120
     $waited = 0
     $storeUrl = $null
     while ($waited -lt $maxWait) {
-        $externalIp = kubectl get svc store-front -n pets -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+        $externalIp = kubectl get svc grid-dashboard -n energy -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
         if ($externalIp) {
             $storeUrl = "http://$externalIp"
             break
@@ -738,10 +738,10 @@ if (Test-Path $k8sPath) {
     }
     
     if ($storeUrl) {
-        Write-Host "  ✅ Store Front URL: $storeUrl" -ForegroundColor Green
+        Write-Host "  ✅ Grid Dashboard URL: $storeUrl" -ForegroundColor Green
     }
     else {
-        Write-Host "  ⚠️  Store Front external IP is still pending. Check again with: kubectl get svc store-front -n pets" -ForegroundColor Yellow
+        Write-Host "  ⚠️  Grid Dashboard external IP is still pending. Check again with: kubectl get svc grid-dashboard -n energy" -ForegroundColor Yellow
     }
 }
 else {
@@ -769,7 +769,7 @@ if ($sreAgentSkipReason -and -not $outputs.sreAgentId.value) {
 
 # Final instructions
 $aksName = if ($outputs.aksClusterName.value) { $outputs.aksClusterName.value } else { "<check Azure Portal>" }
-$siteUrlDisplay = if ($storeUrl) { $storeUrl } else { "kubectl get svc store-front -n pets" }
+$siteUrlDisplay = if ($storeUrl) { $storeUrl } else { "kubectl get svc grid-dashboard -n energy" }
 
 Write-Host @"
 
@@ -778,16 +778,16 @@ Write-Host @"
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  Resources Deployed:                                                         ║
 ║    • AKS Cluster:    $($aksName.PadRight(44))║
-║    • Store Front:    $($siteUrlDisplay.PadRight(44))║
+║    • Grid Dashboard: $($siteUrlDisplay.PadRight(44))║
 ║                                                                              ║
 ║  ℹ️  SRE Agent: See deployment output above for status                       ║
 ║    Portal: https://aka.ms/sreagent/portal                                    ║
 ║                                                                              ║
 ║  Quick Start (after SRE Agent setup):                                        ║
-║    1. Open the store: $siteUrlDisplay
+║    1. Open the dashboard: $siteUrlDisplay
 ║    2. Break something: break-oom                                             ║
-║    3. Refresh store to see failure                                           ║
-║    4. Ask SRE Agent: "Why are pods crashing in the pets namespace?"         ║
+║    3. Refresh dashboard to see failure                                       ║
+║    4. Ask SRE Agent: "Why are pods crashing in the energy namespace?"       ║
 ║    5. Fix it: fix-all                                                        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 

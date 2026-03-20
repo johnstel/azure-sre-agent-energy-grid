@@ -1,8 +1,8 @@
 # =============================================================================
-# SCENARIO 2: CrashLoopBackOff - Application startup failure
+# SCENARIO 2: CrashLoopBackOff - Asset Service Startup Failure
 # =============================================================================
-# This scenario causes the product-service to fail on startup, entering
-# a CrashLoopBackOff state.
+# The asset-service crashes on startup due to invalid grid configuration,
+# entering a CrashLoopBackOff state.
 #
 # SRE Agent can diagnose: Pod is in CrashLoopBackOff, container exit code,
 # recommend checking application logs and configuration.
@@ -17,10 +17,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: product-service
-  namespace: pets
+  name: asset-service
+  namespace: energy
   labels:
-    app: product-service
+    app: asset-service
     scenario: crash-loop
     sre-demo: breakable
 spec:
@@ -29,16 +29,16 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: product-service
+      app: asset-service
   template:
     metadata:
       labels:
-        app: product-service
+        app: asset-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: product-service
+        - name: asset-service
           image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
           ports:
             - containerPort: 3002
@@ -50,9 +50,9 @@ spec:
               memory: "128Mi"
               cpu: "100m"
           env:
-            # BREAKING CHANGE: Invalid AI service URL causes startup failure
+            # BREAKING CHANGE: Invalid forecast service URL causes startup failure
             - name: AI_SERVICE_URL
-              value: "http://nonexistent-service:9999/"
+              value: "http://nonexistent-forecast:9999/"
           # BREAKING CHANGE: Command that causes immediate exit
           command: ["/bin/sh"]
-          args: ["-c", "echo 'Starting with invalid config...'; exit 1"]
+          args: ["-c", "echo 'Starting with invalid grid config...'; exit 1"]

@@ -1,5 +1,5 @@
 // =============================================================================
-// Bicep Parameters File - SRE Agent Sandbox
+// Bicep Parameters File - Energy Grid SRE Agent Sandbox
 // =============================================================================
 // Deploy with: az deployment sub create --location eastus2 --template-file main.bicep
 // =============================================================================
@@ -29,9 +29,9 @@ param userNodeCount = 3
 
 // Tags
 param tags = {
-  workload: 'sre-agent-demo'
+  workload: 'energy-grid-demo'
   environment: 'sandbox'
   managedBy: 'bicep'
-  purpose: 'demonstration'
-  costCenter: 'demo-lab'
+  purpose: 'energy-sre-demo'
+  costCenter: 'energy-demo-lab'
 }

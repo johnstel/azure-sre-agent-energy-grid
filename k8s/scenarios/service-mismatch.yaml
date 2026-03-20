@@ -1,14 +1,14 @@
 # =============================================================================
-# SCENARIO 10: Service Selector Mismatch - Silent Networking Failure
+# SCENARIO 10: Service Selector Mismatch - Meter Service Routing Failure
 # =============================================================================
-# This scenario replaces the order-service Service with one that has a wrong
-# selector label. The order-service pods are perfectly healthy, but the Service
-# routes to nothing because the selector doesn't match any pods.
+# After a "v2 upgrade" the meter-service Service selector was changed to
+# target pods labeled 'meter-service-v2', but actual pods still have
+# 'meter-service'. This causes a silent outage.
 #
 # This is a subtle, realistic networking issue:
 # - All pods show Running/Ready (no crashes, no restarts)
-# - store-front loads fine (it's a client-side app)
-# - But placing an order fails silently (order-service unreachable)
+# - Grid dashboard loads fine (it's a client-side app)
+# - But submitting meter readings fails silently (meter-service unreachable)
 # - SRE Agent must check Service endpoints, not just pod status
 #
 # SRE Agent can diagnose: Empty endpoints, selector mismatch between Service
@@ -24,17 +24,17 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: order-service
-  namespace: pets
+  name: meter-service
+  namespace: energy
   labels:
     scenario: service-mismatch
     sre-demo: breakable
 spec:
   selector:
     # BREAKING CHANGE: Selector doesn't match any existing pods
-    # Real pods have label: app=order-service
-    # This selector looks for app=order-service-v2 (doesn't exist)
-    app: order-service-v2
+    # Real pods have label: app=meter-service
+    # This selector looks for app=meter-service-v2 (doesn't exist)
+    app: meter-service-v2
   ports:
     - port: 3000
       targetPort: 3000

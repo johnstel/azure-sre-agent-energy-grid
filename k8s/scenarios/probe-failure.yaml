@@ -1,7 +1,7 @@
 # =============================================================================
-# SCENARIO 6: Failed Liveness Probe - Health Check Failure
+# SCENARIO 6: Failed Liveness Probe - Grid Health Monitor Misconfigured
 # =============================================================================
-# This scenario deploys a service with a liveness probe that always fails,
+# Grid health monitoring probe misconfigured after a maintenance window,
 # causing Kubernetes to continuously restart the pod.
 #
 # SRE Agent can diagnose: Pod being killed due to failed liveness probe,
@@ -11,33 +11,33 @@
 # kubectl apply -f k8s/scenarios/probe-failure.yaml
 #
 # HOW TO FIX:
-# kubectl delete deployment unhealthy-service -n pets
+# kubectl delete deployment grid-health-monitor -n energy
 # =============================================================================
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: unhealthy-service
-  namespace: pets
+  name: grid-health-monitor
+  namespace: energy
   labels:
-    app: unhealthy-service
+    app: grid-health-monitor
     scenario: probe-failure
     sre-demo: breakable
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: unhealthy-service
+      app: grid-health-monitor
   template:
     metadata:
       labels:
-        app: unhealthy-service
+        app: grid-health-monitor
         scenario: probe-failure
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: unhealthy-app
+        - name: grid-health-app
           image: mcr.microsoft.com/mirror/docker/library/nginx:alpine
           ports:
             - containerPort: 80

@@ -1,8 +1,8 @@
 # =============================================================================
-# SCENARIO 3: ImagePullBackOff - Invalid container image
+# SCENARIO 3: ImagePullBackOff - Failed Dispatch Service Deployment
 # =============================================================================
-# This scenario references a non-existent container image, causing pods
-# to fail with ImagePullBackOff.
+# The dispatch-service deployment fails after a botched container image
+# release, referencing a non-existent image tag.
 #
 # SRE Agent can diagnose: Image pull failure, suggest checking image name,
 # registry credentials, or network connectivity.
@@ -17,10 +17,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: makeline-service
-  namespace: pets
+  name: dispatch-service
+  namespace: energy
   labels:
-    app: makeline-service
+    app: dispatch-service
     scenario: image-pull-backoff
     sre-demo: breakable
 spec:
@@ -29,16 +29,16 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: makeline-service
+      app: dispatch-service
   template:
     metadata:
       labels:
-        app: makeline-service
+        app: dispatch-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: makeline-service
+        - name: dispatch-service
           # BREAKING CHANGE: This image doesn't exist
           image: ghcr.io/azure-samples/aks-store-demo/makeline-service:nonexistent-tag-v999
           imagePullPolicy: Always

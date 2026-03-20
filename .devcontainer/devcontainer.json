@@ -1,5 +1,5 @@
 {
-    "name": "Azure SRE Agent Demo Lab",
+    "name": "Azure Energy Grid SRE Demo Lab",
     "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "features": {
         "ghcr.io/devcontainers/features/azure-cli:1": {
@@ -65,19 +65,19 @@
     ],
     "portsAttributes": {
         "8080": {
-            "label": "Store Front",
+            "label": "Grid Dashboard",
             "onAutoForward": "notify"
         },
         "3000": {
-            "label": "Order Service",
+            "label": "Meter Service",
             "onAutoForward": "silent"
         },
         "3001": {
-            "label": "Makeline Service",
+            "label": "Dispatch Service",
             "onAutoForward": "silent"
         },
         "3002": {
-            "label": "Product Service",
+            "label": "Asset Service",
             "onAutoForward": "silent"
         }
     },

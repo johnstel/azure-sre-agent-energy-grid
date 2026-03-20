@@ -1,15 +1,30 @@
-# Azure SRE Agent Demo Lab 🔧
+# Azure SRE Agent Energy Grid Demo Lab ⚡
 
-A fully automated Azure environment for demonstrating **Azure SRE Agent** capabilities. Deploy a breakable multi-service application on AKS and let SRE Agent diagnose and fix the issues!
+A fully automated Azure environment for demonstrating **Azure SRE Agent** capabilities using an **Energy Grid Operations Platform**. Deploy a breakable multi-service energy grid application on AKS and let SRE Agent diagnose and fix the issues!
 
 ## 🎯 What This Lab Provides
 
-- **Azure Kubernetes Service (AKS)** with a multi-pod e-commerce demo application
-- **8 breakable scenarios** for demonstrating SRE Agent diagnosis
+- **Azure Kubernetes Service (AKS)** with a multi-pod energy grid platform
+- **10 breakable scenarios** for demonstrating SRE Agent diagnosis
 - **Azure SRE Agent** deployed automatically via Bicep for AI-powered diagnostics
 - **Full observability stack**: Log Analytics, Application Insights, Managed Grafana
 - **Ready-to-use scripts** for deployment and teardown
 - **Dev container** for consistent development experience
+
+## ⚡ Energy Grid Architecture
+
+The platform simulates an electric energy producer with grid management and retail consumer services:
+
+| Service | Role | Technology |
+|---------|------|------------|
+| **grid-dashboard** | Consumer portal (usage, billing, outage maps) | Vue.js |
+| **ops-console** | Grid operations console | Vue.js |
+| **meter-service** | Smart meter data ingestion & billing events | Node.js |
+| **asset-service** | Energy asset catalog (generators, substations, rate plans) | Rust |
+| **dispatch-service** | Energy dispatch & load balancing across grid zones | Go |
+| **load-simulator** | Retail consumer usage pattern generator | Python |
+| **rabbitmq** | Event bus (meter events, grid alerts, dispatch commands) | RabbitMQ |
+| **mongodb** | Meter readings, energy transactions, grid state | MongoDB |
 
 ## 🚀 Quick Start
 
@@ -39,13 +54,13 @@ az login --use-device-code
 Once deployed, you can break the application using shortcut commands:
 
 ```bash
-# Out of Memory scenario
+# Meter service memory exhaustion during peak demand
 break-oom
 
-# CrashLoopBackOff
+# Asset service crash — invalid grid configuration
 break-crash
 
-# Image Pull failure
+# Dispatch service deployment failure — bad image release
 break-image
 
 # See all scenarios
@@ -64,9 +79,9 @@ After deployment:
 1. **Open the SRE Agent Portal** — the URL is displayed in deployment output, or visit [aka.ms/sreagent/portal](https://aka.ms/sreagent/portal)
 2. **Connect it to your resources** (AKS, Log Analytics)
 3. **Ask it to diagnose**:
-   - "Why are pods crashing in the pets namespace?"
-   - "What's causing high CPU usage?"
-   - "Diagnose the CrashLoopBackOff error"
+   - "Why are pods crashing in the energy namespace?"
+   - "Smart meter data isn't being processed — what's wrong?"
+   - "What's causing high CPU on the grid calculation nodes?"
 
 See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions, or [docs/PROMPTS-GUIDE.md](docs/PROMPTS-GUIDE.md) for a full catalog of prompts to try.
 
@@ -81,18 +96,18 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 
 ## 🔧 Available Scenarios
 
-| Scenario | Description | SRE Agent Diagnoses |
-|----------|-------------|---------------------|
-| OOMKilled | Memory limit too low | Memory exhaustion, limit recommendations |
-| CrashLoop | App exits immediately | Exit codes, log analysis |
-| ImagePullBackOff | Invalid image reference | Registry/image troubleshooting |
-| HighCPU | Resource exhaustion | Performance analysis |
-| PendingPods | Insufficient cluster resources | Scheduling analysis |
-| ProbeFailure | Failing health checks | Probe configuration |
-| NetworkBlock | NetworkPolicy blocking traffic | Connectivity analysis |
-| MissingConfig | Non-existent ConfigMap | Configuration troubleshooting |
-| MongoDBDown | Database offline, cascading failure | Dependency tracing, root cause |
-| ServiceMismatch | Wrong Service selector, silent failure | Endpoint/selector analysis |
+| Scenario | Energy Narrative | SRE Agent Diagnoses |
+|----------|-----------------|---------------------|
+| OOMKilled | Meter service overwhelmed by smart meter data spike | Memory exhaustion, limit recommendations |
+| CrashLoop | Asset service crashes — invalid grid configuration | Exit codes, log analysis |
+| ImagePullBackOff | Dispatch service fails after botched image release | Registry/image troubleshooting |
+| HighCPU | Grid frequency calculation overload during extreme weather | Performance analysis |
+| PendingPods | Substation monitoring pods can't schedule | Scheduling analysis |
+| ProbeFailure | Grid health monitor misconfigured after maintenance | Probe configuration |
+| NetworkBlock | Meter service isolated after security policy update | Connectivity analysis |
+| MissingConfig | Grid zone configuration missing after promotion | Configuration troubleshooting |
+| MongoDBDown | Meter database offline — cascading dispatch failure | Dependency tracing, root cause |
+| ServiceMismatch | Meter service routing failure after "v2 upgrade" | Endpoint/selector analysis |
 
 ## 🛠️ Commands Reference
 
@@ -120,8 +135,8 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 |---------|-------------|
 | `kubectl apply -f k8s/base/application.yaml` | Deploy healthy application |
 | `kubectl apply -f k8s/scenarios/<scenario>.yaml` | Apply a break scenario |
-| `kubectl get pods -n pets` | Check pod status |
-| `kubectl get events -n pets --sort-by='.lastTimestamp'` | View recent events |
+| `kubectl get pods -n energy` | Check pod status |
+| `kubectl get events -n energy --sort-by='.lastTimestamp'` | View recent events |
 
 ## 📚 Documentation
 

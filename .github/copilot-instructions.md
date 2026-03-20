@@ -1,16 +1,30 @@
-# Azure SRE Agent Demo Lab - Copilot Instructions
+# Azure SRE Agent Energy Grid Demo Lab - Copilot Instructions
 
 ## Project Overview
 
-This repository contains a fully automated Azure SRE Agent demo lab environment. It deploys:
+This repository contains a fully automated Azure SRE Agent demo lab environment themed as an **Energy Grid Operations Platform**. It deploys:
 
-- **Azure Kubernetes Service (AKS)** with a multi-pod sample e-commerce application
+- **Azure Kubernetes Service (AKS)** with a multi-pod energy grid platform
 - **Azure Container Registry** for container images
 - **Azure Key Vault** for secrets management
 - **Observability stack**: Log Analytics, Application Insights, Managed Grafana
 - **Breakable scenarios** for demonstrating SRE Agent diagnosis capabilities
 
-The app uses in-cluster MongoDB and RabbitMQ with Azure Managed Disk storage.
+The platform simulates an electric energy producer with grid management and retail consumer services using in-cluster MongoDB and RabbitMQ with Azure Managed Disk storage.
+
+## Energy Grid Architecture
+
+| Service | Role | Technology |
+|---------|------|------------|
+| `grid-dashboard` | Consumer portal (usage, billing, outage maps) | Vue.js |
+| `ops-console` | Grid operations console | Vue.js |
+| `meter-service` | Smart meter data ingestion & billing events | Node.js |
+| `asset-service` | Energy asset catalog (generators, substations, rates) | Rust |
+| `dispatch-service` | Energy dispatch & grid load balancing | Go |
+| `load-simulator` | Retail consumer usage pattern generator | Python |
+| `grid-worker` | Dispatch processing simulator (disabled) | Python |
+| `rabbitmq` | Event bus (meter events, grid alerts, dispatch) | RabbitMQ |
+| `mongodb` | Meter readings, energy transactions, grid state | MongoDB |
 
 ## Technology Stack
 
@@ -46,30 +60,30 @@ Azure SRE Agent is a Preview feature that provides AI-powered site reliability e
 ### SRE Agent Starter Prompts
 
 For AKS issues:
-- "Why are pods crashing in the pets namespace?"
+- "Why are pods crashing in the energy namespace?"
 - "Show me the health status of my AKS cluster"
-- "What's causing high CPU usage on my nodes?"
+- "What's causing high CPU usage on the grid calculation nodes?"
 
 For general diagnosis:
-- "What issues are affecting my application?"
+- "Smart meter data isn't being processed — what's wrong?"
 - "Analyze performance metrics and identify bottlenecks"
 
 ## Breakable Scenarios
 
 Located in `k8s/scenarios/`:
 
-| File | Issue | SRE Agent Can Diagnose |
-|------|-------|----------------------|
-| `oom-killed.yaml` | Memory exhaustion | OOMKilled events, memory limits |
-| `crash-loop.yaml` | Startup failure | CrashLoopBackOff, exit codes |
-| `image-pull-backoff.yaml` | Bad image | Registry/image issues |
-| `high-cpu.yaml` | Resource exhaustion | CPU contention |
-| `pending-pods.yaml` | Insufficient resources | Scheduling issues |
-| `probe-failure.yaml` | Health check failure | Probe configuration |
-| `network-block.yaml` | Connectivity issues | Network policies |
-| `missing-config.yaml` | ConfigMap reference | Configuration issues |
-| `mongodb-down.yaml` | Cascading dependency failure | Dependency tracing, root cause |
-| `service-mismatch.yaml` | Silent networking failure | Endpoint/selector analysis |
+| File | Energy Narrative | SRE Agent Can Diagnose |
+|------|-----------------|----------------------|
+| `oom-killed.yaml` | Meter service overwhelmed by smart meter data spike | OOMKilled events, memory limits |
+| `crash-loop.yaml` | Asset service crash — invalid grid configuration | CrashLoopBackOff, exit codes |
+| `image-pull-backoff.yaml` | Dispatch service fails after botched image release | Registry/image issues |
+| `high-cpu.yaml` | Grid frequency calculation overload | CPU contention |
+| `pending-pods.yaml` | Substation monitor can't schedule | Scheduling issues |
+| `probe-failure.yaml` | Grid health monitor misconfigured | Probe configuration |
+| `network-block.yaml` | Meter service isolated by bad security policy | Network policies |
+| `missing-config.yaml` | Grid zone configuration missing | Configuration issues |
+| `mongodb-down.yaml` | Meter database outage — cascading failure | Dependency tracing, root cause |
+| `service-mismatch.yaml` | Meter service routing failure after "v2 upgrade" | Endpoint/selector analysis |
 
 ## Common Operations
 
@@ -77,8 +91,8 @@ Located in `k8s/scenarios/`:
 Type `menu` in the terminal to see all available commands. Key shortcuts:
 - `deploy` - Deploy infrastructure
 - `destroy` - Tear down infrastructure  
-- `site` - Show store front URL
-- `kgp` - Get pods in pets namespace
+- `site` - Show grid dashboard URL
+- `kgp` - Get pods in energy namespace
 - `break-oom`, `break-crash`, `break-image` - Apply scenarios
 - `break-mongodb` - Cascading database failure
 - `break-service` - Silent networking failure
@@ -127,7 +141,7 @@ kubectl apply -f k8s/base/application.yaml
 ## When Helping with This Project
 
 1. **For Bicep changes**: Follow best practices in `infra/bicep/` patterns
-2. **For K8s manifests**: Use namespace `pets`, label with `sre-demo: breakable`
+2. **For K8s manifests**: Use namespace `energy`, label with `sre-demo: breakable`
 3. **For scripts**: Use PowerShell, include error handling, support `-WhatIf`
 4. **For docs**: Keep formatting consistent, include code examples
 5. **For new scenarios**: Add to `k8s/scenarios/` and update `docs/BREAKABLE-SCENARIOS.md`

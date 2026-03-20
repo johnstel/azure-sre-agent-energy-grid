@@ -1,8 +1,9 @@
 // =============================================================================
 // Alerts Module
 // =============================================================================
-// Deploys baseline Azure Monitor scheduled query alerts for the SRE demo app.
-// These alerts can be connected to action groups for paging/incident workflows.
+// Deploys baseline Azure Monitor scheduled query alerts for the Energy Grid
+// platform. These alerts can be connected to action groups for paging/incident
+// workflows.
 // =============================================================================
 
 @description('Prefix used for alert names')
@@ -18,7 +19,7 @@ param tags object
 param logAnalyticsWorkspaceId string
 
 @description('Application namespace to monitor')
-param appNamespace string = 'pets'
+param appNamespace string = 'energy'
 
 @description('Optional action group resource IDs for alert notifications')
 param actionGroupIds array = []
@@ -27,7 +28,7 @@ var alertActions = {
   actionGroups: actionGroupIds
   customProperties: {
     source: 'azure-sre-agent-sandbox'
-    workload: 'pet-store'
+    workload: 'energy-grid'
   }
 }
 
@@ -37,8 +38,8 @@ resource podRestartAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   tags: tags
   kind: 'LogAlert'
   properties: {
-    displayName: 'Pet Store - Pod restart spike'
-    description: 'Triggers quickly when restart activity is detected in the application namespace.'
+    displayName: 'Energy Grid - Pod restart spike'
+    description: 'Triggers quickly when restart activity is detected in the energy grid namespace.'
     enabled: true
     severity: 2
     scopes: [
@@ -72,8 +73,8 @@ resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   tags: tags
   kind: 'LogAlert'
   properties: {
-    displayName: 'Pet Store - HTTP 5xx spike'
-    description: 'Triggers when 5xx request count increases in App Insights logs.'
+    displayName: 'Energy Grid - HTTP 5xx spike'
+    description: 'Triggers when 5xx request count increases in energy grid App Insights logs.'
     enabled: true
     severity: 1
     scopes: [
@@ -107,8 +108,8 @@ resource podFailureAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   tags: tags
   kind: 'LogAlert'
   properties: {
-    displayName: 'Pet Store - Failed or pending pods'
-    description: 'Triggers quickly when failed or pending pods are detected in the application namespace.'
+    displayName: 'Energy Grid - Failed or pending pods'
+    description: 'Triggers quickly when failed or pending pods are detected in the energy grid namespace.'
     enabled: true
     severity: 2
     scopes: [
@@ -142,8 +143,8 @@ resource crashLoopOomAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' =
   tags: tags
   kind: 'LogAlert'
   properties: {
-    displayName: 'Pet Store - CrashLoop/OOM detected'
-    description: 'Triggers when CrashLoopBackOff or OOM-related Kubernetes events are detected.'
+    displayName: 'Energy Grid - CrashLoop/OOM detected'
+    description: 'Triggers when CrashLoopBackOff or OOM-related Kubernetes events are detected in the energy grid namespace.'
     enabled: true
     severity: 1
     scopes: [

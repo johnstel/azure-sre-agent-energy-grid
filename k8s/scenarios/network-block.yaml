@@ -1,8 +1,8 @@
 # =============================================================================
-# SCENARIO 7: Network Policy Blocking - Service Connectivity Issues
+# SCENARIO 7: Network Policy Blocking - Meter Service Isolated
 # =============================================================================
-# This scenario applies a network policy that blocks all traffic to the
-# order-service, causing connectivity failures.
+# A security policy update gone wrong isolates the meter-service from the
+# grid, blocking all ingress and egress traffic.
 #
 # SRE Agent can diagnose: Network connectivity issues, service unavailable,
 # recommend checking network policies and firewall rules.
@@ -11,21 +11,21 @@
 # kubectl apply -f k8s/scenarios/network-block.yaml
 #
 # HOW TO FIX:
-# kubectl delete networkpolicy deny-order-service -n pets
+# kubectl delete networkpolicy deny-meter-service -n energy
 # =============================================================================
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: deny-order-service
-  namespace: pets
+  name: deny-meter-service
+  namespace: energy
   labels:
     scenario: network-block
     sre-demo: breakable
 spec:
   podSelector:
     matchLabels:
-      app: order-service
+      app: meter-service
   policyTypes:
     - Ingress
     - Egress

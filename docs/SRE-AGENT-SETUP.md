@@ -134,10 +134,10 @@ Once connected, you can interact with SRE Agent using natural language:
 ### Starter Prompts for AKS
 
 - "Show me the health status of my AKS cluster"
-- "Why are pods crashing in the pets namespace?"
+- "Why are pods crashing in the energy namespace?"
 - "What's causing high CPU usage on my nodes?"
 - "List all pods that have restarted in the last hour"
-- "Diagnose the CrashLoopBackOff error for the order-service pod"
+- "Diagnose the CrashLoopBackOff error for the meter-service pod"
 
 ### Starter Prompts for General Diagnosis
 
@@ -158,7 +158,7 @@ Once connected, you can interact with SRE Agent using natural language:
 2. **Wait for pods to crash** (1-2 minutes)
 
 3. **Ask SRE Agent:**
-   > "I'm seeing pods crash in the pets namespace. Can you diagnose the issue?"
+   > "I'm seeing pods crash in the energy namespace. Can you diagnose the issue?"
 
 4. **Expected Response:**
    - SRE Agent will identify OOMKilled events
@@ -178,7 +178,7 @@ Once connected, you can interact with SRE Agent using natural language:
    ```
 
 2. **Ask SRE Agent:**
-   > "The order-service seems to be unreachable. What's blocking traffic?"
+   > "The meter-service seems to be unreachable. What's blocking traffic?"
 
 3. **Expected Response:**
    - Identifies blocking network policy

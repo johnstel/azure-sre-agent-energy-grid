@@ -1,42 +1,42 @@
 # =============================================================================
-# AKS Store Demo - Base Application Deployment
+# Energy Grid Platform - Base Application Deployment
 # =============================================================================
-# This is the healthy baseline deployment of the AKS Store Demo application.
-# Based on Azure-Samples/aks-store-demo
+# This is the healthy baseline deployment of the Energy Grid Operations
+# Platform for demonstrating Azure SRE Agent diagnosis capabilities.
 #
 # Architecture:
-# - store-front: Vue.js customer-facing website
-# - store-admin: Vue.js admin panel
-# - order-service: Node.js order processing
-# - product-service: Rust-based product catalog
-# - makeline-service: Go order fulfillment
-# - ai-service: Python AI recommendations (optional)
-# - virtual-customer: Load generator
-# - virtual-worker: Order processor simulator
+# - grid-dashboard: Vue.js consumer portal (usage, billing, outage maps)
+# - ops-console: Vue.js grid operations console
+# - meter-service: Node.js smart meter data ingestion
+# - asset-service: Rust-based energy asset catalog
+# - dispatch-service: Go energy dispatch and load balancing
+# - forecast-service: Python energy demand forecasting (optional)
+# - load-simulator: Retail consumer usage pattern generator
+# - grid-worker: Dispatch processing simulator
 #
 # Data Services (in-cluster):
-# - rabbitmq: Message queue
-# - mongodb: Database
+# - rabbitmq: Event bus (meter events, grid alerts, dispatch commands)
+# - mongodb: Meter readings, energy transactions, grid state
 # =============================================================================
 
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: pets
+  name: energy
   labels:
-    app.kubernetes.io/part-of: aks-store-demo
+    app.kubernetes.io/part-of: energy-grid-demo
     sre-agent-demo: "true"
 
 ---
 # =============================================================================
-# RabbitMQ - Message Queue
+# RabbitMQ - Event Bus (meter events, grid alerts, dispatch commands)
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: rabbitmq
-  namespace: pets
+  namespace: energy
   labels:
     app: rabbitmq
 spec:
@@ -91,7 +91,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: rabbitmq
-  namespace: pets
+  namespace: energy
 spec:
   selector:
     app: rabbitmq
@@ -105,13 +105,13 @@ spec:
 
 ---
 # =============================================================================
-# MongoDB - Database Storage (Azure Managed Disk via CSI driver)
+# MongoDB - Meter Data Storage (Azure Managed Disk via CSI driver)
 # =============================================================================
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: mongodb-data-pvc
-  namespace: pets
+  namespace: energy
   labels:
     app: mongodb
 spec:
@@ -124,13 +124,13 @@ spec:
 
 ---
 # =============================================================================
-# MongoDB - Database
+# MongoDB - Meter Database
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mongodb
-  namespace: pets
+  namespace: energy
   labels:
     app: mongodb
 spec:
@@ -170,7 +170,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mongodb
-  namespace: pets
+  namespace: energy
 spec:
   selector:
     app: mongodb
@@ -180,29 +180,29 @@ spec:
 
 ---
 # =============================================================================
-# Product Service - Rust-based product catalog API
+# Asset Service - Rust-based energy asset catalog API
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: product-service
-  namespace: pets
+  name: asset-service
+  namespace: energy
   labels:
-    app: product-service
+    app: asset-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: product-service
+      app: asset-service
   template:
     metadata:
       labels:
-        app: product-service
+        app: asset-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: product-service
+        - name: asset-service
           image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
           ports:
             - containerPort: 3002
@@ -215,7 +215,7 @@ spec:
               cpu: "100m"
           env:
             - name: AI_SERVICE_URL
-              value: "http://ai-service:5001/"
+              value: "http://forecast-service:5001/"
           livenessProbe:
             httpGet:
               path: /health
@@ -233,40 +233,40 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: product-service
-  namespace: pets
+  name: asset-service
+  namespace: energy
 spec:
   selector:
-    app: product-service
+    app: asset-service
   ports:
     - port: 3002
       targetPort: 3002
 
 ---
 # =============================================================================
-# Order Service - Node.js order processing API
+# Meter Service - Node.js smart meter data ingestion API
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-service
-  namespace: pets
+  name: meter-service
+  namespace: energy
   labels:
-    app: order-service
+    app: meter-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: order-service
+      app: meter-service
   template:
     metadata:
       labels:
-        app: order-service
+        app: meter-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: order-service
+        - name: meter-service
           image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
           ports:
             - containerPort: 3000
@@ -287,7 +287,7 @@ spec:
             - name: ORDER_QUEUE_PASSWORD
               value: "guest"
             - name: ORDER_QUEUE_NAME
-              value: "orders"
+              value: "meter-events"
             - name: FASTIFY_ADDRESS
               value: "0.0.0.0"
           livenessProbe:
@@ -307,40 +307,40 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: order-service
-  namespace: pets
+  name: meter-service
+  namespace: energy
 spec:
   selector:
-    app: order-service
+    app: meter-service
   ports:
     - port: 3000
       targetPort: 3000
 
 ---
 # =============================================================================
-# Makeline Service - Go order fulfillment processor
+# Dispatch Service - Go energy dispatch and load balancing
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: makeline-service
-  namespace: pets
+  name: dispatch-service
+  namespace: energy
   labels:
-    app: makeline-service
+    app: dispatch-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: makeline-service
+      app: dispatch-service
   template:
     metadata:
       labels:
-        app: makeline-service
+        app: dispatch-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: makeline-service
+        - name: dispatch-service
           image: ghcr.io/azure-samples/aks-store-demo/makeline-service:latest
           ports:
             - containerPort: 3001
@@ -359,13 +359,13 @@ spec:
             - name: ORDER_QUEUE_PASSWORD
               value: "guest"
             - name: ORDER_QUEUE_NAME
-              value: "orders"
+              value: "meter-events"
             - name: ORDER_DB_URI
               value: "mongodb://mongodb:27017"
             - name: ORDER_DB_NAME
-              value: "orderdb"
+              value: "energydb"
             - name: ORDER_DB_COLLECTION_NAME
-              value: "orders"
+              value: "meter_readings"
           livenessProbe:
             httpGet:
               path: /health
@@ -383,40 +383,40 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: makeline-service
-  namespace: pets
+  name: dispatch-service
+  namespace: energy
 spec:
   selector:
-    app: makeline-service
+    app: dispatch-service
   ports:
     - port: 3001
       targetPort: 3001
 
 ---
 # =============================================================================
-# Store Front - Vue.js customer website
+# Grid Dashboard - Vue.js consumer portal
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: store-front
-  namespace: pets
+  name: grid-dashboard
+  namespace: energy
   labels:
-    app: store-front
+    app: grid-dashboard
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: store-front
+      app: grid-dashboard
   template:
     metadata:
       labels:
-        app: store-front
+        app: grid-dashboard
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: store-front
+        - name: grid-dashboard
           image: ghcr.io/azure-samples/aks-store-demo/store-front:latest
           ports:
             - containerPort: 8080
@@ -429,9 +429,9 @@ spec:
               cpu: "100m"
           env:
             - name: VUE_APP_ORDER_SERVICE_URL
-              value: "http://order-service:3000/"
+              value: "http://meter-service:3000/"
             - name: VUE_APP_PRODUCT_SERVICE_URL
-              value: "http://product-service:3002/"
+              value: "http://asset-service:3002/"
           livenessProbe:
             httpGet:
               path: /health
@@ -449,41 +449,41 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: store-front
-  namespace: pets
+  name: grid-dashboard
+  namespace: energy
 spec:
   type: LoadBalancer
   selector:
-    app: store-front
+    app: grid-dashboard
   ports:
     - port: 80
       targetPort: 8080
 
 ---
 # =============================================================================
-# Store Admin - Vue.js admin panel
+# Ops Console - Vue.js grid operations console
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: store-admin
-  namespace: pets
+  name: ops-console
+  namespace: energy
   labels:
-    app: store-admin
+    app: ops-console
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: store-admin
+      app: ops-console
   template:
     metadata:
       labels:
-        app: store-admin
+        app: ops-console
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: store-admin
+        - name: ops-console
           image: ghcr.io/azure-samples/aks-store-demo/store-admin:latest
           ports:
             - containerPort: 8081
@@ -496,9 +496,9 @@ spec:
               cpu: "100m"
           env:
             - name: VUE_APP_PRODUCT_SERVICE_URL
-              value: "http://product-service:3002/"
+              value: "http://asset-service:3002/"
             - name: VUE_APP_MAKELINE_SERVICE_URL
-              value: "http://makeline-service:3001/"
+              value: "http://dispatch-service:3001/"
           livenessProbe:
             httpGet:
               path: /health
@@ -516,41 +516,41 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: store-admin
-  namespace: pets
+  name: ops-console
+  namespace: energy
 spec:
   type: LoadBalancer
   selector:
-    app: store-admin
+    app: ops-console
   ports:
     - port: 80
       targetPort: 8081
 
 ---
 # =============================================================================
-# Virtual Customer - Load generator for testing
+# Load Simulator - Retail consumer usage pattern generator
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: virtual-customer
-  namespace: pets
+  name: load-simulator
+  namespace: energy
   labels:
-    app: virtual-customer
+    app: load-simulator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: virtual-customer
+      app: load-simulator
   template:
     metadata:
       labels:
-        app: virtual-customer
+        app: load-simulator
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: virtual-customer
+        - name: load-simulator
           image: ghcr.io/azure-samples/aks-store-demo/virtual-customer:latest
           resources:
             requests:
@@ -561,35 +561,35 @@ spec:
               cpu: "50m"
           env:
             - name: ORDER_SERVICE_URL
-              value: "http://order-service:3000/"
+              value: "http://meter-service:3000/"
             - name: ORDERS_PER_HOUR
               value: "100"
 
 ---
 # =============================================================================
-# Virtual Worker - Order processor simulator (disabled by default due to AMQP compatibility)
+# Grid Worker - Dispatch processing simulator (disabled by default)
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: virtual-worker
-  namespace: pets
+  name: grid-worker
+  namespace: energy
   labels:
-    app: virtual-worker
+    app: grid-worker
 spec:
   replicas: 0 # Disabled: AMQP protocol mismatch with RabbitMQ 3.11
   selector:
     matchLabels:
-      app: virtual-worker
+      app: grid-worker
   template:
     metadata:
       labels:
-        app: virtual-worker
+        app: grid-worker
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: virtual-worker
+        - name: grid-worker
           image: ghcr.io/azure-samples/aks-store-demo/virtual-worker:latest
           resources:
             requests:
@@ -600,6 +600,6 @@ spec:
               cpu: "50m"
           env:
             - name: MAKELINE_SERVICE_URL
-              value: "http://makeline-service:3001"
+              value: "http://dispatch-service:3001"
             - name: ORDERS_PER_HOUR
               value: "100"

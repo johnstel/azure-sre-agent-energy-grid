@@ -1,13 +1,12 @@
 # =============================================================================
-# SCENARIO 9: MongoDB Down - Cascading Dependency Failure
+# SCENARIO 9: MongoDB Down - Meter Database Outage (Cascading Failure)
 # =============================================================================
-# This scenario scales MongoDB to 0 replicas, simulating a database outage.
-# Since makeline-service depends on MongoDB for order storage, it will start
-# failing health checks and become unavailable. Orders can still be placed
-# (they queue in RabbitMQ) but are never fulfilled.
+# The meter database goes offline, causing cascading failures:
+# dispatch-service can't process readings, meter data queues in RabbitMQ
+# indefinitely. New readings can still be submitted but never processed.
 #
 # This is the most realistic scenario because it requires SRE Agent to trace
-# the dependency chain: makeline-service → MongoDB → scaled to 0.
+# the dependency chain: dispatch-service → MongoDB → scaled to 0.
 #
 # SRE Agent can diagnose: Dependency failures, cascading impact, service
 # health correlation, and recommend scaling MongoDB back up.
@@ -23,13 +22,13 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mongodb
-  namespace: pets
+  namespace: energy
   labels:
     app: mongodb
     scenario: mongodb-down
     sre-demo: breakable
 spec:
-  # BREAKING CHANGE: Scale to 0 replicas - database goes offline
+  # BREAKING CHANGE: Scale to 0 replicas - meter database goes offline
   replicas: 0
   strategy:
     type: Recreate

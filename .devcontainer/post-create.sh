@@ -8,7 +8,7 @@
 
 set -e
 
-echo "🔧 Setting up Azure SRE Agent Demo Lab dev container..."
+echo "🔧 Setting up Azure Energy Grid SRE Demo Lab dev container..."
 
 # Install additional tools
 echo "📦 Installing additional tools..."
@@ -55,11 +55,11 @@ EOF
 echo "📝 Setting up shell aliases..."
 cat >> ~/.bashrc << 'EOF'
 
-# Azure SRE Agent Demo Lab aliases
+# Azure Energy Grid SRE Demo Lab aliases
 alias k='kubectl'
-alias kgp='kubectl get pods -n pets'
-alias kgs='kubectl get svc -n pets'
-alias kgd='kubectl get deployments -n pets'
+alias kgp='kubectl get pods -n energy'
+alias kgs='kubectl get svc -n energy'
+alias kgd='kubectl get deployments -n energy'
 alias kgn='kubectl get namespaces'
 alias kd='kubectl describe'
 alias kl='kubectl logs'
@@ -90,35 +90,35 @@ alias break-service='kubectl apply -f k8s/scenarios/service-mismatch.yaml'
 
 # Fix commands
 alias fix-all='kubectl apply -f k8s/base/application.yaml'
-alias fix-network='kubectl delete networkpolicy deny-order-service -n pets 2>/dev/null'
-alias fix-extras='kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n pets 2>/dev/null'
+alias fix-network='kubectl delete networkpolicy deny-meter-service -n energy 2>/dev/null'
+alias fix-extras='kubectl delete deployment frequency-calc-overload substation-monitor grid-health-monitor grid-zone-config -n energy 2>/dev/null'
 
 # Site URL command
-alias site='echo "Store Front: http://$(kubectl get svc store-front -n pets -o jsonpath=\"{.status.loadBalancer.ingress[0].ip}\" 2>/dev/null || echo "pending...")"'
+alias site='echo "Grid Dashboard: http://$(kubectl get svc grid-dashboard -n energy -o jsonpath="{.status.loadBalancer.ingress[0].ip}" 2>/dev/null || echo "pending...")"'
 # SRE Agent portal
 alias sre-agent='echo "SRE Agent Portal: https://aka.ms/sreagent/portal"'
 # Helpful functions
 function kwatch() {
-    kubectl get pods -n ${1:-pets} -w
+    kubectl get pods -n ${1:-energy} -w
 }
 
 function klogs() {
-    kubectl logs -n ${2:-pets} -l app=$1 -f
+    kubectl logs -n ${2:-energy} -l app=$1 -f
 }
 EOF
 
 # Same for PowerShell
 mkdir -p ~/.config/powershell
 cat > ~/.config/powershell/Microsoft.PowerShell_profile.ps1 << 'EOF'
-# Azure SRE Agent Demo Lab PowerShell Profile
+# Azure Energy Grid SRE Demo Lab PowerShell Profile
 
 # Aliases
 Set-Alias -Name k -Value kubectl
 
 # Functions
-function kgp { kubectl get pods -n pets @args }
-function kgs { kubectl get svc -n pets @args }
-function kgd { kubectl get deployments -n pets @args }
+function kgp { kubectl get pods -n energy @args }
+function kgs { kubectl get svc -n energy @args }
+function kgd { kubectl get deployments -n energy @args }
 function kgn { kubectl get namespaces @args }
 
 # Demo commands
@@ -147,14 +147,14 @@ function break-config { kubectl apply -f k8s/scenarios/missing-config.yaml }
 function break-mongodb { kubectl apply -f k8s/scenarios/mongodb-down.yaml }
 function break-service { kubectl apply -f k8s/scenarios/service-mismatch.yaml }
 function fix-all { kubectl apply -f k8s/base/application.yaml }
-function fix-network { kubectl delete networkpolicy deny-order-service -n pets 2>$null }
-function fix-extras { kubectl delete deployment cpu-stress-test resource-hog unhealthy-service misconfigured-service -n pets 2>$null }
+function fix-network { kubectl delete networkpolicy deny-meter-service -n energy 2>$null }
+function fix-extras { kubectl delete deployment frequency-calc-overload substation-monitor grid-health-monitor grid-zone-config -n energy 2>$null }
 
 # Site URL command  
 function site { 
-    $ip = kubectl get svc store-front -n pets -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
-    if ($ip) { Write-Host "Store Front: http://$ip" -ForegroundColor Green } 
-    else { Write-Host "Store Front IP not ready yet..." -ForegroundColor Yellow }
+    $ip = kubectl get svc grid-dashboard -n energy -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+    if ($ip) { Write-Host "Grid Dashboard: http://$ip" -ForegroundColor Green } 
+    else { Write-Host "Grid Dashboard IP not ready yet..." -ForegroundColor Yellow }
 }
 
 # SRE Agent portal
@@ -167,25 +167,25 @@ function menu {
     Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    Azure SRE Agent Demo Lab                                   ║
+║                    Azure Energy Grid SRE Demo Lab                              ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  Commands:                                                                   ║
 ║    az login --use-device-code  - Login to Azure                              ║
 ║    deploy                      - Deploy the infrastructure                   ║
 ║    destroy                     - Tear down the infrastructure                ║
-║    site                        - Show the store front URL                    ║
+║    site                        - Show the grid dashboard URL                 ║
 ║    sre-agent                   - Show SRE Agent portal URL                   ║
 ║    menu                        - Show this help menu                         ║
 ║                                                                              ║
-║  Kubernetes Shortcuts (default namespace: pets):                             ║
+║  Kubernetes Shortcuts (default namespace: energy):                            ║
 ║    kgp, kgs, kgd               - Get pods/services/deployments               ║
 ║                                                                              ║
 ║  Break Scenarios:                                                            ║
-║    break-oom                   - OOMKilled (order-service)                   ║
-║    break-crash                 - CrashLoopBackOff (product-service)          ║
-║    break-image                 - ImagePullBackOff (makeline-service)         ║
-║    break-cpu                   - High CPU (new stress pod)                   ║
-║    break-pending               - Pending pods (insufficient resources)       ║
+║    break-oom                   - OOMKilled (meter-service)                   ║
+║    break-crash                 - CrashLoopBackOff (asset-service)            ║
+║    break-image                 - ImagePullBackOff (dispatch-service)         ║
+║    break-cpu                   - High CPU (grid frequency overload)          ║
+║    break-pending               - Pending pods (substation monitor)           ║
 ║    break-probe                 - Liveness probe failure                      ║
 ║    break-network               - Network policy blocking                     ║
 ║    break-config                - Missing ConfigMap                           ║

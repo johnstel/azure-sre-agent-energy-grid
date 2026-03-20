@@ -1,6 +1,6 @@
 # SRE Agent Prompt Library
 
-A comprehensive collection of prompts for Azure SRE Agent, organized by SRE discipline. Use these during demos, day-to-day operations, or to explore what SRE Agent can do.
+A comprehensive collection of prompts for Azure SRE Agent, organized by SRE discipline. Use these during energy grid demos, day-to-day operations, or to explore what SRE Agent can do.
 
 > **Tip:** Start with open-ended prompts and let SRE Agent guide the investigation. Follow up with targeted prompts to drill deeper.
 
@@ -30,8 +30,8 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 |--------|-------------|
 | "Something is wrong with my application. Can you investigate?" | Great starting point — lets SRE Agent discover issues on its own |
 | "Are there any unhealthy resources in my resource group?" | Broad sweep across all Azure resources, not just AKS |
-| "Which pods in the pets namespace are not in a Running state?" | Quick status check across all workloads |
-| "Show me all warning and error events in the pets namespace from the last 30 minutes" | Event-level triage when you know something recently broke |
+| "Which pods in the energy namespace are not in a Running state?" | Quick status check across all workloads |
+| "Show me all warning and error events in the energy namespace from the last 30 minutes" | Event-level triage when you know something recently broke |
 | "Are there any failed deployments or rollouts in progress?" | Catch stuck rollouts or partial updates |
 
 ### Pod-Level Diagnosis
@@ -40,19 +40,19 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 |--------|-------------|
 | "Why is [pod-name] in CrashLoopBackOff?" | Direct pod investigation |
 | "Show me the logs for pods that have restarted in the last hour" | Correlate restarts with log output |
-| "What's the exit code and termination reason for the last failed container in order-service?" | Precise failure details |
+| "What's the exit code and termination reason for the last failed container in meter-service?" | Precise failure details |
 | "Are any init containers failing across my deployments?" | Init container issues are easy to miss |
-| "Compare the running pod spec for order-service to its deployment spec — are there any drift issues?" | Detect manual overrides or config drift |
+| "Compare the running pod spec for meter-service to its deployment spec — are there any drift issues?" | Detect manual overrides or config drift |
 
 ### Networking Issues
 
 | Prompt | When to Use |
 |--------|-------------|
-| "Can store-front reach order-service on port 3000?" | Validate service-to-service connectivity |
-| "Are there any network policies blocking traffic in the pets namespace?" | Surface overly restrictive policies |
-| "Why does the order-service Service have zero endpoints?" | Diagnose selector/label mismatches |
+| "Can grid-dashboard reach meter-service on port 3000?" | Validate service-to-service connectivity |
+| "Are there any network policies blocking traffic in the energy namespace?" | Surface overly restrictive policies |
+| "Why does the meter-service Service have zero endpoints?" | Diagnose selector/label mismatches |
 | "Show me DNS resolution results for mongodb inside the cluster" | Troubleshoot service discovery |
-| "Trace the network path from the store-front ingress to the backend services" | End-to-end connectivity map |
+| "Trace the network path from the grid-dashboard ingress to the backend services" | End-to-end connectivity map |
 
 ### Storage & Volume Issues
 
@@ -80,8 +80,8 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 
 | Prompt | When to Use |
 |--------|-------------|
-| "What's the current CPU and memory utilization for each pod in the pets namespace?" | Real-time resource snapshot |
-| "Show me the request latency trends for store-front over the last 6 hours" | Application-level performance |
+| "What's the current CPU and memory utilization for each pod in the energy namespace?" | Real-time resource snapshot |
+| "Show me the request latency trends for grid-dashboard over the last 6 hours" | Application-level performance |
 | "What are the most common exceptions in Application Insights for my app?" | Error pattern analysis |
 | "Are there any pods consistently running above 80% of their resource limits?" | About-to-break detection |
 | "Show me container restart counts and trends over the last 24 hours" | Stability trending |
@@ -90,7 +90,7 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 
 | Prompt | When to Use |
 |--------|-------------|
-| "Query the last 50 error-level logs from the order-service container" | Targeted log retrieval |
+| "Query the last 50 error-level logs from the meter-service container" | Targeted log retrieval |
 | "Search Application Insights for any 5xx responses in the last hour" | HTTP error investigation |
 | "Show me log volume trends — are any services producing an unusual amount of logs?" | Log storm detection |
 | "Correlate pod restart events with error logs from the same time window" | Root cause correlation |
@@ -147,7 +147,7 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 | "What would happen if I lost one node — would my pods still fit?" | Failure resilience planning |
 | "Are my resource requests and limits set appropriately based on actual usage?" | Right-sizing recommendations |
 | "Show me the ratio of requested resources vs. actual usage for each deployment" | Over-provisioning detection |
-| "Would scaling product-service to 5 replicas fit on the current nodes?" | Pre-scale feasibility check |
+| "Would scaling asset-service to 5 replicas fit on the current nodes?" | Pre-scale feasibility check |
 | "What's the trend in resource utilization over the past week? Am I growing?" | Growth trajectory |
 | "Recommend node pool sizing for my current workload" | Infrastructure right-sizing |
 
@@ -157,14 +157,14 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 
 | Prompt | When to Use |
 |--------|-------------|
-| "Are any containers running as root in the pets namespace?" | Security posture check |
+| "Are any containers running as root in the energy namespace?" | Security posture check |
 | "Check if any pods have containers with privilege escalation enabled" | Privilege audit |
 | "Are there any containers running without resource limits set?" | Best practice enforcement |
-| "Show me the RBAC roles and bindings in the pets namespace" | Access control review |
+| "Show me the RBAC roles and bindings in the energy namespace" | Access control review |
 | "Are any of my container images using the 'latest' tag?" | Image tagging best practice |
 | "Do any pods have host network or host PID access?" | Host-level access audit |
 | "Are my secrets stored in Kubernetes Secrets or referenced from Key Vault?" | Secrets management review |
-| "Check if network policies exist for all services in the pets namespace" | Network segmentation audit |
+| "Check if network policies exist for all services in the energy namespace" | Network segmentation audit |
 
 ---
 
@@ -174,10 +174,10 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 |--------|-------------|
 | "What changed in my cluster in the last 10 minutes?" | Post-change verification |
 | "Were any deployments modified or restarted recently?" | Trace a specific change |
-| "Show me the rollout history for order-service" | Deployment version tracking |
-| "Is the latest rollout for product-service complete and healthy?" | Rollout status check |
+| "Show me the rollout history for meter-service" | Deployment version tracking |
+| "Is the latest rollout for asset-service complete and healthy?" | Rollout status check |
 | "What image versions are running vs. what's defined in the deployment spec?" | Image version drift |
-| "Compare the current order-service deployment to the previous revision" | Diff between revisions |
+| "Compare the current meter-service deployment to the previous revision" | Diff between revisions |
 
 ---
 
@@ -187,7 +187,7 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 |--------|-------------|
 | "Which service has the highest response latency right now?" | Latency hotspot detection |
 | "Is there any CPU throttling happening on my pods?" | Throttling detection |
-| "Analyze the request throughput for store-front — is it within normal range?" | Traffic anomaly detection |
+| "Analyze the request throughput for grid-dashboard — is it within normal range?" | Traffic anomaly detection |
 | "Are there any pods that are being CPU-throttled due to low limits?" | Resource constraint impact |
 | "Show me the p95 and p99 latency for my application endpoints" | Tail latency analysis |
 | "My application is slow. Identify the bottleneck — is it CPU, memory, network, or disk?" | Performance triage |
@@ -199,7 +199,7 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 
 | Prompt | When to Use |
 |--------|-------------|
-| "Map out the service dependencies in the pets namespace" | Service topology discovery |
+| "Map out the service dependencies in the energy namespace" | Service topology discovery |
 | "Is MongoDB healthy and accepting connections?" | Database dependency check |
 | "Is RabbitMQ running and are queues being consumed?" | Message broker health |
 | "Which services depend on MongoDB and how would they be affected if it went down?" | Blast radius analysis |
@@ -214,14 +214,14 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 
 | Prompt | What It Does |
 |--------|-------------|
-| "Restart the order-service pods" | Rolling restart of a deployment |
-| "Scale product-service to 3 replicas" | Horizontal scaling |
-| "Delete the cpu-stress-test deployment" | Remove rogue/test workloads |
-| "Remove the deny-order-service network policy" | Unblock network traffic |
+| "Restart the meter-service pods" | Rolling restart of a deployment |
+| "Scale asset-service to 3 replicas" | Horizontal scaling |
+| "Delete the frequency-calc-overload deployment" | Remove rogue/test workloads |
+| "Remove the deny-meter-service network policy" | Unblock network traffic |
 | "Scale the mongodb deployment back to 1 replica" | Restore a dependency |
-| "Roll back the order-service deployment to the previous revision" | Deployment rollback |
+| "Roll back the meter-service deployment to the previous revision" | Deployment rollback |
 | "Cordon the unhealthy node and drain its workloads" | Node maintenance |
-| "Increase the memory limit for order-service to 256Mi" | Resource limit adjustment |
+| "Increase the memory limit for meter-service to 256Mi" | Resource limit adjustment |
 | "Apply the healthy configuration from k8s/base/application.yaml" | Full state restoration |
 
 ---
@@ -233,7 +233,7 @@ Use these prompts in the **Subagent builder** to set up recurring checks:
 | Prompt | Schedule | Purpose |
 |--------|----------|---------|
 | "Check AKS cluster health and alert if any node is NotReady" | Every 15 min | Node health monitoring |
-| "Monitor pod restarts in pets namespace — alert if any pod restarts more than 3 times in an hour" | Every 15 min | Restart anomaly detection |
+| "Monitor pod restarts in energy namespace — alert if any pod restarts more than 3 times in an hour" | Every 15 min | Restart anomaly detection |
 | "Run a daily capacity report and flag if any node exceeds 80% CPU or memory" | Daily at 8 AM | Capacity monitoring |
 | "Check for any pods in CrashLoopBackOff or ImagePullBackOff every 30 minutes" | Every 30 min | Failure state detection |
 | "Generate a weekly SRE report summarizing incidents, restarts, and resource trends" | Weekly on Monday | Operational summary |
@@ -247,10 +247,10 @@ Great for demos where the audience may not know Kubernetes terminology:
 
 | Prompt | Why It Works |
 |--------|-------------|
-| "My website is broken" | SRE Agent discovers what "broken" means |
-| "Customers are complaining that checkout is slow" | Business-language → technical diagnosis |
+| "The grid dashboard is broken" | SRE Agent discovers what "broken" means |
+| "Consumers are complaining that billing is slow" | Business-language → technical diagnosis |
 | "We deployed something an hour ago and now things are bad" | Change correlation from a human perspective |
-| "Is my app ready for a big product launch tomorrow?" | Capacity + health in business terms |
+| "Is my energy grid platform ready for peak summer demand?" | Capacity + health in business terms |
 | "Help me understand why my costs went up this month" | Bridges SRE and FinOps |
 | "I'm new to this cluster — give me a tour" | Onboarding/knowledge transfer |
 | "What should I be worried about right now?" | Proactive risk assessment |
@@ -260,8 +260,8 @@ Great for demos where the audience may not know Kubernetes terminology:
 
 ## Pro Tips
 
-1. **Layer your prompts** — Start broad ("what's wrong?"), then narrow ("why is order-service failing?"), then act ("restart order-service")
-2. **Use business language** — SRE Agent translates "checkout is slow" into pod metrics and traces
+1. **Layer your prompts** — Start broad ("what's wrong with the grid?"), then narrow ("why is meter-service failing?"), then act ("restart meter-service")
+2. **Use business language** — SRE Agent translates "billing is slow" into pod metrics and traces
 3. **Ask "why" not "what"** — "Why is this pod restarting?" yields better insight than "show me pod status"
 4. **Request timelines** — "When did this start?" helps SRE Agent correlate events
 5. **Combine signals** — "Correlate the pod restarts with CPU spikes and any recent deployments" gets multi-signal analysis

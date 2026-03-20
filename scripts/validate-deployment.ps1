@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Validates that the Azure SRE Agent Demo Lab deployment is healthy.
+    Validates that the Azure SRE Agent Energy Grid Demo Lab deployment is healthy.
 
 .DESCRIPTION
     This script checks:
@@ -59,7 +59,7 @@ function Write-Section {
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                   Azure SRE Agent Demo Lab - Validation                      ║
+║                   Azure Energy Grid SRE Demo Lab - Validation                ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║  Checking deployment health and readiness...                                 ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -178,12 +178,12 @@ if (Write-Check "All nodes are Ready" ($healthyNodes -eq $totalNodes) "$healthyN
 # =============================================================================
 # APPLICATION HEALTH
 # =============================================================================
-Write-Section "Demo Application (pets namespace)"
+Write-Section "Energy Grid Application (energy namespace)"
 
 # Check if namespace exists
-$namespace = kubectl get namespace pets -o json 2>$null | ConvertFrom-Json
+$namespace = kubectl get namespace energy -o json 2>$null | ConvertFrom-Json
 $totalChecks++
-if (Write-Check "Namespace 'pets' exists" ($null -ne $namespace)) {
+if (Write-Check "Namespace 'energy' exists" ($null -ne $namespace)) {
     $passedChecks++
 }
 else {
@@ -192,7 +192,7 @@ else {
 
 # Check pods
 if ($namespace) {
-    $pods = kubectl get pods -n pets -o json 2>$null | ConvertFrom-Json
+    $pods = kubectl get pods -n energy -o json 2>$null | ConvertFrom-Json
     
     if ($pods.items.Count -gt 0) {
         Write-Host "`n  Pod Status:" -ForegroundColor White
@@ -221,14 +221,14 @@ if ($namespace) {
         Write-Host "`n  Summary: $runningPods/$($pods.items.Count) pods running" -ForegroundColor $(if ($runningPods -eq $pods.items.Count) { "Green" } else { "Yellow" })
     }
     else {
-        Write-Host "  ⚠️  No pods found in 'pets' namespace" -ForegroundColor Yellow
+        Write-Host "  ⚠️  No pods found in 'energy' namespace" -ForegroundColor Yellow
         Write-Host "     Run: kubectl apply -f k8s/base/application.yaml" -ForegroundColor Gray
     }
 }
 
 # Check services
 Write-Host "`n  Services:" -ForegroundColor White
-$services = kubectl get svc -n pets -o json 2>$null | ConvertFrom-Json
+$services = kubectl get svc -n energy -o json 2>$null | ConvertFrom-Json
 
 foreach ($svc in $services.items) {
     $svcName = $svc.metadata.name
@@ -258,15 +258,15 @@ foreach ($svc in $services.items) {
     }
 }
 
-# Check for store-front LoadBalancer specifically
-$storeFrontSvc = $services.items | Where-Object { $_.metadata.name -eq "store-front" }
+# Check for grid-dashboard LoadBalancer specifically
+$storeFrontSvc = $services.items | Where-Object { $_.metadata.name -eq "grid-dashboard" }
 if ($storeFrontSvc -and $storeFrontSvc.spec.type -eq "LoadBalancer") {
     $externalIP = $null
     if ($storeFrontSvc.status.loadBalancer.ingress -and $storeFrontSvc.status.loadBalancer.ingress.Count -gt 0) {
         $externalIP = $storeFrontSvc.status.loadBalancer.ingress[0].ip
     }
     if ($externalIP) {
-        Write-Host "`n  🌐 Store Front URL: http://$externalIP" -ForegroundColor Cyan
+        Write-Host "`n  🌐 Grid Dashboard URL: http://$externalIP" -ForegroundColor Cyan
     }
 }
 
@@ -328,8 +328,8 @@ else {
 
 Common fixes:
 - Deploy application: kubectl apply -f k8s/base/application.yaml
-- Wait for pods: kubectl get pods -n pets -w
-- Check events: kubectl get events -n pets --sort-by='.lastTimestamp'
+- Wait for pods: kubectl get pods -n energy -w
+- Check events: kubectl get events -n energy --sort-by='.lastTimestamp'
 
 "@ -ForegroundColor Yellow
 }

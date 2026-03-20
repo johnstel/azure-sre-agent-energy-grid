@@ -1,7 +1,8 @@
 # =============================================================================
-# SCENARIO 8: ConfigMap Misconfiguration - Missing Configuration
+# SCENARIO 8: Missing ConfigMap - Grid Zone Configuration Missing
 # =============================================================================
-# This scenario references a non-existent ConfigMap, preventing pod startup.
+# Grid zone configuration is missing after an environment promotion,
+# preventing the pod from starting.
 #
 # SRE Agent can diagnose: Pod failing to start due to missing ConfigMap,
 # recommend creating the required ConfigMap or fixing the reference.
@@ -10,27 +11,27 @@
 # kubectl apply -f k8s/scenarios/missing-config.yaml
 #
 # HOW TO FIX:
-# kubectl delete deployment misconfigured-service -n pets
+# kubectl delete deployment grid-zone-config -n energy
 # =============================================================================
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: misconfigured-service
-  namespace: pets
+  name: grid-zone-config
+  namespace: energy
   labels:
-    app: misconfigured-service
+    app: grid-zone-config
     scenario: missing-config
     sre-demo: breakable
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: misconfigured-service
+      app: grid-zone-config
   template:
     metadata:
       labels:
-        app: misconfigured-service
+        app: grid-zone-config
         scenario: missing-config
     spec:
       nodeSelector:

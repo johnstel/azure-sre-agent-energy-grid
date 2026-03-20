@@ -1,7 +1,7 @@
 // =============================================================================
-// Azure SRE Agent Demo Lab - Main Bicep Template
+// Azure SRE Agent Energy Grid Demo Lab - Main Bicep Template
 // =============================================================================
-// This template deploys an AKS cluster with a multi-pod sample application,
+// This template deploys an AKS cluster with a multi-pod energy grid platform,
 // along with supporting infrastructure for demonstrating Azure SRE Agent
 // capabilities for diagnostics and troubleshooting.
 // =============================================================================
@@ -81,10 +81,10 @@ param userNodeCount int = 3
 
 @description('Tags to apply to all resources')
 param tags object = {
-  workload: 'sre-agent-demo'
+  workload: 'energy-grid-demo'
   environment: 'sandbox'
   managedBy: 'bicep'
-  purpose: 'demonstration'
+  purpose: 'energy-sre-demo'
 }
 
 // =============================================================================
@@ -255,7 +255,7 @@ module alerts 'modules/alerts.bicep' = if (deployAlerts) {
     location: location
     tags: tags
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
-    appNamespace: 'pets'
+    appNamespace: 'energy'
     actionGroupIds: effectiveAlertActionGroupIds
   }
 }

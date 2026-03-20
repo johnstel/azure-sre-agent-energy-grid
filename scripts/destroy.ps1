@@ -33,7 +33,7 @@ $ErrorActionPreference = 'Stop'
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                    Azure SRE Agent Demo Lab - DESTROY                        ║
+║                    Azure Energy Grid SRE Demo Lab - DESTROY                  ║
 ║                                                                              ║
 ║                         ⚠️  WARNING ⚠️                                        ║
 ║                                                                              ║
@@ -88,7 +88,8 @@ try {
     Write-Host "   The deletion is running in the background." -ForegroundColor Gray
     Write-Host "   Check Azure Portal for status." -ForegroundColor Gray
     
-} catch {
+}
+catch {
     Write-Host "`n❌ Failed to delete resource group: $_" -ForegroundColor Red
     exit 1
 }

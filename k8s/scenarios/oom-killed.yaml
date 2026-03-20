@@ -1,20 +1,19 @@
 # =============================================================================
-# Breakable Scenarios for Azure SRE Agent Demo
+# Breakable Scenarios for Azure SRE Agent Energy Grid Demo
 # =============================================================================
-# This file contains various failure scenarios that can be applied to the
-# AKS Store Demo application for demonstrating Azure SRE Agent diagnosis
+# This file contains a failure scenario that can be applied to the
+# Energy Grid Platform for demonstrating Azure SRE Agent diagnosis
 # capabilities.
 #
-# Each scenario is in its own YAML document separated by ---
-# Apply specific scenarios with: kubectl apply -f scenarios/<scenario>.yaml
+# Apply with: kubectl apply -f k8s/scenarios/oom-killed.yaml
 #
-# See docs/BREAKABLE-SCENARIOS.md for detailed instructions on using each.
+# See docs/BREAKABLE-SCENARIOS.md for detailed instructions.
 # =============================================================================
 
 # =============================================================================
-# SCENARIO 1: OOMKilled - Out of Memory Crash
+# SCENARIO 1: OOMKilled - Meter Service Memory Exhaustion
 # =============================================================================
-# This scenario causes the order-service to run out of memory and crash.
+# Smart meter data spike during peak demand overwhelms the meter-service.
 # SRE Agent can diagnose: "Pod is OOMKilled", recommend increasing memory limits.
 #
 # HOW TO BREAK:
@@ -27,10 +26,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: order-service
-  namespace: pets
+  name: meter-service
+  namespace: energy
   labels:
-    app: order-service
+    app: meter-service
     scenario: oom-killed
     sre-demo: breakable
 spec:
@@ -39,20 +38,20 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: order-service
+      app: meter-service
   template:
     metadata:
       labels:
-        app: order-service
+        app: meter-service
     spec:
       nodeSelector:
         nodepool-type: user
       containers:
-        - name: order-service
+        - name: meter-service
           image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
           ports:
             - containerPort: 3000
-          # BREAKING CHANGE: Memory limit is way too low
+          # BREAKING CHANGE: Memory limit is way too low for meter data processing
           resources:
             requests:
               memory: "8Mi" # Extremely low
@@ -70,7 +69,7 @@ spec:
             - name: ORDER_QUEUE_PASSWORD
               value: "guest"
             - name: ORDER_QUEUE_NAME
-              value: "orders"
+              value: "meter-events"
             - name: FASTIFY_ADDRESS
               value: "0.0.0.0"
             # Force memory allocation to trigger OOM faster

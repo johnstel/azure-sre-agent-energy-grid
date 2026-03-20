@@ -1,6 +1,6 @@
 # Cost Estimation Guide
 
-This document provides estimated costs for running the Azure SRE Agent Demo Lab.
+This document provides estimated costs for running the Azure SRE Agent Energy Grid Demo Lab.
 
 > **Note:** Costs are estimates based on US East 2 region pricing as of 2024. Actual costs may vary based on region, usage patterns, and Azure pricing changes.
 
