@@ -115,7 +115,7 @@ var names = {
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
-  tags: tags
+  tags: union(tags, { SecurityControl: 'Ignore' })
 }
 
 // =============================================================================

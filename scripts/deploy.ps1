@@ -667,6 +667,9 @@ az aks get-credentials `
     --name $outputs.aksClusterName.value `
     --overwrite-existing
 
+# Convert kubeconfig to use Azure CLI auth so kubelogin doesn't prompt for a client ID
+kubelogin convert-kubeconfig -l azurecli
+
 Write-Host "  ✅ kubectl configured for cluster: $($outputs.aksClusterName.value)" -ForegroundColor Green
 
 $sreAgentManagedIdentityPrincipalId = ''
