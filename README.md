@@ -34,6 +34,9 @@ The platform simulates an electric energy producer with grid management and reta
 - Azure region supporting SRE Agent: `East US 2`, `Sweden Central`, or `Australia East`
 - [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli) installed
 - [VS Code](https://code.visualstudio.com/) with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (optional but recommended)
+- **macOS users**: [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/) is also required for the dev container to work
+
+> 🍎 **On a Mac?** See the [Mac + VS Code Setup Guide](docs/MAC-VSCODE-SETUP.md) for a complete step-by-step walkthrough, including how to get the `menu` command working.
 
 ![Menu](media/menu.png)
 
@@ -140,6 +143,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 
 ## 📚 Documentation
 
+- [Mac + VS Code Setup Guide](docs/MAC-VSCODE-SETUP.md) ← **Start here if you're on a Mac**
 - [SRE Agent Setup Guide](docs/SRE-AGENT-SETUP.md)
 - [Prompts Guide](docs/PROMPTS-GUIDE.md)
 - [Breakable Scenarios Guide](docs/BREAKABLE-SCENARIOS.md)
