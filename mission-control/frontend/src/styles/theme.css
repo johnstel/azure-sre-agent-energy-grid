@@ -1,0 +1,93 @@
+@import 'tailwindcss';
+
+/* Energy Grid Design System — ported from grid-dashboard.html & ops-console.html */
+:root {
+  /* Backgrounds */
+  --bg: #0f172a;
+  --card: #1e293b;
+  --card-border: #334155;
+  --surface: #0d1117;
+
+  /* Accent palette */
+  --accent: #22d3ee;       /* cyan — primary */
+  --accent-secondary: #a78bfa; /* purple — ops console accent */
+  --green: #34d399;
+  --amber: #fbbf24;
+  --red: #f87171;
+
+  /* Text */
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+
+  /* Badge backgrounds */
+  --badge-green-bg: #064e3b;
+  --badge-red-bg: #7f1d1d;
+  --badge-amber-bg: #78350f;
+  --badge-purple-bg: #1e1b4b;
+
+  /* Header gradient */
+  --header-from: #0f172a;
+  --header-to: #1e3a5f;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Cascadia Code', 'Fira Code', monospace;
+}
+
+/* Global resets matching existing dashboards */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* Utility classes matching dashboard patterns */
+.card {
+  background: var(--card);
+  border-radius: 10px;
+  padding: 1.2rem;
+  border: 1px solid var(--card-border);
+}
+
+.badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badge-online  { background: var(--badge-green-bg);  color: var(--green); }
+.badge-offline { background: var(--badge-red-bg);    color: var(--red); }
+.badge-warning { background: var(--badge-amber-bg);  color: var(--amber); }
+.badge-info    { background: var(--badge-purple-bg); color: var(--accent-secondary); }
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot-green { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot-amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.dot-red   { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+
+/* Terminal / log box */
+.log-box {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  max-height: 320px;
+  overflow-y: auto;
+  line-height: 1.6;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.loading { animation: pulse 1.5s infinite; color: var(--muted); }
