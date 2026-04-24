@@ -10,4 +10,103 @@
 
 ## Learnings
 
-(none yet)
+### 2026-04-24: Mission Control Architecture Analysis
+
+**Context:** Analyzed entire codebase to design a single-page control interface for the SRE Agent Energy Grid demo lab.
+
+**Key Discoveries:**
+
+1. **Existing Design Language:** The project already has two Vue.js dashboards (`grid-dashboard.html`, `ops-console.html`) with consistent dark theme styling (`:root` CSS variables: `--bg: #0f172a`, `--accent: #22d3ee`, card-based layouts). Mission Control should inherit this visual language.
+
+2. **PowerShell as Deployment Interface:** All core operations (`deploy.ps1`, `destroy.ps1`, `validate-deployment.ps1`) are PowerShell scripts that wrap Azure CLI and kubectl commands. They output structured JSON (`deployment-outputs.json`) and use rich terminal formatting. Mission Control must execute these scripts via `child_process` and parse outputs.
+
+3. **Scenario Architecture:** The 10 breakable scenarios (`k8s/scenarios/*.yaml`) are standalone Kubernetes manifests with metadata labels (`scenario: oom-killed`, `sre-demo: breakable`). Healthy baseline is in `k8s/base/application.yaml` (1133 lines). Scenario status can be detected by querying pods for `scenario` label presence.
+
+4. **SRE Agent Integration:** SRE Agent is deployed via Bicep (`Microsoft.App/agents@2025-05-01-preview`) with managed identity and RBAC. Portal URL is constructed from agent resource ID. No direct API access discovered — portal is the primary interface. Integration point is URL construction + external browser launch.
+
+5. **Dev Container Environment:** Current dev setup uses VS Code dev containers with Azure CLI, kubectl, PowerShell, k9s, kubectx pre-installed. Users authenticate via `az login --use-device-code`. Mission Control must validate these tools exist on startup.
+
+6. **Cross-Platform Challenges:**
+   - PowerShell binary: `pwsh` on Mac/Linux, `pwsh.exe` on Windows
+   - kubectl context management: User might have multiple contexts (need validation)
+   - Azure auth state: Cannot assume user is logged in (need preflight check)
+
+7. **Real-Time Monitoring Requirements:** Existing dashboards poll backend services (asset-service, meter-service) every 5-60 seconds. Mission Control should poll `kubectl get pods/svc/deployments -n energy -o json` at similar intervals. Logs should stream via `kubectl logs -f`.
+
+**Architectural Decision:** **Electron + Vue 3 + Vite**
+- **Why Electron:** Cross-platform shell execution (`child_process.spawn()`), no server setup, native app UX
+- **Why Vue 3:** Consistency with existing dashboards, lightweight, Composition API for reactive state
+- **Why Vite:** Fast hot reload, zero-config TypeScript, modern dev experience
+- **Rejected Tauri:** Rust adds unnecessary complexity; team already familiar with Node.js
+
+**Integration Strategy:**
+- **Deployment Tab:** Wraps `deploy.ps1` and `destroy.ps1` with IPC handlers, streams logs to UI
+- **Monitor Tab:** Polls kubectl every 5s for pods/services/deployments, renders tables with status badges
+- **Scenarios Tab:** Reads `k8s/scenarios/` directory, provides Break/Fix buttons per scenario, detects status via labels
+- **SRE Agent Tab:** Constructs portal URL from deployment outputs, opens in external browser, displays quick prompt templates
+
+**Risks Identified:**
+1. **High:** PowerShell path resolution across platforms → Mitigate with `getPwshPath()` utility
+2. **Medium:** Azure auth state (user not logged in) → Mitigate with `az account show` preflight check
+3. **Medium:** kubectl context mismatch → Mitigate with context validation before each command
+4. **Low:** Long-running command streaming → Standard `child_process` pattern, low risk
+
+**Next Steps:**
+- Scaffold `mission-control/` directory with Electron + Vite boilerplate
+- Implement Phase 1: Deployment tab with deploy/destroy buttons + log streaming
+- Cross-platform validation on Mac and Windows before expanding features
+
+**Files Analyzed:**
+- `scripts/deploy.ps1` (31KB, 700+ lines) — Main deployment orchestration
+- `scripts/destroy.ps1` — Teardown with Key Vault purge logic
+- `scripts/validate-deployment.ps1` — Health check validation
+- `k8s/base/application.yaml` (1133 lines) — Healthy baseline
+- `k8s/scenarios/*.yaml` (10 files) — Breakable failure scenarios
+- `k8s/base/grid-dashboard.html` — Vue.js consumer dashboard (design reference)
+- `k8s/base/ops-console.html` — Vue.js operations console (design reference)
+- `infra/bicep/main.bicep` — Infrastructure orchestration (AKS, ACR, Key Vault, SRE Agent)
+- `infra/bicep/modules/sre-agent.bicep` — SRE Agent deployment with managed identity
+- `.devcontainer/devcontainer.json` — Dev container configuration (PowerShell, Azure CLI, kubectl)
+- `.devcontainer/post-create.sh` — Shell aliases and helper functions
+
+**Decision Document:** Created `.squad/decisions/inbox/dallas-mission-control-arch.md` with full technical specification.
+
+---
+
+## 2026-04-24: Mission Control Planning Session
+
+**Context:** Led squad planning session for Mission Control SPA. Brought in PM Contractor for business scoping and Software Architect Contractor for technical validation. Session outcome: **Fastify + Vue 3 + Vite browser-based architecture approved; MVP scope defined; ready for dev start.**
+
+### Dallas Session Contributions
+
+1. **Initial Architecture Analysis:** Analyzed entire codebase and recommended Electron + Vue 3 + Vite approach (comprehensive 772-line specification document)
+2. **Design Language Identification:** Identified existing Vue.js dashboards' dark theme + cyan accents for reuse; mapped CSS variables to new Mission Control
+3. **Integration Point Mapping:** Documented all PowerShell/kubectl/Azure auth touch points
+4. **Cross-Platform Risk Assessment:** Identified PowerShell path resolution, kubectl context, Azure auth as key risks; proposed mitigations
+
+### Critical Outcome: Architect Recommendation
+
+**Software Architect Contractor REJECTED Electron, recommended browser-based instead:**
+- Electron adds 150MB+ overhead for a dev tool
+- Browser-based simpler to deploy, maintain, no packaging complexity
+- **Dallas accepted architect guidance** — approved Fastify + Vue 3 + Vite
+
+### Final Architecture (Post-Planning)
+
+- **Backend:** Node.js Fastify (TypeScript, 20+ REST endpoints, WebSocket streaming)
+- **Frontend:** Vue 3 Composition API + Vite (consistency with existing dashboards)
+- **Deployment:** Single Docker image, single port in production
+- **Dev Mode:** Two ports (backend :3001, frontend :5173 with proxy)
+
+### MVP Scope (Approved)
+
+**Week 1 Delivery:** Deploy/destroy automation + real-time pod/service status + scenario control + SRE Agent portal access + preflight validation
+
+**Success Criteria:** Deploy → Inject scenario → Launch portal in <2 minutes, 99%+ reliability
+
+### Next Immediate Action
+
+Developer starts Week of 2026-04-28. Dallas to review code against architect specification every 2 days during Phase 1.
+
+**Status:** ✅ Planning complete. Ready for development sprint. All decisions merged into `.squad/decisions.md`. Orchestration logs created in `.squad/orchestration-log/`.
+
