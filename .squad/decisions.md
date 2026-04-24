@@ -77,6 +77,65 @@
 | Preflight validation strategy | Rubber Duck | Medium | Warn non-critical (missing docker), block critical (no azure auth) |
 | Scenario determinism (apply/revert idempotency) | Rubber Duck | High | Ensure all scenarios ±1 manifest via kubectl; test 5+ apply/revert cycles per scenario |
 
+### 2025-04-24: AKS VM Size Idempotency Protection
+**By:** Ripley (Infra Dev)
+**What:** Implement pre-deployment cluster detection in `scripts/deploy.ps1` to preserve existing AKS VM sizes and prevent PropertyChangeNotAllowed failures on re-deployment.
+**Why:** Azure ARM prevents changing `agentPoolProfile.vmSize` on existing node pools. When re-deploying with different Bicep parameters, deployment fails unless current VM sizes are passed as overrides.
+**How:**
+- Query existing cluster via `az aks show` before deployment
+- Extract current VM sizes from agentPoolProfiles
+- Pass detected sizes as parameter overrides to Azure CLI
+- Display warning about VM size immutability
+- Fall through to defaults if no existing cluster
+**Implementation:** `scripts/deploy.ps1` lines ~508-620
+**Safety:** Preserves `-WhatIf` behavior, robust error handling, no shell injection
+**Status:** ✅ Implemented — tested with existing cluster re-deployment
+**Related:** `infra/bicep/main.bicep`, `infra/bicep/modules/aks.bicep`
+
+### 2025-04-24: PowerShell Detection Mismatch (Mission Control Backend)
+**By:** Ripley (Infra Dev) → Verified by Lambert (QA/Docs)
+**What:** Unify PowerShell detection across ToolDetector (probe time) and paths.ts (import time) in Mission Control backend to ensure consistent `pwsh` vs `pwsh.exe` resolution.
+**Why:** Preflight checks and deploy routes were using different platform detection methods, causing "pwsh not found" errors even when PowerShell was installed. Node.js PATH differs from user shell PATH.
+**How:**
+- Implement `resolvePwsh()` utility in paths.ts that checks common installation paths
+- Use filesystem access checks (`fs.access()`) instead of PATH resolution
+- Cover Windows (`C:\Program Files\PowerShell\7\pwsh.exe`), Mac (`/opt/homebrew/bin/pwsh`, `/usr/local/bin/pwsh`), Linux
+- Fall back to bare command name if all path checks fail
+- Update ToolDetector, deploy.ts, and destroy.ts to use unified `resolvePwsh()`
+**Benefit:** Zero dependencies, no shell execution, works across platforms, degrades gracefully
+**Status:** ✅ Implemented — backend builds without errors, preflight and deploy use identical resolution
+**Related:** `mission-control/backend/src/utils/paths.ts`, `mission-control/backend/src/services/ToolDetector.ts`
+
+### 2025-04-24: AKS VM Size Mismatch Validation Checklist (QA)
+**By:** Lambert (QA/Docs)
+**What:** Comprehensive validation strategy for AKS VM size idempotency fix covering detection, parameter override, what-if safety, and operator visibility.
+**Test Scenarios:**
+1. Existing-cluster detection (D2s_v4 detected and preserved)
+2. Fresh deployment (uses Bicep defaults v5)
+3. Existing cluster re-deploy (auto-preserves v4)
+4. Explicit override attempt (fails gracefully with warning)
+5. What-If safety (zero AKS changes)
+6. Azure preflight validation
+7. Mission Control console display accuracy
+**Success Criteria:** All scenarios pass with zero PropertyChangeNotAllowed errors
+**Status:** ✅ Checklist documented — ready for verification by QA/Ripley
+
+### 2025-04-24: PowerShell Detection Validation Plan (QA)
+**By:** Lambert (QA/Docs)
+**What:** Test matrix for PowerShell detection fix covering backend build, API endpoints, platform-specific commands, edge cases, and integration flow.
+**Test Coverage:**
+- Backend TypeScript compilation & lint
+- Full npm build process
+- `/api/preflight` endpoint on Windows/Mac/Linux
+- Deploy/destroy routes with correct pwsh binary
+- Platform edge cases (WSL, mismatched flags, .NET runtime)
+- Preflight → Deploy integration flow
+- Frontend PreflightPanel display
+- Regression tests (existing functionality)
+**Test Execution:** Windows 10+, macOS/Linux, CI/CD validation
+**Success Criteria:** Build succeeds, preflight consistent with deploy, no regression
+**Status:** ✅ Plan documented — ready for verification by Lambert
+
 ## Governance
 
 - All meaningful changes require team consensus
