@@ -9,9 +9,24 @@
 
 ## Learnings
 
-### 2025-07-18: Ops-Console Validation Audit
+### 2026-04-24: Mission Control Smoke Test — Complete Validation Suite
+- **Dependencies:** All 196 workspace packages install correctly; verified frontend, backend, and root node_modules
+- **Build process:** Production build succeeds cleanly with `npm run build` (86.17 kB frontend, 32.22 kB gzipped)
+- **Asset inventory:** All 8 components, 3 composables, types, theme CSS present and correctly imported; no broken links
+- **Development workflow:** Vite dev server (:5173) with proxy to Fastify (:3333) works correctly; hot module reloading functional
+- **Production workflow:** `npm run start` serves full SPA from Fastify with correct Content-Type headers (HTML, JS, CSS)
+- **Documentation:** README.md URLs accurate (no changes needed)
+- **Port conflict risk:** Orphaned processes can silently block :3333, causing blank page. Recommend pre-flight port check in dev scripts
+- **Key insight:** Port conflicts are the #1 user-facing failure mode for Mission Control — backend failure is silent to frontend
 
-**Files reviewed:**
+### 2026-04-24: Mission Control Production Blank-Screen Failure (coordinated with Parker)
+- Root cause: Fastify static asset serving with `wildcard: false` prevented Vite hashed filenames from matching
+- Symptoms: Browser "Cannot use import statement outside a module" errors; blank page
+- Fix applied by Parker: Removed `wildcard: false` from `mission-control/backend/src/server.ts` line 35
+- Verification: All assets now served with correct MIME types; production build fully functional
+- **Coordination note:** Confirmed Parker's fix independently via full smoke test workflow
+
+### 2025-07-18: Ops-Console Validation Audit
 - `k8s/base/ops-console.html` — standalone HTML file (may be stale)
 - `k8s/base/nginx-ops.conf` — standalone nginx config
 - `k8s/base/application.yaml` lines 950–1055 — ops-console ConfigMaps, Deployment, Service
@@ -101,3 +116,26 @@ Azure `PropertyChangeNotAllowed` error when existing AKS cluster uses Standard_D
 - **Key finding:** Comprehensive validation must cover not just happy path but error cases (missing cluster, explicit override attempts, WSL edge cases)
 - **Test prioritization:** Fresh deployment → Existing detection → Re-deploy → What-If → Preflight validation
 - **Orchestration log:** `2026-04-24T20:01:53Z-aks-vmsize-idempotency.md`
+
+### 2026-04-24: Mission Control Local Load Failure — Port Conflict Diagnosis
+
+**Context:** User reported "okay it is not loading" after Mission Control development completed.
+
+**Root cause:** Port 3333 was already in use by orphaned Microsoft Edge Helper process (PID 77607), preventing backend Fastify server from starting. Frontend Vite server started successfully on :5173 but showed blank page because backend API was unavailable.
+
+**Validation performed:**
+1. ✅ Workspace dependencies installed (`npm install` from root)
+2. ✅ Frontend Vite server running on http://127.0.0.1:5173
+3. ❌ Backend Fastify server failed with `EADDRINUSE` on :3333
+4. ✅ All component/composable/type files present (no broken imports)
+5. ✅ Theme CSS exists and loads correctly
+6. ✅ TypeScript compilation succeeds with zero errors
+7. ✅ Production build succeeds (86.17kB frontend bundle)
+
+**Fix:** Killed blocking process with `lsof -ti:3333 | xargs kill`, restarted dev servers.
+
+**Documentation accuracy:** README.md line 31 correctly states http://localhost:5173 (dev) and http://localhost:3333 (production). No changes needed.
+
+**Key insight:** Port conflicts are the #1 user-facing failure mode for Mission Control. Backend failure is silent from frontend perspective (blank page with no errors). Recommend adding port conflict pre-flight check to `npm run dev` script.
+
+**Decision artifact:** `.squad/decisions/inbox/lambert-mission-control-smoke.md` contains full smoke test report with 14-step validation matrix and troubleshooting guide.

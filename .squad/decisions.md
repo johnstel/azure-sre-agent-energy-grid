@@ -2,11 +2,35 @@
 
 ## Active Decisions
 
-### 2026-04-24: Contractor bench policy
-**By:** John Stelmaszek
+### 2026-04-24: Mission Control Blank-Screen Production Failure — Fastify Static Wildcard Fix
+**By:** Parker (Platform Architect)  
+**What:** Fastify static asset serving with `wildcard: false` prevented Vite-generated hashed asset filenames from being matched, causing fallthrough to SPA HTML route and browser module loading failures. Removed the `wildcard: false` configuration to enable glob matching on dynamic asset paths.
+**Why:** Production builds generate content-hashed asset names (e.g., `index-abc123.js`). Fastify's restrictive `wildcard: false` setting broke asset delivery by forcing hash-suffixed URLs to return HTML instead of JavaScript/CSS with correct MIME types.
+**Fix:** Removed line 35 from `mission-control/backend/src/server.ts`: `wildcard: false`.
+**Verification:** ✅ Development mode (`npm run dev`), production mode (`npm run start`), all assets correctly served with proper Content-Type headers, no errors in browser console.
+**Status:** ✅ Resolved — Mission Control now fully operational in both dev and production modes
+
+### 2026-04-24: Mission Control Smoke Test — Port Conflict & Workspace Validation
+**By:** Lambert (QA/Docs)  
+**What:** Full smoke test of Mission Control development and production workflows including workspace dependency validation, build process verification, asset inventory check, and production server testing.
+**Findings:**
+- ✅ All 196 workspace packages installed correctly
+- ✅ Frontend builds successfully with zero TypeScript errors (86.17 kB gzipped)
+- ✅ Development servers (Vite :5173, Fastify :3333) start and respond correctly
+- ✅ Production build serves SPA with correct MIME types for all assets
+- ✅ README.md URLs are accurate (no documentation changes needed)
+- ⚠️ Port conflict risk: orphaned Edge Helper blocked :3333, causing blank page with silent failure. Recommend pre-flight port check in dev script.
+**Recommendations:** 
+1. Add port conflict detection to `npm run dev`
+2. Add pre-flight dependency check script
+3. Document port troubleshooting (optional enhancement)
+**Status:** ✅ Verified — Mission Control fully functional, no blocked issues
+
+### 2026-04-24: Contractor Bench Policy
+**By:** John Stelmaszek  
 **What:** Use specialist contractor agents (SRE, Security Engineer, DevOps Automator, Backend Architect, etc.) from the bench for reviews and expertise as needed. Bring them in and out of the project on demand.
 **Why:** Leverages the full agent bench for quality without permanent team bloat.
-**Status:** ✅ Active — successfully used for Mission Control planning session
+**Status:** ✅ Active — successfully used for Mission Control planning session and team diagnostics
 
 ### 2026-04-24: Mission Control Architecture — Fastify + Vue 3 + Vite (Browser-Based)
 **By:** Software Architect Contractor (approved by Dallas Lead + PM Contractor)

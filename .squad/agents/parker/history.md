@@ -10,6 +10,21 @@
 
 ## Learnings
 
+### 2026-04-24: Mission Control Blank-Screen Production Failure — Fastify Static Wildcard Fix
+- **Root cause:** Fastify's `@fastify/static` configured with `wildcard: false` prevented glob matching on Vite-generated hashed asset filenames (`/assets/index-*.js`, `/assets/index-*.css`)
+- **Symptom:** Asset requests fell through to SPA HTML fallback route, returning incorrect MIME type (`text/html` instead of `application/javascript` or `text/css`)
+- **Browser error:** "Cannot use import statement outside a module" (JavaScript MIME type mismatch)
+- **Fix:** Removed `wildcard: false` from `mission-control/backend/src/server.ts` line 35 to enable glob matching
+- **Verification:** All Vite assets now served with correct Content-Type headers; production build fully functional
+- **Key insight:** Modern SPA asset serving requires wildcard/glob matching to handle content-hashed filenames from Vite builds
+
+### 2026-04-24: Mission Control Smoke Test Coordination (with Lambert)
+- Coordinated with Lambert on full workspace validation and build verification
+- All assets, components, composables load correctly; no broken import chains
+- README.md URLs verified accurate (development :5173, production :3333)
+- Identified and resolved port :3333 conflict (orphaned Edge Helper) during testing
+- Production workflow verified: `npm run build` → `npm run start` succeeds with all assets correctly served
+
 ### 2025-07-24: Ops-Console Full Review
 - **Resources found:** 2 ConfigMaps (`ops-console-html`, `ops-console-nginx`), 1 Deployment, 1 Service — all in `energy` namespace
 - **Selectors aligned:** Deployment labels `app: ops-console` → Service selector `app: ops-console` ✅

@@ -110,3 +110,10 @@
 - **Testing pattern:** Always capture command output before attempting JSON parsing when error codes may indicate failure
 - **Future:** Expanded Bicep VM-size allowlist to v4 SKUs; fixed network.bicep subnet outputs to concrete IDs; validated with `-WhatIf` on existing cluster
 - **Orchestration log:** `2026-04-24T20:01:53Z-aks-vmsize-idempotency.md`
+
+### 2026-04-24: Mission Control UI Design System Refinement
+- **What:** Refined the Mission Control Vue frontend as a single-page command center rather than tabbed or routed views.
+- **Durable UI convention:** Keep operational sections visible in order: readiness, deploy, destroy, pod monitor, scenarios.
+- **Design system pattern:** Use semantic intent classes for cards, badges, buttons, form controls, metrics, and panel actions so safe, warning, recovery, telemetry, output, and destructive states are visually distinct.
+- **Safety convention:** Destroy remains visually quarantined with locked/armed status and a unique red danger button; scenario activation uses amber fault-injection styling, not primary cyan.
+- **Validation:** `cd mission-control && npm run build` passed.
