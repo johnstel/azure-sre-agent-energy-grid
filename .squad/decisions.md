@@ -2,6 +2,75 @@
 
 ## Active Decisions
 
+### 2026-04-25T18:58:04Z: Mission Control Wallboard Redesign (Desktop/Wallboard-First, Fixed-Zone 16:9 Layout)
+
+**By:** John Stelmaszek (user directive), reviewed by UX Architect, UI Designer, Parker (SRE), Executive, Brand Guardian, Product/Business  
+**What:** Redesign Mission Control from single-scroll responsive design to wallboard-first fixed-zone layout optimized for 16:9 monitors in help desk environments. Wallboard is the primary display mode; responsive narrow-screen fallback remains for development/troubleshooting but is not primary.
+
+**Key Directives:**
+
+1. **Wallboard-First IA** — Fixed-zone layout (NOT single-scroll responsive)
+   - Header: Command bar, quick status summary
+   - Main grid: Expected-vs-actual resource inventory (service name | desired pods | running pods | expected state | actual state)
+   - Right panel: Active incidents (top 5 by severity), pod/process board
+   - Bottom drawer: Selected logs/events (collapsible, 0-300px)
+   - No animations, no auto-expand of full logs (vertical waste)
+
+2. **1920x1080 Fixed Spec** (UI Designer)
+   - Command bar (80px fixed)
+   - Main viewport (900px)
+   - Collapsible logs drawer (0-300px)
+   - Left panel 60% (inventory grid), right panel 40% (incidents + pod board)
+   - Severity colors: Red (#ef4444) critical, Amber (#f59e0b) warning, Green (#10b981) healthy, Gray (#6b7280) unknown
+   - Typography: 18pt+ for operational text (accessibility requirement)
+
+3. **Expected-vs-Actual as Hero Feature** (Product/Business)
+   - Central inventory matrix: Deployment spec (expected replicas, resources, labels) vs actual pod state (running count, container state, memory/CPU)
+   - Mismatch = red cell + severity badge ("1 unavailable", "CrashLoopBackOff", "OOMKilled")
+   - Click-through: Select pod → populate Logs Panel
+   - Join logic required in backend: Deployment spec + actual pod state + events
+
+4. **Backend API Extensions** (Parker SRE)
+   - `/api/inventory` (GET) → unified expected-vs-actual view (Deployments + pods + endpoints)
+   - `/api/pods/:name/logs` (GET, WebSocket) → read-only streaming pod logs (last 500 lines, optional tail mode)
+   - `/api/events` (GET, WebSocket) → Kubernetes events stream (sorted by createdAt desc, namespace: energy hard-lock)
+   - `/api/services/:name/endpoints` (GET) → Service endpoint resolver (pod IPs, readiness probes, port mappings)
+   - All APIs namespace-locked to `energy`; redaction rules for sensitive data in logs/events
+
+5. **Operational Readiness Criteria** (Executive Review)
+   - Health Heartbeat: Always-visible "all systems nominal" indicator (top-right)
+   - Active Incidents: Current pod failures, state mismatches, restarts ranked by severity
+   - Pod Stability: Restart loop detection, >2 restarts in 30min alert
+   - Data-Flow Integrity: Can operator validate meter→storage→dispatch pipeline without drilling into logs?
+   - Recent SRE Agent Findings: Display latest AI diagnosis results (if available)
+
+6. **Brand & Positioning** (Brand Guardian)
+   - Remove "Azure SRE Agent" from app header title → "Mission Control" only
+   - Rename "Ask Copilot" panel → "Explain This State" (clarify local explainer vs autonomous agent)
+   - Remove narrative prose, section numbers, marketing copy → Terse action labels, defer help to tooltips/docs
+   - No splash screens, onboarding narrative, or training framing
+
+7. **Help Desk Workflow Integration** (Product/Business)
+   - Wallboard always-on during 8-hour shifts (5-second refresh, real-time failure alerts)
+   - Active scenario badges: Show if breakable scenario is applied (e.g., "scenario: oom-killed" badge on service row)
+   - Job status visible: Deploy/destroy job queue with status, elapsed time, job logs on drill-through
+   - Deploy/destroy forms MOVED OFF wallboard to separate control panel (prevent fat-finger mistakes)
+   - Out of MVP: Mobile responsiveness (wallboard-only for now)
+
+**Why:** User request for help desk ops center workflow. Current single-scroll responsive design optimized for narrow mobile screens is not suitable for 8-foot viewing distance and 8-hour shift monitoring. Fixed zones reduce cognitive load, maximize information density, and support always-on display. Expected-vs-actual matrix is the highest-value diagnostic tool for help desk troubleshooting. Operational readiness framing ensures credibility over decoration.
+
+**Supersedes:** Prior directive for "single-scroll responsive Mission Control" is superseded for desktop/wallboard mode. Narrow-screen responsive fallback preserved for dev environments.
+
+**Status:** ✅ Approved — Wallboard design approved by all contractors. Ready for developer implementation in Phase 2. Phase 1 (MVP, Week 1) ships current browser-based SPA; Phase 2 incorporates wallboard redesign.
+
+**Timeline:** Phase 1 (MVP, Week 1) → Phase 2 (Wallboard + API extensions, Week 2-3) → Phase 3 (Polish, Week 4+)
+
+**Artifacts:**
+- `.squad/orchestration-log/2026-04-25T18-58-04Z-mission-control-wallboard-redesign.md` (full review batch with all contractor input)
+- `.squad/log/2026-04-25T18-58-04Z-mission-control-wallboard-redesign.md` (session summary)
+
+---
+
 ### 2026-04-24: Mission Control Blank-Screen Production Failure — Fastify Static Wildcard Fix
 **By:** Parker (Platform Architect)  
 **What:** Fastify static asset serving with `wildcard: false` prevented Vite-generated hashed asset filenames from being matched, causing fallthrough to SPA HTML route and browser module loading failures. Removed the `wildcard: false` configuration to enable glob matching on dynamic asset paths.

@@ -110,3 +110,16 @@ Developer starts Week of 2026-04-28. Dallas to review code against architect spe
 
 **Status:** ✅ Planning complete. Ready for development sprint. All decisions merged into `.squad/decisions.md`. Orchestration logs created in `.squad/orchestration-log/`.
 
+---
+
+## 2026-04-25T18:58:04Z: Mission Control Wallboard Redesign Review Batch
+
+**Context:** Full contractor batch review for Mission Control redesign toward wallboard ops center (16:9 fixed-zone layout, expected-vs-actual hero matrix, operational readiness criteria).
+
+**Key Outcome:** Single-scroll responsive design SUPERSEDED for wallboard mode. All five contractors converged on fixed-zone layout optimized for 8-foot help desk monitoring. Brand Guardian repositioning approved (remove Azure SRE Agent from header, rename Ask Copilot → Explain This State). Product/Business cleared active scenario badges + job status visibility + deploy/destroy form move to control panel.
+
+**Dallas Notes:** Phase 2 will incorporate wallboard IA and new API surface (/api/inventory, pod logs, events, endpoints). Phase 1 (current MVP) ships browser SPA unchanged. Wallboard Phase 2 is a UI/IA redesign, not a data model refactor.
+
+**Orchestration Log:** `.squad/orchestration-log/2026-04-25T18-58-04Z-mission-control-wallboard-redesign.md` (full review batch)
+
+---

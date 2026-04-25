@@ -173,3 +173,25 @@ All agents should only use `qwen/qwen3.6-35b-a3b` for local coding workflows. Cl
 **Review Decision:** APPROVED by Lambert (QA/Docs) after one README copy fix.
 
 **Status:** Ready for commit to .squad/ (decisions merged, orchestration log written, session log written, inbox cleared).
+
+---
+
+## 2026-04-25T18:58:04Z: Mission Control Wallboard Redesign Review Batch — SRE Input
+
+**Contractor Review:** Wallboard redesign for 16:9 help desk room monitor (fixed-zone layout, expected-vs-actual matrix, operational readiness).
+
+**Parker SRE Feasibility Assessment:**
+- **Gap Analysis:** Current APIs expose pods/services/deployments/scenarios/jobs, but NOT pod logs, aggregate inventory view, resource events, or service endpoints
+- **Recommendations:** 
+  1. Add `/api/inventory` → unified expected-vs-actual view (Deployments spec + actual pod state + endpoints + events)
+  2. Add `/api/pods/:name/logs` (GET + WebSocket tail) → pod logs streaming (last 500 lines, server-side buffer)
+  3. Add `/api/events` (GET + WebSocket watch) → Kubernetes events stream, namespace hard-lock to `energy`, redaction rules
+  4. Add `/api/services/:name/endpoints` → Service endpoint resolver (pod IPs, readiness probes, port mappings)
+  5. Namespace hard-lock: All wallboard APIs implicit `?namespace=energy` (no cross-namespace support)
+  6. Redaction library: Mask connection strings, tokens, API keys in logs/events
+  7. Scenario symptom mapping: Map `scenario` label presence to expected UI state/warning
+
+**Parker Notes:** Wallboard IA is sound. Backend work is 1-2 days for `/api/inventory` join logic + pod logs streaming + events watch. No architectural blockers. Phase 2 feasible within timeline.
+
+**Status:** Parker approved wallboard design; API recommendations captured in decisions.md for Phase 2 developer implementation.
+

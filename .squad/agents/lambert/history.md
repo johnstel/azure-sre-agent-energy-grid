@@ -180,3 +180,21 @@ Orchestration and decision consolidation for Mission Control Ask Copilot feature
 - ✅ Git staging ready: `.squad/` directory prepared for commit
 
 **Status:** Ready for git commit with co-authorship trailer.
+
+---
+
+## 2026-04-25T18:58:04Z: Mission Control Wallboard Redesign Review Batch — QA/Docs Input
+
+**Contractor Review:** Wallboard redesign for 16:9 help desk room monitor (fixed-zone layout, expected-vs-actual matrix, operational readiness).
+
+**Lambert QA/Docs Input:**
+- Validation of UX Architect wallboard IA recommendations (fixed zones, no single-scroll, accessibility guidance, phased MVP with logs Phase 2)
+- Review of UI Designer 1920x1080 layout spec and severity color system (credibility over decoration)
+- Collaboration with Parker (SRE) on backend API feasibility (inventory join, pod logs streaming, events watch)
+- Support for Brand Guardian repositioning (remove Azure SRE Agent from header, rename Ask Copilot → Explain This State)
+- QA perspective: Test matrix needed for wallboard phase (fixture data, layout verification, drill-through interactions, edge cases for pod state)
+
+**Lambert Notes:** Wallboard UI design is sound. Phase 2 scope is well-defined. QA can begin test plan writing once Phase 1 MVP ships.
+
+**Status:** Lambert approved wallboard design; QA responsibilities captured for Phase 2 planning.
+
