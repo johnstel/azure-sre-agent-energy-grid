@@ -9,6 +9,58 @@
 
 ## Learnings
 
+### 2026-04-25: Public LoadBalancer NSG Troubleshooting Documentation (Finalized with Reviews)
+**Issue:** Public LoadBalancer IPs for grid-dashboard and ops-console returned timeout/empty reply despite healthy pods, services, and Azure LB configuration.
+
+**Root cause:** VNet AKS subnet NSG (`vnet-srelab-snet-aks-nsg-eastus2`) lacked inbound HTTP allow rule. Default `DenyAllInBound` (priority 65000) blocked Internet-sourced traffic forwarded by Azure LoadBalancer. Both AKS-managed node NSG and VNet subnet NSG affect the public LoadBalancer path.
+
+**Permanent fix:** Bicep rule `Allow-Internet-HTTP-To-AKS-LB` persisted in `infra/bicep/modules/network.bicep` (lines 36–49).
+
+**Documentation created (Initial):**
+1. `docs/TROUBLESHOOTING.md` — LoadBalancer/NSG troubleshooting guide
+2. Updated `README.md`, `docs/SRE-AGENT-SETUP.md`, `docs/BREAKABLE-SCENARIOS.md` with cross-links
+
+**Parker (SRE) Review Feedback Incorporated:**
+- Added K8s diagnostic baselines: `kubectl describe svc`, `kubectl get endpointslices`, `kubectl get endpoints`
+- Added port mapping validation (containerPort → targetPort → service port)
+- Added escalation cue: if port-forward + in-cluster work but public IP fails, K8s is healthy, problem is Azure LB/NSG path
+- Added selector/label alignment and DNS/service validation diagnostics
+- Created separate `docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md` with comprehensive K8s service diagnostics (8452 bytes)
+- Added decision table: external IP pending vs assigned+timeout vs connection refused vs HTTP codes
+
+**Ripley (Infra) Review Feedback Incorporated:**
+- Explained three-layer path: K8s Service → Azure LoadBalancer → VNet subnet NSG → Pod
+- Documented that both AKS-managed node NSG and VNet subnet NSG can affect public LoadBalancer ingress
+- Added exact Azure CLI commands with resource group variables:
+  - Getting node resource group: `az aks show -g $RESOURCE_GROUP -n aks-srelab --query nodeResourceGroup`
+  - Listing AKS node NSG rules: `az network nsg rule list -g $AKS_RG --nsg-name aks-agentpool-*`
+  - Listing VNet subnet NSG rules: `az network nsg rule list -g $RESOURCE_GROUP --nsg-name vnet-srelab-snet-aks-nsg-*`
+  - Verifying NSG association: `az network vnet subnet show --query networkSecurityGroup.id`
+  - Listing Load Balancer rules/probes/backend pools: `az network lb rule/probe/address-pool list`
+  - Idempotent remediation: `az network nsg rule create` with error suppression (won't fail if rule exists)
+- Added decision table mapping external IP states and response patterns to root causes
+
+**Final Documentation Set:**
+1. `docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md` (NEW, 8452 bytes) — K8s-focused diagnostics: 5-step baseline, port mapping validation, DNS validation, escalation decision tree, common scenarios
+2. `docs/TROUBLESHOOTING.md` (ENHANCED) — Three-layer architecture diagram, decision table, comprehensive Azure NSG/LB diagnostics with exact CLI commands (node RG, both NSG layers, LB config, idempotent remediation)
+3. `README.md` (UPDATED) — Links to both K8s and Azure troubleshooting guides separated in documentation section
+4. `docs/SRE-AGENT-SETUP.md` (UPDATED) — References both K8s and Azure troubleshooting guides in scenarios section
+5. `docs/BREAKABLE-SCENARIOS.md` (UPDATED) — References both guides in Best Practices
+
+**Pattern Refinement:**
+- **Two-guide approach:** K8s service issues → KUBERNETES-SERVICE-TROUBLESHOOTING.md; Azure LB/NSG issues → TROUBLESHOOTING.md
+- **Decision tree:** Quick decision table maps symptom (IP state + response type) to root cause, eliminating need for full diagnostic sequence in simple cases
+- **Exact commands:** All Azure CLI commands copy-paste ready, with resource group variables, idempotent remediation (no failure if rule exists)
+- **Cross-linking:** README links both; guides reference each other; decision table drives operators to correct guide
+- **Escalation cue:** If K8s baseline passes (port-forward works, in-cluster curl works), problem is definitely Azure networking (not K8s)
+
+**Key Insights from Reviews:**
+1. **Three-layer path critical:** Operators must understand traffic flows: K8s Service → Azure LB → VNet NSG → Pod to understand failure modes
+2. **Diagnostic progression:** K8s baseline (port-forward, endpoints, labels) determines if problem is "above the line" (K8s) or "below the line" (Azure)
+3. **Exact commands matter:** Operators need copy-paste-ready Azure CLI, not conceptual descriptions; variables must match actual resource names
+4. **Idempotent fixes:** Remediation commands must not fail if rule already exists; enables safe reapplication
+5. **Decision tables accelerate diagnosis:** Map symptoms (external IP pending/assigned, response type) to root causes without requiring full diagnostic sequence every time
+
 ### 2026-04-24: Mission Control Smoke Test — Complete Validation Suite
 - **Dependencies:** All 196 workspace packages install correctly; verified frontend, backend, and root node_modules
 - **Build process:** Production build succeeds cleanly with `npm run build` (86.17 kB frontend, 32.22 kB gzipped)
@@ -139,3 +191,57 @@ Azure `PropertyChangeNotAllowed` error when existing AKS cluster uses Standard_D
 **Key insight:** Port conflicts are the #1 user-facing failure mode for Mission Control. Backend failure is silent from frontend perspective (blank page with no errors). Recommend adding port conflict pre-flight check to `npm run dev` script.
 
 **Decision artifact:** `.squad/decisions/inbox/lambert-mission-control-smoke.md` contains full smoke test report with 14-step validation matrix and troubleshooting guide.
+
+## Team Update: Local Coding Model Preference — 2026-04-25T18:16:29Z
+
+**Memo:** The team now prefers a local OpenAI-compatible model endpoint for coding-oriented workflows (Ripley, Parker, Lambert). Configuration:
+- **Endpoint:** `http://localhost:1234/v1`
+- **Model:** `qwen/qwen3-coder-next`
+- **Rationale:** Reduces latency, cloud API dependency; enables offline and experimental workflows
+
+This preference is now documented in `.squad/decisions.md` and orchestration logs. All agents remain compatible with cloud models as fallback.
+
+## Team Update: Local Model Fallback — 2026-04-25T18:19:49Z
+
+**Memo:** The preferred model `qwen/qwen3-coder-next` is currently unavailable due to LM Studio memory pressure. Active fallback:
+- **Endpoint:** `http://localhost:1234/v1`
+- **Fallback Model:** `qwen/qwen3.6-35b-a3b`
+- **Status:** Operationally validated; equivalent coding capability
+- **Recovery:** Preference state preserved for rapid restoration when LM Studio memory constraints resolve
+
+All agents remain compatible with cloud models as secondary fallback. Team decision recorded in `.squad/decisions.md`.
+
+## CORRECTION: qwen3-Coder-Next is Legacy — 2026-04-25T18:21:45Z
+
+**⚠️ CORRECTION:** Previous decisions (2026-04-25T18:14:34Z and 2026-04-25T18:19:49Z) recommended `qwen/qwen3-coder-next` as a preferred or fallback model. **This is incorrect.** The model is legacy and must not be used.
+
+**Corrected Policy:**
+- **Active Local Model:** `qwen/qwen3.6-35b-a3b` (only model configured in `.squad/config.json`)
+- **Legacy Model:** `qwen/qwen3-coder-next` — do not attempt to load or use
+- **Endpoint:** `http://localhost:1234/v1`
+- **Rationale:** User clarification; Coordinator has removed all references to qwen3-coder-next from configuration
+
+All agents should only use `qwen/qwen3.6-35b-a3b` for local coding workflows. Cloud models remain as secondary fallback.
+
+
+### 2026-04-25: Mission Control Ask Copilot Reviewer Validation
+**By:** Lambert (QA/Docs)
+**Verdict:** APPROVE after one README copy fix adding explicit Technical Preview/local-only wording.
+**Validation performed:** Checked package manifests and lockfile alignment for `@github/copilot-sdk` and `vue-router` removal; verified backend `/api/assistant/ask` input validation, single-request guard, timeout/cleanup, `gpt-4.1`, one `get_mission_control_state` tool, allowlisted permissions, sanitized unavailable errors, and job snapshots without raw logs; verified frontend remains a single scrollable page with metadata/sources/tools/limits/errors visible; verified README differentiates Ask Copilot from Azure SRE Agent and documents Copilot CLI/auth prerequisites.
+**Commands:** `cd mission-control && npm ls --workspaces --depth=0 --omit=dev`, `npm ls --workspaces --depth=0 --include=dev`, `npm run build`, `npm run lint`, and focused HTTP smoke checks for health, empty question, over-length question, and a live assistant request.
+**Evidence:** Build and lint passed. API smoke checks returned health 200, validation 400s, and live assistant 200 with model `gpt-4.1`, `get_mission_control_state`, snapshot timestamp, 7 sources, and 3 limitations.
+**Follow-up:** Consider a future automated test harness for assistant validation/concurrency, but no blocker for this artifact.
+
+## Scribe Batch Completion: Mission Control Ask Copilot — 2026-04-25T18:44:47Z
+
+**By:** Scribe
+
+Orchestration and decision consolidation for Mission Control Ask Copilot feature batch completed:
+- ✅ Orchestration log written: `.squad/orchestration-log/2026-04-25T18:44:47Z-copilot-assistant.md`
+- ✅ Session log written: `.squad/log/2026-04-25T18:44:47Z-mission-control-copilot-assistant.md`
+- ✅ Decisions merged: inbox files consolidated into `.squad/decisions/decisions.md` and inbox cleared
+- ✅ Inbox files deleted: `parker-copilot-sdk-assistant.md`, `lambert-copilot-sdk-assistant-review.md`
+- ✅ Team history appended: Parker and Lambert histories updated with completion note
+- ✅ Git staging ready: `.squad/` directory prepared for commit
+
+**Status:** Ready for git commit with co-authorship trailer.

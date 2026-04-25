@@ -166,3 +166,45 @@
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction
 - Contractor agents brought in for specialized expertise; documented in orchestration logs
+
+### 2026-04-25: LoadBalancer NSG Troubleshooting Documentation
+**By:** Lambert (QA/Docs), with Parker (SRE) and Ripley (Infra) review
+**What:** Added supportability documentation for the public LoadBalancer timeout/empty-reply incident, covering both Kubernetes service diagnostics and Azure LoadBalancer/VNet subnet NSG diagnostics.
+**Why:** The grid-dashboard and ops-console public VIPs failed even though pods, services, endpoints, nodePorts, and in-cluster curl were healthy. The root cause was the VNet AKS subnet NSG missing inbound TCP 80, so the docs now teach operators to distinguish K8s issues from Azure LB/NSG issues quickly.
+**Artifacts:** `docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md`, `docs/TROUBLESHOOTING.md`, README docs links, `docs/SRE-AGENT-SETUP.md`, and `docs/BREAKABLE-SCENARIOS.md`.
+**Status:** Implemented and reviewed; permanent infrastructure rule remains in `infra/bicep/modules/network.bicep` as `Allow-Internet-HTTP-To-AKS-LB`.
+
+### 2026-04-25T18:14:34Z: User directive — Local Coding Model Configuration (SUPERSEDED)
+**By:** John Stelmaszek (via Copilot)
+**What:** Configure coding-oriented Squad agents to prefer the local OpenAI-compatible model at `http://localhost:1234/v1`, using `qwen/qwen3-coder-next` for Ripley, Parker, and Lambert.
+**Why:** User request to enable local model evaluation for coding workflows, reduce latency and cloud API dependency, support experimental coding patterns and offline workflows.
+**Artifacts:** `.squad/orchestration-log/2026-04-25T18:16:29Z-scribe-local-coding-model.md`, `.squad/log/2026-04-25T18:16:29Z-local-coding-model-config.md`.
+**Status:** Superseded by 2026-04-25T18:20:56Z correction — qwen/qwen3-coder-next is legacy and should not be used.
+
+### 2026-04-25T18:18:37Z: User directive — Local Model Fallback (SUPERSEDED)
+**By:** John Stelmaszek (via Copilot)
+**What:** `qwen/qwen3-coder-next` is not currently available due to local memory pressure; use the loaded local model `qwen/qwen3.6-35b-a3b` as the current fallback for coding-oriented Squad agents.
+**Why:** User request — Coordinator validated model availability downgrade after LM Studio memory pressure caused model eviction. Fallback captures team decision for rapid recovery once memory constraints resolve.
+**Artifacts:** `.squad/orchestration-log/2026-04-25T18:19:49Z-scribe-local-model-fallback.md`, `.squad/log/2026-04-25T18:19:49Z-local-model-fallback.md`.
+**Status:** Superseded by 2026-04-25T18:20:56Z correction — qwen/qwen3-coder-next is legacy.
+
+### 2026-04-25T18:20:56Z: User directive — qwen3-Coder-Next Declared Legacy
+**By:** John Stelmaszek (via Copilot)
+**What:** Do not try `qwen/qwen3-coder-next` for local coding agents; it is legacy. Use `qwen/qwen3.6-35b-a3b` as the local coding model preference instead.
+**Why:** User directive — Coordinator has updated `.squad/config.json` to remove `qwen/qwen3-coder-next` entirely and configure only `qwen/qwen3.6-35b-a3b` as the active local model. Legacy preference paths must not be attempted.
+**Artifacts:** `.squad/orchestration-log/2026-04-25T18:21:45Z-scribe-qwen3-coder-next-legacy.md`, `.squad/log/2026-04-25T18:21:45Z-qwen3-coder-next-legacy.md`.
+**Status:** Active; team history corrected; legacy model removed from configuration.
+
+### 2026-04-25T18:44:47Z: Mission Control Ask Copilot — Backend Architecture
+**By:** Parker (SRE Dev), Copilot SDK Contractor (architecture review)  
+**Verdict:** APPROVED by Lambert (QA/Docs)
+
+**What:** Add GitHub Copilot SDK assistant in Mission Control backend only. Single read-only `get_mission_control_state` tool, `gpt-4.1` model, point-in-time state snapshot. Strict tool allowlist, 60s timeout, concurrency guard, input validation, timestamp/sources/tools metadata exposure. Frontend Ask Copilot panel with request input, response display, error handling. README updated with Technical Preview disclaimer, local-only framing, Copilot CLI/auth prerequisites.
+
+**Why:** Product framing defines Ask Copilot as local explainer/triage assistant (not autonomous SRE agent, not Azure SRE Agent replacement). Backend-only reduces auth complexity and establishes clear trust boundary. Read-only state snapshot eliminates mutating operations. Defers streaming, MCP, mutating/shell/file tools, persistent sessions, autonomous remediation.
+
+**Evidence:** Package manifests aligned. Backend safety: input validation, single-request guard, timeout/cleanup, strict tool allowlist, no logs. Frontend framing: single scrollable page with metadata/sources/tools/limits/errors visible. README differentiates Ask Copilot from Azure SRE Agent. Build ✅, lint ✅, API smoke checks ✅ (health 200, validation 400s, live assistant 200 with model/tool/metadata).
+
+**Follow-up:** Future automated test harness for assistant API validation/concurrency (non-blocking).
+
+**Artifacts:** `.squad/orchestration-log/2026-04-25T18:44:47Z-copilot-assistant.md`, `.squad/log/2026-04-25T18:44:47Z-mission-control-copilot-assistant.md`.
