@@ -30,6 +30,22 @@
 
 ## Learnings
 
+### 2026-04-26: Mission Control Health Classifier QA Review
+
+**Scope:** Code + live verification of KubeClient.ts health classifier fix to stop marking healthy services as degraded.
+
+**Review Result:** ✅ PASS
+
+**Key findings:**
+- Current-health gate correctly filters out resolved Warning events from degradation logic
+- Real degradation signals preserved: missing pods, insufficient replicas, critical/warning pod reasons, empty/not-ready endpoints, restarts
+- Live `/api/inventory` verification: 9 healthy services, no false degradation flags
+- Build and lint passed
+
+**Learnings:**
+- Health classification must separate "event history" from "current state" to avoid false degradation signals
+- Historical resolved events in recentEvents are useful for audit but must not trigger operator alerts
+
 ### 2026-04-26: Mission Control Click Feedback QA Review
 
 **Scope:** Accessibility + UX/readability review of click feedback implementation (MissionWallboard.vue, theme.css).

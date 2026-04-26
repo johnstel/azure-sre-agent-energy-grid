@@ -19,6 +19,26 @@
 
 ## Learnings
 
+### 2026-04-26: Mission Control Health Classifier — Backend Fix
+
+**Engagement:** User directive to stop marking healthy services as degraded when resolved Kubernetes Warning events are present.
+
+**Scope:** KubeClient.ts filterEvents() to add current-health gate; preserve real degradation signals.
+
+**Delivered:**
+- ✅ Modified `mission-control/backend/src/services/KubeClient.ts`
+- ✅ Added current-health gate: resolved Warning events remain in recentEvents but do not mark deployments as degraded
+- ✅ Real signals preserved: missing pods, insufficient replicas, critical/warning pod reasons, empty/not-ready endpoints, restarts
+- ✅ Live verified: `/api/inventory` reports 9 healthy services with no false degradation
+- ✅ Build/lint passed
+
+**Commit:** 6e21d12 (Ignore resolved warning events for healthy services)
+**Status:** Complete — verified live on local backend
+
+**Learnings:**
+- Kubernetes Warning events persist in recentEvents even after resolution; filtering requires current-state check, not event-only filtering
+- Health classification must distinguish "historical/resolved issue" from "current degradation" to avoid operator confusion on wallboard
+
 ### 2026-04-26: Mission Control Click Feedback — Implemented
 
 **Engagement:** Requested by Coordinator; reviewed by UX Architect (advisory), Lambert (accessibility QA).

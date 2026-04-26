@@ -2,6 +2,24 @@
 
 ## Active Decisions
 
+### 2026-04-26T20:32:37Z: Mission Control Health Classifier — Ignore Resolved Warning Events
+
+**By:** John Stelmaszek (user directive), implemented by Parker, reviewed by Lambert
+**What:** Mission Control KubeClient.ts updated to not mark healthy services as degraded when resolved Kubernetes Warning events are present. Real degradation signals preserved: missing pods, insufficient replicas, critical/warning pod reasons, empty/not-ready endpoints, restarts.
+
+**Implementation:**
+- Modified `mission-control/backend/src/services/KubeClient.ts` — added current-health gate to filterEvents()
+- Historical/resolved events remain in recentEvents for audit but do not trigger degradation flags
+- Live verification: `/api/inventory` reports 9 healthy services with no false degradation
+
+**Commit:** `6e21d12` — `Ignore resolved warning events for healthy services`
+
+**Status:** ✅ Complete — verified live on local backend
+
+**Why:** Startup warning events resolved over time were incorrectly causing healthy deployments to appear degraded in the wallboard, confusing operators about true service health.
+
+---
+
 ### 2026-04-26T01:31:16Z: Wave 0 Closure & Wave 1 Launch — Orchestration Gate Complete
 
 **By:** John Stelmaszek (user directive), reviewed by Dallas (Architecture), Security (Auditability), Operator (UX/UAT), SRE (Industry), Brand Guardian (Narrative), Executive (Business), Product Manager
