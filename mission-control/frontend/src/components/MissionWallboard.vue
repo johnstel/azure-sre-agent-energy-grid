@@ -30,12 +30,15 @@
         </button>
         <button
           class="command-button command-button--primary"
+          :class="{ 'is-refreshing': inventoryLoading }"
           type="button"
+          :aria-label="inventoryLoading ? 'Refreshing Mission Control data' : 'Refresh Mission Control data'"
           :aria-busy="inventoryLoading"
           :disabled="inventoryLoading"
+          :title="inventoryLoading ? 'Refreshing Mission Control data' : 'Refresh Mission Control data'"
           @click="refreshAll"
         >
-          {{ inventoryLoading ? 'Refreshing...' : 'Refresh' }}
+          Refresh
         </button>
       </div>
     </div>
