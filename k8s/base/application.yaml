@@ -32,6 +32,18 @@ metadata:
 # =============================================================================
 # RabbitMQ - Event Bus (meter events, grid alerts, dispatch commands)
 # =============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-enabled-plugins
+  namespace: energy
+  labels:
+    app: rabbitmq
+    sre-demo: breakable
+data:
+  enabled_plugins: "[rabbitmq_management,rabbitmq_prometheus,rabbitmq_amqp1_0]."
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -59,34 +71,46 @@ spec:
               name: amqp
             - containerPort: 15672
               name: management
+          volumeMounts:
+            - name: rabbitmq-enabled-plugins
+              mountPath: /etc/rabbitmq/enabled_plugins
+              subPath: enabled_plugins
+              readOnly: true
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "200m"
-            limits:
               memory: "512Mi"
-              cpu: "500m"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
           livenessProbe:
             exec:
               command: ["rabbitmq-diagnostics", "check_port_connectivity"]
             initialDelaySeconds: 90
             periodSeconds: 30
-            timeoutSeconds: 15
+            timeoutSeconds: 20
             failureThreshold: 3
           readinessProbe:
             exec:
               command: ["rabbitmq-diagnostics", "check_port_connectivity"]
             initialDelaySeconds: 30
             periodSeconds: 10
-            timeoutSeconds: 10
+            timeoutSeconds: 15
             failureThreshold: 6
           env:
             - name: RABBITMQ_PLUGINS
-              value: "rabbitmq_management,rabbitmq_amqp1_0"
+              value: "rabbitmq_management rabbitmq_prometheus rabbitmq_amqp1_0"
             - name: RABBITMQ_DEFAULT_USER
               value: "guest"
             - name: RABBITMQ_DEFAULT_PASS
               value: "guest"
+      volumes:
+        - name: rabbitmq-enabled-plugins
+          configMap:
+            name: rabbitmq-enabled-plugins
+            items:
+              - key: enabled_plugins
+                path: enabled_plugins
 
 ---
 apiVersion: v1

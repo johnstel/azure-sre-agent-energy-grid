@@ -446,3 +446,56 @@ Pre-existing worktree diff observed in `scripts/deploy.ps1` and runtime files (n
 - ✅ Wave 2-ready (clear roadmap for alert diagnostic settings, KQL library, multi-scenario UAT)
 
 **Status:** ✅ Wave 1 CLOSED_WITH_PENDING_HUMAN_PORTAL | 🚀 Wave 2 LAUNCH GATE CLEAR (upon operator portal evidence completion)
+
+---
+
+### 2026-04-26: Wave 0 Capability Contracts Locked
+
+**By:** Lambert (QA/Docs)
+**Status:** ✅ APPROVED (from Wave 0 gate closure)
+
+## What
+
+Wave 0 capability contracts written in `docs/CAPABILITY-CONTRACTS.md` are now locked:
+
+1. **Scenario IDs** (§3): 10 kebab-case IDs matching `k8s/scenarios/` filenames. No renames after gate.
+2. **Alert naming** (§4): `{prefix}-{slug}` format, Sev 0–3 mapping, required custom properties.
+3. **Runbook IDs** (§5): `RB-{NNN}` format with reserved ranges 001–099, 100–199, 200–299.
+4. **RBAC profiles** (§6): `review-readonly`, `review-remediate` (default), `auto-remediate`.
+5. **MTTR timestamps** (§7): T0–T5 model.
+6. **SCHEMA_TBD rule** (§8): All SRE Agent preview fields must carry the tag.
+7. **Telemetry dimensions** (§1): `sre.scenario`, `sre.service`, `sre.namespace`, `sre.component`, `sre.version`.
+
+## Why
+
+Plan.md anti-rework analysis shows that alerts, KQL, runbooks, MTTR, and SLOs all depend on these contracts. Locking them now prevents rework in Waves 1–5.
+
+## Impact
+
+- **Ripley**: Alert deployment (Wave 1) must use the §4 taxonomy. Activity Log export and retention alignment are Wave 1 Bicep tasks.
+- **Parker**: No K8s manifest changes needed for Wave 0. Scenario IDs are locked — if Parker adds new scenarios, they must follow §3 schema.
+- **Lambert**: Can begin Wave 1 KQL queries and evidence capture once alerts are deployed.
+
+**Status:** ✅ Merged from inbox (approved in Wave 0 gate closure 2026-04-26T01:31:16Z)
+
+---
+
+### 2026-04-26: Production Work Runs Through GitHub Issues
+
+**By:** John Stelmaszek (via Copilot)
+**Status:** ✅ Active operating rule
+
+## What
+
+Now that the environment is being treated as production, work should proceed through GitHub issues. As the team discovers gaps while diagnosing or remediating live AKS health, those gaps should become GitHub issues and be routed to the right core owner plus contractor, specialist, or writer when appropriate.
+
+## Why
+
+Issue-driven work keeps production findings visible, reviewable, prioritized, and auditable instead of burying them in chat, logs, or ad hoc local notes.
+
+## Impact
+
+- Coordinator creates or updates GitHub issues for production findings after review.
+- Core owners remediate through reviewed source changes and live validation.
+- Contractors/specialists are engaged when the issue needs security, architecture, SRE, product, or documentation expertise.
+- Writers are engaged for customer-facing or operator-facing documentation gaps.

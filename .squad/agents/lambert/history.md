@@ -28,6 +28,9 @@
 
 ## Learnings
 
+### 2026-04-26: RabbitMQ Live Repair QA Gate
+- For RabbitMQ repair reviews, require all three checks before approval: source diff matches issue #1 resource/probe contract, `rabbitmq-plugins list -e -m` shows `rabbitmq_amqp1_0`, and full service health accounts for intentional `grid-worker` 0/0 plus no Service expectation for worker/simulator deployments.
+
 ### 2026-04-26: RabbitMQ AMQP 1.0 QA Review
 - For narrow runtime fixes, Lambert should verify both the permanent manifest value and the diff boundary: parse `k8s/base/application.yaml` to confirm `RABBITMQ_PLUGINS=rabbitmq_management,rabbitmq_amqp1_0`, then inspect zero-context diff to ensure no probe/resource tuning or broad refactor is mixed in.
 
