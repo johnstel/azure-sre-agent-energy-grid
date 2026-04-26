@@ -684,3 +684,19 @@ Cluster `aks-gridmon-dev` was in **STOPPED** power state, preventing all Contain
 **Handoff**: Parker cleared to execute MongoDBDown + ServiceMismatch live captures. DO NOT STOP cluster until Wave 2 complete.
 
 **Cost Note**: Cluster will remain running (~$1.50-2.00/hour) until Parker + Lambert confirm Wave 2 closure.
+
+---
+
+## 2026-04-26: Issue #3 AKS Headroom Remediation
+
+**Task:** Diagnose and remediate Pending Defender/Retina pods on live `aks-srelab`.
+
+### Learnings
+
+**Pending security/observability pods are degraded coverage:** Treat Pending Defender, Retina, AMA, admission/security policy, or similar `kube-system` pods as security/observability degradation, not optional background noise.
+
+**Capacity-positive remediation is the default:** When evidence shows immediate node pressure, prefer reversible scale-out before resize, maxPods tuning, request/limit changes, affinity/toleration changes, or disabling components. If DaemonSet pods are node-affinity pinned to a saturated node, capture evidence first and use only targeted, reviewed rescheduling of non-security/non-admission replicas.
+
+**Azure CNI default maxPods=30 is too tight for this demo stack:** With Defender, Retina, AMA, CSI, Azure Policy, Gatekeeper, Calico, and app workloads, 30 pods per node leaves little room for add-on churn. New clusters should set explicit higher maxPods, while existing pools must preserve immutable maxPods to avoid deployment failures.
+
+**Security posture must be preserved during headroom fixes:** Do not disable Defender, Retina, monitoring, admission/security policies, resource requests/limits, affinity, or tolerations to make scheduling green. Do not delete pods blindly; capture before/after Pending pods, describe events, node allocatable/requested capacity, node pool SKU/count/maxPods, kube-system DaemonSet readiness, and `energy` workload health.

@@ -28,6 +28,11 @@
 
 ## Learnings
 
+### 2026-04-26: Issue #3 AKS maxPods QA Review
+- Treat AKS `maxPods` as node-pool immutable like VM size: QA approval requires proof that `deploy.ps1` preserves existing pool values for both `-WhatIf` and deployment before raising new-cluster defaults.
+- Pending Defender, Retina, AMA, or similar `kube-system` pods are degraded security/observability coverage; live remediation pass requires no Pending pods plus full Defender/Retina readiness and healthy `energy` workloads.
+- New-cluster `maxPods=50` is capacity-positive without increasing node count, but existing pools at `maxPods=30` remain live-vs-IaC drift until a reviewed maintenance-window recreation/resize.
+
 ### 2026-04-26: RabbitMQ Live Repair QA Gate
 - For RabbitMQ repair reviews, require all three checks before approval: source diff matches issue #1 resource/probe contract, `rabbitmq-plugins list -e -m` shows `rabbitmq_amqp1_0`, and full service health accounts for intentional `grid-worker` 0/0 plus no Service expectation for worker/simulator deployments.
 

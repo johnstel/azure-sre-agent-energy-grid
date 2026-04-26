@@ -26,6 +26,10 @@ param systemNodeVmSize = 'Standard_D2s_v5'
 param userNodeVmSize = 'Standard_D2s_v5'
 param systemNodeCount = 2
 param userNodeCount = 3
+// New clusters use higher maxPods than AKS's Azure CNI default (30) to leave room for Defender/Retina/monitoring DaemonSets.
+// Existing node pools keep their immutable maxPods via scripts/deploy.ps1.
+param systemMaxPods = 50
+param userMaxPods = 50
 
 // Tags
 param tags = {

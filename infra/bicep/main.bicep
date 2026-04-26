@@ -87,6 +87,16 @@ param systemNodeCount int = 2
 @maxValue(10)
 param userNodeCount int = 3
 
+@description('Maximum pods per system node pool node. New clusters use this to preserve scheduling headroom; existing pools keep their immutable value via scripts/deploy.ps1.')
+@minValue(30)
+@maxValue(110)
+param systemMaxPods int = 50
+
+@description('Maximum pods per user node pool node. New clusters use this to preserve scheduling headroom; existing pools keep their immutable value via scripts/deploy.ps1.')
+@minValue(30)
+@maxValue(110)
+param userMaxPods int = 50
+
 @description('Tags to apply to all resources')
 param tags object = {
   workload: 'energy-grid-demo'
@@ -202,6 +212,8 @@ module aks 'modules/aks.bicep' = {
     userNodeVmSize: userNodeVmSize
     systemNodeCount: systemNodeCount
     userNodeCount: userNodeCount
+    systemMaxPods: systemMaxPods
+    userMaxPods: userMaxPods
     vnetSubnetId: network.outputs.aksSubnetId
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     acrId: containerRegistry.outputs.acrId

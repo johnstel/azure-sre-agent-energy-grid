@@ -585,6 +585,8 @@ if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($aksShowOutput)) 
 $systemNodeVmSizeParam = $null
 $userNodeVmSizeParam = $null
 $kubernetesVersionParam = $null
+$systemMaxPodsParam = $null
+$userMaxPodsParam = $null
 
 if ($existingAksCluster) {
     Write-Host "  ℹ️  Found existing AKS cluster: $aksClusterName" -ForegroundColor Cyan
@@ -599,17 +601,21 @@ if ($existingAksCluster) {
 
     if ($systemPool) {
         $systemNodeVmSizeParam = $systemPool.vmSize
+        $systemMaxPodsParam = $systemPool.maxPods
         Write-Host "  • System pool VM size: $systemNodeVmSizeParam (immutable)" -ForegroundColor White
+        Write-Host "  • System pool maxPods: $systemMaxPodsParam (immutable)" -ForegroundColor White
     }
 
     if ($userPool) {
         $userNodeVmSizeParam = $userPool.vmSize
+        $userMaxPodsParam = $userPool.maxPods
         Write-Host "  • User pool VM size:   $userNodeVmSizeParam (immutable)" -ForegroundColor White
+        Write-Host "  • User pool maxPods:   $userMaxPodsParam (immutable)" -ForegroundColor White
     }
 
-    Write-Host "`n  ⚠️  AKS node pool VM sizes are immutable. Using existing sizes to prevent deployment failure." -ForegroundColor Yellow
+    Write-Host "`n  ⚠️  AKS node pool VM sizes and maxPods are immutable. Using existing values to prevent deployment failure." -ForegroundColor Yellow
     Write-Host "     Existing Kubernetes version is also preserved to avoid unsupported downgrade attempts." -ForegroundColor Gray
-    Write-Host "     To change VM sizes or recreate from defaults, destroy the cluster or use a different WorkloadName." -ForegroundColor Gray
+    Write-Host "     To change VM sizes/maxPods or recreate from defaults, destroy the cluster or use a different WorkloadName." -ForegroundColor Gray
 }
 else {
     Write-Host "  ℹ️  No existing AKS cluster found. Will use default VM sizes from parameters file." -ForegroundColor Gray
@@ -645,6 +651,12 @@ if ($WhatIf) {
     }
     if ($userNodeVmSizeParam) {
         $whatIfParameterArgs += "userNodeVmSize=$userNodeVmSizeParam"
+    }
+    if ($systemMaxPodsParam) {
+        $whatIfParameterArgs += "systemMaxPods=$systemMaxPodsParam"
+    }
+    if ($userMaxPodsParam) {
+        $whatIfParameterArgs += "userMaxPods=$userMaxPodsParam"
     }
 
     $whatIfOutput = az deployment sub what-if `
@@ -688,6 +700,12 @@ try {
     }
     if ($userNodeVmSizeParam) {
         $deployParameterArgs += "userNodeVmSize=$userNodeVmSizeParam"
+    }
+    if ($systemMaxPodsParam) {
+        $deployParameterArgs += "systemMaxPods=$systemMaxPodsParam"
+    }
+    if ($userMaxPodsParam) {
+        $deployParameterArgs += "userMaxPods=$userMaxPodsParam"
     }
 
     $createArgs = @(

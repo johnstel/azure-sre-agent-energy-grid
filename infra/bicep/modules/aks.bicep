@@ -33,6 +33,12 @@ param systemNodeCount int
 @description('User node pool node count')
 param userNodeCount int
 
+@description('Maximum pods per system node pool node')
+param systemMaxPods int
+
+@description('Maximum pods per user node pool node')
+param userMaxPods int
+
 @description('Subnet ID for AKS nodes')
 param vnetSubnetId string
 
@@ -96,6 +102,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-02-01' = {
         osSKU: 'AzureLinux'
         mode: 'System'
         vnetSubnetID: vnetSubnetId
+        maxPods: systemMaxPods
         enableAutoScaling: true
         minCount: 1
         maxCount: 5
@@ -114,6 +121,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-02-01' = {
         osSKU: 'AzureLinux'
         mode: 'User'
         vnetSubnetID: vnetSubnetId
+        maxPods: userMaxPods
         enableAutoScaling: true
         minCount: 1
         maxCount: 10
