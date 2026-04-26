@@ -11,6 +11,23 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 - **Ready-to-use scripts** for deployment and teardown
 - **Dev container** for consistent development experience
 
+## 🛡️ Trust & Safety Model
+
+> **Azure SRE Agent is in Public Preview.** This demo runs in **Review mode** — the agent proposes actions, humans approve them. Nothing executes without your sign-off.
+
+| Trust Tier | Configuration | What the Agent Can Do | Approval |
+|------------|--------------|----------------------|----------|
+| **Diagnosis Only** | `accessLevel: 'Low'` | Read logs, query metrics, analyze state | N/A — read-only |
+| **Propose & Approve** | `accessLevel: 'High'`, `mode: 'Review'` | Diagnose + propose remediation | ✅ Human approves every action |
+| **Autonomous** | `accessLevel: 'High'`, `mode: 'Auto'` | Diagnose + execute autonomously | ❌ **Not demonstrated** |
+
+This lab deploys the **Propose & Approve** tier. For the full RBAC matrix (demo vs. production), security guardrails, and safe language guidance, see:
+
+- [Capability Contracts](docs/CAPABILITY-CONTRACTS.md) — shared contracts, RBAC matrix, data retention
+- [Demo Narrative](docs/DEMO-NARRATIVE.md) — 20-minute customer story arc and Q&A prep
+- [Safe Language Guardrails](docs/SAFE-LANGUAGE-GUARDRAILS.md) — what to claim and what not to claim
+- [Demo Runbook](docs/DEMO-RUNBOOK.md) — step-by-step operator checklist
+
 ## ⚡ Energy Grid Architecture
 
 The platform simulates an electric energy producer with grid management and retail consumer services:
@@ -67,9 +84,12 @@ break-image
 menu
 ```
 
+> 💡 **Best demo impact**: Start with `break-oom`, then try `break-mongodb` for cascading failure diagnosis — see [Demo Narrative](docs/DEMO-NARRATIVE.md) for the recommended 20-minute story arc.
+
 To restore:
 ```bash
-fix-all
+kubectl apply -f k8s/base/application.yaml
+# Or in the dev container: fix-all
 ```
 
 ## 🤖 Using SRE Agent
@@ -140,9 +160,15 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 
 ## 📚 Documentation
 
+- [Demo Runbook](docs/DEMO-RUNBOOK.md) — operator checklist for running the demo
+- [Demo Narrative](docs/DEMO-NARRATIVE.md) — 20-minute customer story arc
+- [Safe Language Guardrails](docs/SAFE-LANGUAGE-GUARDRAILS.md) — claims to avoid during demos
+- [Capability Contracts](docs/CAPABILITY-CONTRACTS.md) — shared contracts, RBAC, retention
 - [SRE Agent Setup Guide](docs/SRE-AGENT-SETUP.md)
 - [Prompts Guide](docs/PROMPTS-GUIDE.md)
 - [Breakable Scenarios Guide](docs/BREAKABLE-SCENARIOS.md)
+- [Kubernetes Service Troubleshooting](docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md)
+- [Azure Networking Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Cost Estimation](docs/COSTS.md)
 
 ## 🤝 Contributing

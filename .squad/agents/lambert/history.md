@@ -198,3 +198,89 @@ Orchestration and decision consolidation for Mission Control Ask Copilot feature
 
 **Status:** Lambert approved wallboard design; QA responsibilities captured for Phase 2 planning.
 
+---
+
+## 2026-04-25: Mission Control Wallboard Acceptance Gate
+
+**By:** Lambert (QA/Docs)
+
+**Context:** John asked Lambert to define acceptance checks for the approved Mission Control wallboard rebuild while Parker and the frontend contractor implement.
+
+**Validation performed:**
+- Read the approved wallboard decision, current Mission Control frontend/backend structure, Lambert history, team focus, and contractor-engagement skill.
+- Ran `cd mission-control && npm run build && npm run lint`; both passed.
+- Attempted local production server start with `NO_OPEN=1 npm run start`; it failed to bind `127.0.0.1:3333` because another process was already using the port. Did not terminate shared/user processes.
+- Smoke-checked the existing server on `127.0.0.1:3333`: `/api/health` and `/api/events` returned JSON, but `/api/inventory`, `/api/pods/example/logs`, and `/api/services/example/endpoints` returned `text/html`, indicating SPA fallback rather than implemented JSON API routes.
+
+**Acceptance artifact:** `.squad/decisions/inbox/lambert-wallboard-acceptance.md`
+
+**Key QA gates captured:**
+- Backend API contract for inventory/events/logs/endpoints, including JSON 404 for unknown `/api/*`.
+- Hard namespace lock to `energy` with no user-supplied namespace override.
+- Redaction requirements before logs/events leave the backend.
+- 1920×1080 fixed-zone wallboard layout with constrained drawer and approved severity palette.
+- Expected-vs-actual matrix as hero feature with scenario mismatch visibility.
+- Click-through logs/events drawer behavior.
+- Reduced tutorial/static prose and `Explain This State` naming.
+- Deploy/destroy controls moved off the primary wallboard.
+
+**Current verdict:** Build/lint pass, but wallboard implementation is not ready for QA acceptance. Backend route coverage and frontend wallboard IA still need Parker/frontend contractor completion before Dallas review.
+
+---
+
+## 2026-07-22: Wave 0 Documentation Fix Pass
+
+**By:** Lambert (QA/Docs)
+
+**Context:** Wave 0 received APPROVE WITH FIXES from Operator, Product, Brand, and Security reviewers. All fixes are documentation-only — no runtime changes.
+
+**Files created:**
+- `docs/DEMO-RUNBOOK.md` — operator-facing sequential checklist (OC-1, DO-6, DO-7)
+- `docs/DEMO-NARRATIVE.md` — 20-minute customer story arc (Brand FIX 1, FIX 5)
+- `docs/SAFE-LANGUAGE-GUARDRAILS.md` — claims guardrails (Brand FIX 4)
+
+**Files modified:**
+- `docs/CAPABILITY-CONTRACTS.md` — added §9-§13 for S0-1..S0-5, fixed `ReadOnly` → `Low`, renumbered §14-§16
+- `docs/BREAKABLE-SCENARIOS.md` — added pass/fail criteria for all 10 scenarios (OC-3)
+- `docs/evidence/README.md` — added capture checklist template, screenshot/KQL standards (OC-2)
+- `README.md` — added Trust & Safety Model section, updated doc links (Brand FIX 2, EB-2)
+
+**Key learnings:**
+1. **accessLevel terminology**: Bicep `sre-agent.bicep` uses `@allowed(['High', 'Low'])`. `ReadOnly` does not exist as an accessLevel value — it was incorrectly used in the first draft. Always verify enum values against source Bicep.
+2. **Pass/fail criteria are essential for UAT**: Without explicit PASS/FAIL criteria, operators cannot self-assess demo runs. Every scenario needs at minimum: what SRE Agent should identify, what it should recommend, and what constitutes failure.
+3. **Safe language guardrails prevent overclaiming**: Preview status must be surfaced prominently, not buried in footers. A "do not claim X / say Y instead" table is the most effective format.
+4. **Trust model is the #1 brand asset**: The three-tier model (Low/Review, High/Review, High/Auto) is the enterprise objection killer. It should be the first thing customers see, not buried in internal docs.
+5. **Evidence capture needs a template**: Empty folder structures are insufficient — operators need a copy-paste checklist with specific artifact types, naming conventions, and pass/fail assessment criteria.
+
+**Decision artifact:** `.squad/decisions/inbox/lambert-wave0-fixpass.md`
+
+### 2025-07-22: Wave 0 Polish Pass — Brand + Operator Fixes
+
+**Context:** Brand Guardian and Operator UAT both returned APPROVE WITH FIXES. Applied all 6 docs-only polish fixes.
+
+**Fixes applied:**
+1. `fix-all` ambiguity → portable kubectl command first, alias explained as dev-container-only (RUNBOOK Step 5)
+2. Inline scenario prompts → prompt table for OOMKilled/MongoDBDown/ServiceMismatch in RUNBOOK Step 4c
+3. Wave 0 completion checklist → 8-item checklist added to end of DEMO-RUNBOOK.md
+4. Scenario ordering conflict → BREAKABLE-SCENARIOS.md "Comprehensive Demo" now defers to DEMO-NARRATIVE.md
+5. README MongoDB visibility → `break-mongodb` callout + DEMO-NARRATIVE link in "Breaking Things"
+6. Core vs Extended demo → DEMO-NARRATIVE.md split into Core Demo (20 min, 3 scenarios) and Extended Demo (25+ min, 5 scenarios)
+
+**Files modified:**
+- `docs/DEMO-RUNBOOK.md` — Step 5 rewrite, Step 4c prompt table, Wave 0 checklist
+- `docs/DEMO-NARRATIVE.md` — Core/Extended demo split, version history
+- `docs/BREAKABLE-SCENARIOS.md` — Comprehensive Demo section replaced
+- `README.md` — MongoDB callout, fix-all clarification
+
+**Validation:**
+- Old conflicting sequence (OOM→NetworkBlock→CrashLoop) eliminated: 0 grep matches
+- MongoDBDown/cascading story present in README: confirmed
+- No runtime files modified: only .md files in diff
+- All doc cross-references consistent
+
+**Key learnings:**
+1. **Canonical source pattern**: When multiple docs cover the same topic (scenario ordering), designate one as canonical and have others defer with a one-liner link. Prevents drift.
+2. **Inline prompts for live demos**: Operators cannot tab-switch during a live demo. The top prompt per scenario must be inline in the runbook, not in a separate document.
+3. **Completion checklists close waves**: Without an explicit "you are done" checklist, wave completion is ambiguous. A checklist in the runbook makes the exit gate self-certifiable.
+
+**Decision artifact:** `.squad/decisions/inbox/lambert-wave0-polish.md`

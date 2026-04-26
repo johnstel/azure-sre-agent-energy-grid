@@ -50,6 +50,12 @@ kubectl describe pod -l app=meter-service -n energy | grep -A 5 "Last State"
 - "I see OOMKilled events. What memory should I allocate for meter data processing?"
 - "Diagnose the memory issues in the energy namespace"
 
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent identifies `OOMKilled` as root cause AND recommends increasing memory limits
+- ✅ **PASS**: Pod restarts are visible within 60 seconds of scenario injection
+- ❌ **FAIL**: SRE Agent misidentifies root cause after 3 prompt attempts
+- ❌ **FAIL**: Agent recommends unrelated fix (e.g., image pull, network issue)
+
 **How to fix:**
 ```bash
 kubectl apply -f k8s/base/application.yaml
@@ -84,6 +90,12 @@ kubectl logs -l app=asset-service -n energy --previous
 - "Why is asset-service in CrashLoopBackOff?"
 - "Show me the logs for the crashing asset catalog pods"
 - "What's causing exit code 1 in the energy asset service?"
+
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent identifies `CrashLoopBackOff` and analyzes container exit codes/logs
+- ✅ **PASS**: Agent traces root cause to invalid command or configuration
+- ❌ **FAIL**: Agent does not check container logs or exit codes
+- ❌ **FAIL**: Agent attributes crash to resource exhaustion instead of configuration
 
 **How to fix:**
 ```bash
@@ -120,6 +132,12 @@ kubectl describe pod -l app=dispatch-service -n energy | grep -A 10 Events
 - "Help me troubleshoot the container image issue for energy dispatch"
 - "What's wrong with the dispatch-service deployment?"
 
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent identifies `ImagePullBackOff` and names the non-existent image tag
+- ✅ **PASS**: Agent recommends verifying the image exists in the registry
+- ❌ **FAIL**: Agent does not identify the image/registry issue
+- ❌ **FAIL**: Agent attributes failure to application crash instead of image pull
+
 **How to fix:**
 ```bash
 kubectl apply -f k8s/base/application.yaml
@@ -154,6 +172,12 @@ kubectl top nodes
 - "Grid services are slow. What's consuming all the CPU?"
 - "Analyze CPU usage across pods in the energy namespace"
 - "Which pods are causing resource contention on the grid platform?"
+
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent identifies excessive CPU consumption by frequency-calc-overload pods
+- ✅ **PASS**: Agent recommends resource limits or scaling adjustments
+- ❌ **FAIL**: Agent does not identify the CPU-intensive workload
+- ❌ **FAIL**: Agent attributes slowness to network or memory issues
 
 **How to fix:**
 ```bash
@@ -190,6 +214,12 @@ kubectl describe pod -l app=substation-monitor -n energy | grep -A 10 Events
 - "I can't schedule new grid monitoring workloads. What's wrong?"
 - "Analyze cluster capacity for the energy platform"
 
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent identifies Pending state and traces to insufficient cluster resources (CPU/memory requests too high)
+- ✅ **PASS**: Agent recommends reducing resource requests or scaling the cluster
+- ❌ **FAIL**: Agent does not check scheduling events or resource requests
+- ❌ **FAIL**: Agent attributes Pending to image pull or configuration issues
+
 **How to fix:**
 ```bash
 kubectl delete deployment substation-monitor -n energy
@@ -225,6 +255,12 @@ kubectl describe pod -l app=grid-health-monitor -n energy | grep -A 5 "Liveness"
 - "Diagnose the health check failures in the energy namespace"
 - "What's wrong with the liveness probe on grid-health-monitor?"
 
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent identifies liveness probe failure and the misconfigured endpoint
+- ✅ **PASS**: Agent recommends correcting the probe path or endpoint
+- ❌ **FAIL**: Agent attributes restarts to application crash instead of probe misconfiguration
+- ❌ **FAIL**: Agent does not inspect probe configuration
+
 **How to fix:**
 ```bash
 kubectl delete deployment grid-health-monitor -n energy
@@ -257,6 +293,12 @@ kubectl exec -n energy deploy/grid-dashboard -- curl -s meter-service:3000/healt
 - "Why can't the grid dashboard reach meter-service?"
 - "Diagnose network connectivity issues in the energy namespace"
 - "What network policies are blocking meter data ingestion?"
+
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent identifies NetworkPolicy blocking traffic to meter-service
+- ✅ **PASS**: Agent recommends removing or modifying the blocking network policy
+- ❌ **FAIL**: Agent does not check NetworkPolicies
+- ❌ **FAIL**: Agent attributes connectivity failure to DNS or application issues
 
 **How to fix:**
 ```bash
@@ -292,6 +334,12 @@ kubectl describe pod -l app=grid-zone-config -n energy | grep -A 10 Events
 - "Grid zone configuration pod won't start. Something about ConfigMap?"
 - "What configuration is missing for the grid zone deployment?"
 - "Troubleshoot the ConfigMap reference error in the energy namespace"
+
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent identifies missing ConfigMap reference as root cause
+- ✅ **PASS**: Agent recommends creating the missing ConfigMap or correcting the reference
+- ❌ **FAIL**: Agent does not check volume mounts or ConfigMap references
+- ❌ **FAIL**: Agent attributes ContainerCreateError to image or resource issues
 
 **How to fix:**
 ```bash
@@ -332,6 +380,13 @@ kubectl exec -n energy deploy/rabbitmq -- rabbitmqctl list_queues
 - "Why is dispatch-service failing health checks?"
 - "Trace the dependency chain — what broke first?"
 - "Scale the mongodb deployment back to 1 replica"
+
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent traces the cascading failure: MongoDB down → dispatch-service health check failures → meter events queuing
+- ✅ **PASS**: Agent identifies MongoDB (0 replicas) as the root cause, not dispatch-service
+- ✅ **PASS**: Agent recommends scaling MongoDB back to 1+ replicas
+- ❌ **FAIL**: Agent treats dispatch-service failure as the root cause without tracing to MongoDB
+- ❌ **FAIL**: Agent does not identify the dependency chain across services
 
 **How to fix:**
 ```bash
@@ -380,6 +435,13 @@ kubectl get pods -n energy -l app=meter-service --show-labels
 - "Compare the meter-service Service selector to the actual pod labels"
 - "Fix the selector on the meter-service Service to match the pods"
 
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent identifies the Service selector mismatch (`meter-service-v2` vs `meter-service`)
+- ✅ **PASS**: Agent checks Service endpoints (empty) and compares selector to pod labels
+- ✅ **PASS**: Agent recommends correcting the Service selector to match pod labels
+- ❌ **FAIL**: Agent reports "all pods healthy" without checking Service endpoints
+- ❌ **FAIL**: Agent does not analyze Service selector vs pod label alignment
+
 **How to fix:**
 ```bash
 kubectl apply -f k8s/base/application.yaml
@@ -398,12 +460,9 @@ kubectl apply -f k8s/base/application.yaml
 
 ### Comprehensive Demo (20 minutes)
 
-1. **Introduction** - Show healthy energy grid platform
-2. **Break #1** - OOMKilled (meter service memory exhaustion)
-3. **Break #2** - Network Policy (meter service isolated)
-4. **Break #3** - CrashLoopBackOff (asset service config failure)
-5. **Advanced** - Show scheduled monitoring task
-6. **Cleanup** - Restore all scenarios
+See [DEMO-NARRATIVE.md](DEMO-NARRATIVE.md) for the canonical 20-minute story arc with scenario ordering, dramatic escalation, and Q&A prep. The recommended sequence is:
+
+1. **OOMKilled** (Opener) → 2. **MongoDBDown** (Climax — cascading failure) → 3. **ServiceMismatch** (Trust anchor — catches what humans miss)
 
 ### "Baking" for Advisor Recommendations
 
@@ -420,5 +479,7 @@ Some scenarios benefit from running longer to gather metrics:
 - ✅ Have baseline metrics before breaking things
 - ✅ Document what you did and when for demos
 - ✅ Keep fix commands ready
+- ✅ If public LoadBalancer IPs stop responding, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#-public-loadbalancer-not-responding) before assuming a scenario broke it
+- ✅ For Kubernetes service issues (endpoints empty, selectors wrong, port mismatches), see [KUBERNETES-SERVICE-TROUBLESHOOTING.md](KUBERNETES-SERVICE-TROUBLESHOOTING.md)
 - ❌ Don't apply multiple breaking scenarios simultaneously
 - ❌ Don't leave scenarios running unattended
