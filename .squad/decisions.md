@@ -480,6 +480,42 @@ Plan.md anti-rework analysis shows that alerts, KQL, runbooks, MTTR, and SLOs al
 
 ---
 
+### 2026-04-26T17:30:54Z: Production RabbitMQ + AKS Repair Cycle Complete — Issues #1–#3 Closed, #4 Deferred
+
+**By:** Production team (Parker, Lambert, Ripley), Security Engineer (contractor), Dallas (Lead), Technical Writer, Coordinator
+**Status:** ✅ CLOSED (Live + Source) | ⏸️ DEFERRED (#4)
+
+**What:** RabbitMQ crash-loop (35+ restarts) eliminated via plugin activation + resource limit fixes. Secondary finding: AKS node pool scheduling headroom improved. Deferred maintenance-window runbook for maxPods drift.
+
+**Issues Resolved:**
+- **#1** — `fix: RabbitMQ crash-looping due to insufficient resource limits and probe timeouts` → ✅ Commit `3e79963`
+- **#2** — `Bug: RabbitMQ missing AMQP 1.0 plugin causes restart loop (35+ restarts)` → ✅ Commit `9389061`
+- **#3** — `AKS node pool has low scheduling headroom for system add-ons` → ✅ Commit `fe6aa3f`
+
+**Issues Deferred:**
+- **#4** — `Plan maintenance-window AKS node pool recreation to eliminate maxPods drift` → ⏸️ Commit `79bb175` (runbook); scheduled window TBD
+
+**Production Outcomes:**
+- RabbitMQ stable post-fix with 0 restarts during validation
+- Energy namespace workloads healthy after repair
+- No Pending kube-system pods remained after AKS scheduling remediation
+- Defender/Retina security and observability coverage restored without disabling controls
+
+**Key Decisions:**
+1. **Security First:** Rejected capacity reductions; Defender/Retina monitoring mandatory (Contractor + Ripley aligned)
+2. **Capacity Positive:** Applied only safe remediation; durable defaults now target `maxPods=50` for new clusters while preserving immutable existing-pool values during redeploy
+3. **Deferred Maintenance:** Blue/green node-pool replacement deferred to scheduled maintenance window (Dallas decision)
+4. **Runbook Required:** `docs/AKS-MAXPODS-MAINTENANCE-RUNBOOK.md` created before any maintenance execution
+
+**Cross-Agent Workflow:**
+- Parker (Live Diagnosis) → Lambert (QA Gate #1/#2) → Security (Security Policy) → Ripley (Live + Source Fix #3) → Lambert (QA Gate #3) → Dallas (Lead Decision #4) → Technical Writer (Runbook) → Lambert (Docs QA) → Coordinator (GitHub Sync)
+
+**Why:** Production incidents require rapid diagnosis, coordinated remediation, and security-conscious decision-making. Issue-driven workflow kept findings visible, reviewable, and auditable. Secondary finding escalated appropriately with security constraints applied.
+
+**Follow-up:** Issue #4 remains OPEN for scheduled maintenance window execution with runbook ready.
+
+---
+
 ### 2026-04-26: Production Work Runs Through GitHub Issues
 
 **By:** John Stelmaszek (via Copilot)
