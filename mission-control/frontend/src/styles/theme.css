@@ -434,6 +434,17 @@ button:disabled {
   transform: translateY(-1px);
 }
 
+.command-button:not(:disabled):active {
+  transform: translateY(0);
+  opacity: 0.85;
+}
+
+.command-button.is-pressed {
+  border-color: rgb(34 211 238 / 0.58);
+  background: rgb(8 145 178 / 0.26);
+  box-shadow: inset 0 0 0 1px rgb(34 211 238 / 0.32), 0 10px 22px rgb(34 211 238 / 0.1);
+}
+
 .command-button--primary {
   background: var(--accent);
   color: var(--bg-deep);
@@ -482,6 +493,11 @@ button:disabled {
   border-color: rgb(254 202 202 / 0.76);
 }
 
+.danger-button:not(:disabled):active {
+  transform: translateY(0);
+  opacity: 0.85;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -493,7 +509,9 @@ button:disabled {
   }
 
   .command-button:not(:disabled):hover,
+  .command-button:not(:disabled):active,
   .danger-button:not(:disabled):hover,
+  .danger-button:not(:disabled):active,
   .skip-link {
     transform: none;
   }

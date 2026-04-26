@@ -20,15 +20,22 @@
       <div class="wallboard__actions" aria-label="Operational controls">
         <button
           class="command-button command-button--neutral"
+          :class="{ 'is-pressed': controlPanelOpen }"
           type="button"
           aria-controls="wallboard-control-dock portal-validation"
           :aria-expanded="controlPanelOpen"
           @click="controlPanelOpen = !controlPanelOpen"
         >
-          Controls
+          {{ controlPanelOpen ? 'Controls Open' : 'Controls' }}
         </button>
-        <button class="command-button command-button--primary" type="button" :disabled="inventoryLoading" @click="refreshAll">
-          Refresh
+        <button
+          class="command-button command-button--primary"
+          type="button"
+          :aria-busy="inventoryLoading"
+          :disabled="inventoryLoading"
+          @click="refreshAll"
+        >
+          {{ inventoryLoading ? 'Refreshing...' : 'Refresh' }}
         </button>
       </div>
     </div>
@@ -207,9 +214,10 @@
             v-for="incident in incidents"
             :key="inventoryKey(incident)"
             class="incident-row"
-            :class="`incident-row--${incident.severity}`"
+            :class="[`incident-row--${incident.severity}`, { 'is-selected': selected?.id === inventoryKey(incident) }]"
             role="button"
             tabindex="0"
+            :aria-selected="selected?.id === inventoryKey(incident)"
             @click="selectInventoryItem(incident)"
             @keydown.enter.prevent="selectInventoryItem(incident)"
             @keydown.space.prevent="selectInventoryItem(incident)"
@@ -232,9 +240,13 @@
             v-for="pod in pods"
             :key="pod.name"
             class="pod-row"
-            :class="pod.ready && pod.status === 'Running' ? 'pod-row--healthy' : 'pod-row--warning'"
+            :class="[
+              pod.ready && pod.status === 'Running' ? 'pod-row--healthy' : 'pod-row--warning',
+              { 'is-selected': selected?.id === `pod:${pod.name}` }
+            ]"
             role="button"
             tabindex="0"
+            :aria-selected="selected?.id === `pod:${pod.name}`"
             @click="selectPod(pod.name)"
             @keydown.enter.prevent="selectPod(pod.name)"
             @keydown.space.prevent="selectPod(pod.name)"
@@ -1792,6 +1804,22 @@ defineExpose({
   cursor: pointer;
   padding: 0.7rem;
   text-align: left;
+  transition: box-shadow 160ms ease, opacity 160ms ease;
+}
+
+.incident-row:hover,
+.pod-row:hover {
+  box-shadow: inset 0 0 0 2px rgb(34 211 238 / 0.2);
+}
+
+.incident-row:active,
+.pod-row:active {
+  opacity: 0.85;
+}
+
+.incident-row.is-selected,
+.pod-row.is-selected {
+  box-shadow: inset 0 0 0 2px rgb(34 211 238 / 0.38);
 }
 
 .incident-row span,
@@ -2063,6 +2091,13 @@ defineExpose({
   .analyst-drawer {
     top: 0;
     width: min(100vw, 420px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .incident-row:active,
+  .pod-row:active {
+    opacity: 1;
   }
 }
 </style>

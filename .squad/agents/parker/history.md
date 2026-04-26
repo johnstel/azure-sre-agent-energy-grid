@@ -864,3 +864,25 @@ Used `"alert.scenarios": "oom-killed,crash-loop"` comma-separated format for mul
 **Next Action**: Awaiting John's decision on Option A (rerun authorization) vs Option B (accept incomplete Wave 1).
 
 **Production Learning**: Pre-flight check requirement for Container Insights ingestion BEFORE scenario execution. Configuration correctness ≠ active data pipeline. Always verify target namespace has recent data BEFORE injecting failure scenarios.
+
+---
+
+## 2026-04-26 - Mission Wallboard Click Feedback UI
+
+**Task**: Implement visual click feedback for Controls/Refresh buttons and persistent selection highlighting for incident/pod rows.
+
+**Changes**:
+- Added `:active` states to `.command-button` and `.danger-button` in `theme.css` (translateY(0) + opacity 0.85)
+- Added `.is-selected` class binding to incident rows based on `selected?.id === inventoryKey(incident)`
+- Added `.is-selected` class binding to pod rows based on `selected?.id === 'pod:${pod.name}'`
+- Added `aria-selected` attribute to both incident and pod rows for accessibility
+- Implemented hover/active CSS for `.incident-row` and `.pod-row` using existing cyan inset selection language (`rgb(34 211 238 / 0.2)` hover, `0.38` selected)
+- Added `prefers-reduced-motion: reduce` overrides to disable opacity changes in reduced-motion mode
+
+**Files Modified**:
+- `mission-control/frontend/src/components/MissionWallboard.vue` (template + scoped styles)
+- `mission-control/frontend/src/styles/theme.css` (button :active states)
+
+**Validation**: ✅ `npm run build` and `npm run lint` both passed.
+
+**Learning**: Vue's class binding syntax `[arrayClass, { conditional }]` cleanly handles multiple severity states + selection state without redundant DOM checks. Existing `selected` state reused for pod highlighting instead of introducing new `selectedPod` ref.
