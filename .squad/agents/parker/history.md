@@ -19,7 +19,29 @@
 
 ## Learnings
 
-### 2026-04-26: RabbitMQ Live Drift Repair
+### 2026-04-26: Mission Control Click Feedback — Implemented
+
+**Engagement:** Requested by Coordinator; reviewed by UX Architect (advisory), Lambert (accessibility QA).
+
+**Scope:** Add visual click feedback to Mission Control Controls button and Refresh action in MissionWallboard.vue.
+
+**Delivered:**
+- ✅ Persistent Controls open state (stays open until user closes)
+- ✅ Refreshing label + loading state during API calls
+- ✅ aria-busy attribute for screen reader users
+- ✅ Button state feedback styling in theme.css
+- ✅ Accessibility: WCAG 2.2 Level AA verified (Lambert review)
+- ✅ CI: Build/lint passed
+
+**Commit:** 2e23a05 (Add Mission Control click feedback)  
+**Status:** Merged to main
+
+**Learnings:**
+- Click feedback on wallboard buttons must persist state (not auto-close) to let users see that their input was received
+- aria-busy is critical for screen reader users to understand loading state
+- Refreshing label disambiguates between "user clicked" and "system is fetching" — both different states that users need to see
+
+
 - Live AKS RabbitMQ had drifted from source: AMQP 1.0 was absent and issue #1 resource/probe tuning was not applied. Verify live plugin state with `rabbitmq-plugins list -e -m`; env presence alone is not proof.
 - The `rabbitmq:3.11-management-alpine` image in this cluster did not consume `RABBITMQ_PLUGINS`; mounting `/etc/rabbitmq/enabled_plugins` from a ConfigMap enabled `rabbitmq_amqp1_0` reliably while preserving resources and probes.
 

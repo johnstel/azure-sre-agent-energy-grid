@@ -28,7 +28,25 @@
 
 ## Learnings
 
+## Learnings
+
+### 2026-04-26: Mission Control Click Feedback QA Review
+
+**Scope:** Accessibility + UX/readability review of click feedback implementation (MissionWallboard.vue, theme.css).
+
+**Review Result:** ✅ PASS
+
+**Key findings:**
+- Persistent Controls open state improves discoverability — user sees button state without needing rapid feedback
+- aria-busy attribute correctly signals loading state to screen readers
+- Refreshing label provides text-based feedback for non-decorative button state (good for wallboard environments with screen reader users)
+- CSS button states follow theme conventions; no contrast or focus issues
+- No accessibility blockers; ready for production
+
+**Quality gate:** All WCAG 2.2 Level AA checks pass (Pass 7 final verdict). No Critical/Serious findings.
+
 ### 2026-04-26: Issue #4 maxPods maintenance runbook QA
+
 - Durable operator docs for maxPods drift should explicitly encode Dallas's defer-with-issue gate: no live remediation outside the maintenance window, capacity-positive migration, and temporary scale-out only if pod-density pressure returns first.
 - Do not promote temporary `plan/` artifacts into durable docs unless approved; the runbook should stand alone and reference the issue plus source files instead.
 
