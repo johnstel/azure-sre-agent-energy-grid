@@ -284,3 +284,29 @@ Orchestration and decision consolidation for Mission Control Ask Copilot feature
 3. **Completion checklists close waves**: Without an explicit "you are done" checklist, wave completion is ambiguous. A checklist in the runbook makes the exit gate self-certifiable.
 
 **Decision artifact:** `.squad/decisions/inbox/lambert-wave0-polish.md`
+
+### 2025-07-22: Wave 0 Final Gate — Security + Product + Brand + Operator Fixes
+
+**Context:** Four reviewers returned APPROVE WITH FIXES. Applied all remaining fixes on top of the prior polish pass.
+
+**Security fix (CRITICAL — Finding 1):**
+- DEMO-NARRATIVE.md line 38: "Every action is logged, every proposal is visible" → replaced with specific App Insights + Activity Log language
+- DEMO-NARRATIVE.md line 102: "Every action proposal, approval, and execution is traceable" → replaced with portal/Activity Log specifics
+- DEMO-NARRATIVE.md line 112: "Full auditability — every action is logged and queryable" → replaced with "Auditable by design" + evidence contracts language
+- All three replacements now align with SAFE-LANGUAGE-GUARDRAILS.md ❌/✅ table
+
+**Product fix (F-2):**
+- CAPABILITY-CONTRACTS.md §3: `service-mismatch` root_cause_category changed from `networking` to `configuration` to match scenario-manifest.yaml (selector mismatch is a config error, not a network error)
+
+**Already applied in prior pass (verified still present):**
+- fix-all ambiguity (Operator FIX-1) ✅
+- Inline scenario prompts (Operator FIX-2) ✅
+- Wave 0 completion checklist (Operator FIX-5) ✅
+- BREAKABLE-SCENARIOS ordering (Brand FIX-1 + Operator FIX-4) ✅
+- README MongoDB visibility (Brand FIX-2) ✅
+- Core vs Extended demo (Brand FIX-3 + Product F-1) ✅
+
+**Key learning:**
+- Audit claims are the highest-risk overclaim category. Even internal docs can overclaim auditability when the underlying telemetry pipeline is incomplete (Activity Log not exported, SRE Agent conversation retention unknown). Always cross-check closing scripts against the guardrails table.
+
+**Decision artifact:** `.squad/decisions/inbox/lambert-wave0-final-gate.md`

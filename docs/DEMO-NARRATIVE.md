@@ -35,7 +35,7 @@ Show the healthy energy grid:
 | **Propose & Approve** | `mode: 'Review'`, `accessLevel: 'High'` | Diagnose + propose remediation actions | ✅ Human approves every action |
 | **Autonomous** | `mode: 'Auto'`, `accessLevel: 'High'` | Diagnose + execute without approval | ❌ Not demonstrated in this lab |
 
-> **Key message**: "SRE Agent proposes actions; humans approve them. Every action is logged, every proposal is visible, nothing executes without your sign-off. You choose the trust level."
+> **Key message**: "SRE Agent proposes actions; humans approve them. Proposals are visible in the portal, actions are logged in App Insights and the Activity Log, and nothing executes without your sign-off. You choose the trust level."
 
 **This demo runs in Propose & Approve mode** — the agent recommends, the operator decides.
 
@@ -99,7 +99,7 @@ If during any scenario SRE Agent proposes an action:
 ### The Audit Story
 
 - "Every conversation with SRE Agent is logged in App Insights"
-- "Every action proposal, approval, and execution is traceable"
+- "Action proposals are visible in the portal; ARM-level executions appear in the Activity Log"
 - Show the RBAC matrix: "The agent's permissions are explicitly scoped — Reader + Contributor on this resource group, nothing more"
 - Reference: [CAPABILITY-CONTRACTS.md](CAPABILITY-CONTRACTS.md) §10 for the full RBAC matrix
 
@@ -109,7 +109,7 @@ If during any scenario SRE Agent proposes an action:
 1. **AI-assisted diagnosis** that traces cascading failures in seconds, not minutes
 2. **Human-in-the-loop controls** — nothing executes without your approval
 3. **Transparent permissions** — you control what the agent can see and do
-4. **Full auditability** — every action is logged and queryable
+4. **Auditable by design** — conversations are logged in App Insights, ARM actions appear in the Activity Log, and we capture evidence per demo run
 
 This is not about replacing SREs. It's about giving SREs a tireless pair that reads every log, checks every dependency, and presents the diagnosis — so you can make the decision."
 
@@ -173,5 +173,6 @@ See [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for the complete 
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
+| 2025-07-22 | 0.3 | Security fix — soften 3 audit overclaims per SAFE-LANGUAGE-GUARDRAILS alignment | Lambert (QA/Docs) |
 | 2026-04-26 | 0.2 | Wave 0 polish — Core/Extended demo split, scenario table alignment | Lambert (QA/Docs) |
 | 2026-04-26 | 0.1 | Wave 0 — Initial demo narrative | Lambert (QA/Docs) |
