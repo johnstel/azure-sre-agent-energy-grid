@@ -35,7 +35,7 @@ Show the healthy energy grid:
 | **Propose & Approve** | `mode: 'Review'`, `accessLevel: 'High'` | Diagnose + propose remediation actions | ✅ Human approves every action |
 | **Autonomous** | `mode: 'Auto'`, `accessLevel: 'High'` | Diagnose + execute without approval | ❌ Not demonstrated in this lab |
 
-> **Key message**: "SRE Agent proposes actions; humans approve them. Proposals are visible in the portal, actions are logged in App Insights and the Activity Log, and nothing executes without your sign-off. You choose the trust level."
+> **Key message**: "SRE Agent proposes actions; humans approve them. Proposals are visible in the portal, operational telemetry is configured to App Insights, ARM-level actions appear in the Activity Log, and nothing executes without your sign-off. You choose the trust level."
 
 **This demo runs in Propose & Approve mode** — the agent recommends, the operator decides.
 
@@ -98,7 +98,7 @@ If during any scenario SRE Agent proposes an action:
 
 ### The Audit Story
 
-- "Every conversation with SRE Agent is logged in App Insights"
+- "SRE Agent operational telemetry is configured to App Insights — exact conversation/action fields are SCHEMA_TBD until verified in the deployed Preview service"
 - "Action proposals are visible in the portal; ARM-level executions appear in the Activity Log"
 - Show the RBAC matrix: "The agent's permissions are explicitly scoped — Reader + Contributor on this resource group, nothing more"
 - Reference: [CAPABILITY-CONTRACTS.md](CAPABILITY-CONTRACTS.md) §10 for the full RBAC matrix
@@ -109,7 +109,7 @@ If during any scenario SRE Agent proposes an action:
 1. **AI-assisted diagnosis** that traces cascading failures in seconds, not minutes
 2. **Human-in-the-loop controls** — nothing executes without your approval
 3. **Transparent permissions** — you control what the agent can see and do
-4. **Auditable by design** — conversations are logged in App Insights, ARM actions appear in the Activity Log, and we capture evidence per demo run
+4. **Auditable by design** — operational telemetry is configured to App Insights, ARM actions appear in the Activity Log, and we capture evidence per demo run (exact conversation/action schema is SCHEMA_TBD per Preview)
 
 This is not about replacing SREs. It's about giving SREs a tireless pair that reads every log, checks every dependency, and presents the diagnosis — so you can make the decision."
 
@@ -149,7 +149,7 @@ For a 10-minute demo, use only scenarios 1 and 2. For a 5-minute demo, use scena
 | 2 | "What permissions does it need?" | "Minimum: Reader + Log Analytics Reader (`accessLevel: 'Low'`). For remediation: add Contributor (`accessLevel: 'High'`). See our RBAC matrix in CAPABILITY-CONTRACTS.md §10." |
 | 3 | "Is this production-ready?" | "SRE Agent is in Public Preview. The demo lab uses broad permissions for convenience — see our demo-vs-production RBAC guidance for what production looks like." |
 | 4 | "What about auto-remediation?" | "Auto mode exists but we deliberately run in Review mode. Auto requires a separate security review — rollback procedures, blast radius containment, and kill-switch documentation." |
-| 5 | "Where's the audit trail?" | "Conversations are logged in App Insights. ARM-level actions appear in the Activity Log. We capture KQL evidence for every demo run." |
+| 5 | "Where's the audit trail?" | "SRE Agent operational telemetry is configured to App Insights; ARM-level actions appear in the Activity Log. Exact conversation/action fields are SCHEMA_TBD until verified in the deployed Preview service. We capture KQL evidence for every demo run." |
 | 6 | "What if the agent is wrong?" | "In Review mode, you see the proposal before it executes. If it's wrong, reject it — nothing happens. The agent learns from the conversation context." |
 | 7 | "Does it replace my SRE team?" | "No. It replaces the first 15 minutes of manual triage. Your SREs still make the decisions — they just get the diagnosis faster." |
 | 8 | "How does it know about my infrastructure?" | "It reads your Azure resource graph, Container Insights logs, and App Insights telemetry. It has the same view as an SRE with Reader access." |
@@ -164,7 +164,7 @@ See [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for the complete 
 
 - ❌ "Reduces MTTR by X%" → ✅ "Reduces manual investigation from ~5 kubectl commands to a single prompt"
 - ❌ "Autonomous incident detection" → ✅ "Diagnoses issues you point it to; can be wired to alerts"
-- ❌ "Full audit trail" → ✅ "Actions are logged in App Insights; here's what it looks like"
+- ❌ "Full audit trail" → ✅ "Operational telemetry is configured to App Insights; exact fields are SCHEMA_TBD"
 - ❌ "Production-grade RBAC" → ✅ "Demo uses broad permissions; see our production RBAC guidance"
 
 ---
@@ -173,6 +173,7 @@ See [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for the complete 
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
+| 2025-07-22 | 0.4 | SCHEMA_TBD audit fix — replace all "conversations logged in App Insights" with Preview-safe telemetry language | Lambert (QA/Docs) |
 | 2025-07-22 | 0.3 | Security fix — soften 3 audit overclaims per SAFE-LANGUAGE-GUARDRAILS alignment | Lambert (QA/Docs) |
 | 2026-04-26 | 0.2 | Wave 0 polish — Core/Extended demo split, scenario table alignment | Lambert (QA/Docs) |
 | 2026-04-26 | 0.1 | Wave 0 — Initial demo narrative | Lambert (QA/Docs) |
