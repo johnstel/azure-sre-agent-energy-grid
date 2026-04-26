@@ -28,6 +28,9 @@
 
 ## Learnings
 
+### 2026-04-26: RabbitMQ AMQP 1.0 QA Review
+- For narrow runtime fixes, Lambert should verify both the permanent manifest value and the diff boundary: parse `k8s/base/application.yaml` to confirm `RABBITMQ_PLUGINS=rabbitmq_management,rabbitmq_amqp1_0`, then inspect zero-context diff to ensure no probe/resource tuning or broad refactor is mixed in.
+
 ### 2026-04-25: Public LoadBalancer NSG Troubleshooting Documentation (Finalized with Reviews)
 **Issue:** Public LoadBalancer IPs for grid-dashboard and ops-console returned timeout/empty reply despite healthy pods, services, and Azure LB configuration.
 

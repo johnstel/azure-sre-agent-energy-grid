@@ -81,6 +81,8 @@ spec:
             timeoutSeconds: 10
             failureThreshold: 6
           env:
+            - name: RABBITMQ_PLUGINS
+              value: "rabbitmq_management,rabbitmq_amqp1_0"
             - name: RABBITMQ_DEFAULT_USER
               value: "guest"
             - name: RABBITMQ_DEFAULT_PASS

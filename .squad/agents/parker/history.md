@@ -19,6 +19,9 @@
 
 ## Learnings
 
+### 2026-04-26: RabbitMQ AMQP 1.0 Source Fix
+- RabbitMQ 3.11 management image does not enable AMQP 1.0 by default; the healthy baseline must set `RABBITMQ_PLUGINS=rabbitmq_management,rabbitmq_amqp1_0` so rhea/go-amqp clients do not trigger `amqp1_0_plugin_not_enabled` restart storms.
+
 ### 2026-04-25: Wave 1 OOMKilled Evidence Framework — Blocked on Cluster Health
 **Scope:** Complete Wave 1 live UAT evidence collection framework for OOMKilled scenario end-to-end SRE diagnosis flow.
 
