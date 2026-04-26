@@ -1,0 +1,72 @@
+// =============================================================================
+// Pod Lifecycle Events — Parameterised Query
+// =============================================================================
+// Purpose: Track pod state transitions, restarts, and lifecycle events
+// Use case: Diagnose pod availability issues, restart patterns, OOMKilled events
+// Time range: Configurable via TimeRange parameter (default: last 30 minutes)
+// Parameters:
+//   - sre_namespace: Kubernetes namespace (default: "energy")
+//   - sre_scenario: Scenario ID filter (optional, e.g., "oom-killed")
+//   - TimeRange: Time window for analysis (default: 30m)
+//   - timeBin: Time bucket granularity for trending (default: 5m)
+//
+// SCHEMA: KubePodInventory, KubeEvents — Azure Monitor Container Insights (Stable)
+// Required projected columns: TimeBucket, ResourceId, CorrelationId (per Security MF-3)
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARAMETERS — Modify before running
+// ─────────────────────────────────────────────────────────────────────────────
+let sre_namespace = "energy";  // Parameter: Namespace to query
+let sre_scenario = "";         // Parameter: Scenario filter (optional, empty = all)
+let TimeRange = 30m;           // Parameter: Time window
+let timeBin = 5m;              // Parameter: Time bucket granularity
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUERY LOGIC
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Pod inventory with current status and restart counts
+KubePodInventory
+| where TimeGenerated > ago(TimeRange)
+| where Namespace == sre_namespace
+| summarize
+    CurrentStatus = arg_max(TimeGenerated, PodStatus),
+    TotalRestarts = max(ContainerRestartCount),
+    LastSeen = max(TimeGenerated),
+    ResourceId = any(_ResourceId)  // Capture AKS cluster resource ID
+    by Name, Namespace, ContainerName
+| join kind=leftouter (
+    // Join with recent events for failure signals
+    KubeEvents
+    | where TimeGenerated > ago(TimeRange)
+    | where Namespace == sre_namespace
+    | where Reason in ("OOMKilled", "CrashLoopBackOff", "BackOff", "Failed", "FailedScheduling")
+    | extend
+        CorrelationIdRaw = column_ifexists("CorrelationId", "")  // Container Insights events may not have CorrelationId
+    | summarize
+        EventCount = count(),
+        FailureReasons = make_set(Reason),
+        LastEvent = max(TimeGenerated),
+        CorrelationId = any(CorrelationIdRaw)  // Aggregate the extended field
+        by Name, Namespace
+) on $left.Name == $right.Name, $left.Namespace == $right.Namespace
+| extend
+    HasFailures = isnotnull(EventCount),
+    TimeBucket = bin(LastSeen, timeBin),  // Time bucket for trending
+    Scenario = sre_scenario  // Tag with scenario filter for correlation
+| project
+    TimeBucket,
+    Namespace,
+    PodName = Name,
+    ContainerName,
+    Status = CurrentStatus,
+    Restarts = TotalRestarts,
+    HasFailures,
+    FailureReasons,
+    LastSeen,
+    LastEvent,
+    ResourceId,
+    CorrelationId,
+    Scenario
+| order by Restarts desc, Status asc

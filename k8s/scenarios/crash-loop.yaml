@@ -4,8 +4,9 @@
 # The asset-service crashes on startup due to invalid grid configuration,
 # entering a CrashLoopBackOff state.
 #
-# SRE Agent can diagnose: Pod is in CrashLoopBackOff, container exit code,
-# recommend checking application logs and configuration.
+# Scenario is intended to test whether SRE Agent can diagnose: Pod is in
+# CrashLoopBackOff, container exit code, and recommend checking application logs
+# and configuration.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/crash-loop.yaml
@@ -23,6 +24,15 @@ metadata:
     app: asset-service
     scenario: crash-loop
     sre-demo: breakable
+  annotations:
+    sre.scenario: crash-loop
+    sre.service: asset-service
+    sre.namespace: energy
+    sre.component: api
+    sre.runbook_id: RB-002-crash-loop
+    sre.root_cause_category: configuration
+    sre.change_source: deployment
+    sre.version: "2026-04-25"
 spec:
   replicas: 2
   strategy:
@@ -34,6 +44,15 @@ spec:
     metadata:
       labels:
         app: asset-service
+      annotations:
+        sre.scenario: crash-loop
+        sre.service: asset-service
+        sre.namespace: energy
+        sre.component: api
+        sre.runbook_id: RB-002-crash-loop
+        sre.root_cause_category: configuration
+        sre.change_source: deployment
+        sre.version: "2026-04-25"
     spec:
       nodeSelector:
         nodepool-type: user

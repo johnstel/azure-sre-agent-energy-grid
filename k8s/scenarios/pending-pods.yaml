@@ -4,8 +4,9 @@
 # New substation monitoring pods request more resources than available,
 # remaining stuck in Pending state — cluster capacity exhausted.
 #
-# SRE Agent can diagnose: Pods pending due to insufficient resources,
-# recommend scaling the cluster or reducing resource requests.
+# Scenario is intended to test whether SRE Agent can diagnose: Pods pending due
+# to insufficient resources, and recommend scaling the cluster or reducing
+# resource requests.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/pending-pods.yaml

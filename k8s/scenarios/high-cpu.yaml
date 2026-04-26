@@ -4,8 +4,9 @@
 # Extreme weather event triggers intensive grid frequency calculations,
 # consuming excessive CPU and affecting other workloads.
 #
-# SRE Agent can diagnose: High CPU usage, resource contention, recommend
-# scaling, resource limits, or investigating the workload.
+# Scenario is intended to test whether SRE Agent can diagnose: High CPU usage
+# and resource contention, and recommend scaling, resource limits, or
+# investigating the workload.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/high-cpu.yaml

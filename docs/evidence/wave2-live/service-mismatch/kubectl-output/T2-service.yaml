@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"meter-service","namespace":"energy"},"spec":{"ports":[{"port":3000,"targetPort":3000}],"selector":{"app":"meter-service"}}}
+  creationTimestamp: "2026-04-26T12:42:14Z"
+  name: meter-service
+  namespace: energy
+  resourceVersion: "635052"
+  uid: 035e9042-6957-4918-86a7-3470fa66fa92
+spec:
+  clusterIP: IP_REDACTED
+  clusterIPs:
+  - IP_REDACTED
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - port: 3000
+    protocol: TCP
+    targetPort: 3000
+  selector:
+    app: meter-service-v2
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

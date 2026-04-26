@@ -123,3 +123,30 @@ Developer starts Week of 2026-04-28. Dallas to review code against architect spe
 **Orchestration Log:** `.squad/orchestration-log/2026-04-25T18-58-04Z-mission-control-wallboard-redesign.md` (full review batch)
 
 ---
+
+## 2026-04-26: Wave 1→5 Gated Execution Sequence
+
+**Context:** With Wave 0 closed (7/7 team approvals), produced the canonical gated execution plan for completing the full demo across all 5 waves.
+
+**Key Decisions:**
+
+1. **Wave 1 has 10 exact closure criteria** — all must pass before Wave 2 starts. CI drift guard workflow is a gap (`.github/workflows/validate-scenarios.yml` doesn't exist yet). Live KQL validation against a deployed workspace is required.
+
+2. **Wave 2 focuses on 3 reference scenarios only** — OOMKilled (simple), MongoDBDown (complex cascading), ServiceMismatch (subtle). These are the customer incident proof. Includes a 20-minute dry-run demo.
+
+3. **Waves 3 and 4 can run in parallel** — Security/safe-fail (W3) and Runbooks/telemetry (W4) have no mutual dependencies. Both depend on Wave 2 completion. This is the key scheduling optimization.
+
+4. **Wave 5 requires both W3 + W4** — MTTR measurement needs runbook evidence, SLO needs App Insights telemetry, compliance package needs security evidence.
+
+5. **Anti-rework critical path:** Activity Log export (W1) → audit trail (W3) → change correlation (W5). If Activity Log is missing, W3 and W5 evidence is empty. This is the #1 dependency to protect.
+
+6. **Specialist contractor engagement pattern:** SRE Contractor gates technical accuracy at W2/W4/W5. Security Engineer Contractor gates RBAC at W3 and compliance at W5. Brand Guardian gates narrative at demo dry-runs.
+
+**Gaps Found:**
+- CI workflow `validate-scenarios.yml` missing — Ripley must create
+- W3-3 (RBAC denial UX) may be blocked by Preview limitations — planned fallback is "document limitation, don't fabricate"
+- `slo-meter-ingest` SLO (W5-4) depends on W4-4 App Insights instrumentation — long dependency chain
+
+**Decision Artifact:** `.squad/decisions/inbox/dallas-wave-execution-sequence-2026-04-26.md`
+
+---

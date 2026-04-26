@@ -1,0 +1,3 @@
+NAME                                READY   STATUS    RESTARTS   AGE    IP           NODE                               NOMINATED NODE   READINESS GATES
+dispatch-service-5589cf949c-mxbp6   1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+dispatch-service-5589cf949c-rqx6w   1/1     Running   0          7h4m   IP_REDACTED    NODE_REDACTED   <none>           <none>

@@ -1,0 +1,163 @@
+// =============================================================================
+// Scenario Verification: ServiceMismatch — Meter Service Routing Failure
+// =============================================================================
+// Scenario ID: service-mismatch
+// Purpose: Verify service selector mismatch scenario is active and diagnosable
+// Expected signals: pods running but service unreachable, no crashes, possible client errors
+// Root cause validation: kubectl/K8s API needed to compare selector vs. pod labels
+// Time range: Last 30 minutes (impact is immediate but subtle)
+//
+// LIMITATIONS:
+//   - KQL can show symptom evidence: pods running and possible client connection errors
+//   - KQL CANNOT prove selector mismatch or endpoint membership (KubeServices does not expose selectors/endpoints)
+//   - For root cause validation, use: kubectl get svc meter-service -n energy -o yaml (selector)
+//     and kubectl get pods -n energy --show-labels (pod labels)
+//
+// USAGE:
+//   1. kubectl apply -f k8s/scenarios/service-mismatch.yaml
+//   2. Wait 30-60 seconds for service endpoint update
+//   3. Run this query in Log Analytics workspace
+//   4. Verify symptom evidence: pods running, service object observed, potential client errors
+//   5. Confirm root cause with: kubectl describe svc meter-service -n energy (selector vs. endpoints)
+//
+// SCHEMA: KubePodInventory, KubeServices, KubeEvents — Azure Monitor Container Insights (Stable)
+// Required projected columns: TimeBucket, ResourceId, CorrelationId (per Security MF-3)
+//
+// NOTE: This is a "silent failure" scenario — pods are healthy but unreachable.
+// SRE Agent must inspect K8s API (selector vs. labels) to diagnose root cause.
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARAMETERS — Modify before running
+// ─────────────────────────────────────────────────────────────────────────────
+let sre_scenario = "service-mismatch";
+let sre_namespace = "energy";
+let sre_service = "meter-service";
+let TimeRange = 30m;
+let timeBin = 5m;              // Parameter: Time bucket granularity
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUERY LOGIC
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Meter service pods (should be Running)
+let MeterServicePods = KubePodInventory
+| where TimeGenerated > ago(TimeRange)
+| where Namespace == sre_namespace
+| where Name contains sre_service
+| summarize
+    arg_max(TimeGenerated, PodStatus, _ResourceId)
+    by Name, Namespace
+| summarize
+    PodCount = dcount(Name),
+    RunningPods = countif(PodStatus == "Running"),
+    LastSeen = max(TimeGenerated),
+    ResourceId = any(_ResourceId)
+    by Namespace
+| extend
+    Scenario = sre_scenario,
+    Service = sre_service,
+    TimeBucket = bin(LastSeen, timeBin),
+    CorrelationId = "";  // Pod inventory does not have CorrelationId
+
+// Service object observations. KubeServices exposes service metadata, not endpoint membership.
+let ServiceObservations = KubeServices
+| where TimeGenerated > ago(TimeRange)
+| where Namespace == sre_namespace
+| where ServiceName == sre_service
+| extend
+    Scenario = sre_scenario,
+    Service = sre_service,
+    ServiceObserved = 1,
+    TimeBucket = bin(TimeGenerated, timeBin),
+    ResourceId = column_ifexists("_ResourceId", ""),
+    CorrelationId = ""  // Service data does not have CorrelationId
+| summarize
+    ServiceRecords = count(),
+    LastSeen = max(TimeGenerated),
+    ResourceId = any(ResourceId),
+    CorrelationId = any(CorrelationId)
+    by Scenario, Service, Namespace, TimeBucket;
+
+// Check for connection errors in grid-dashboard or other clients
+let ClientErrors = KubeEvents
+| where TimeGenerated > ago(TimeRange)
+| where Namespace == sre_namespace
+| where Name contains "grid-dashboard" or Name contains "dispatch"
+| where Message contains "connection refused" or Message contains "timeout" or Message contains "503"
+| extend
+    Scenario = sre_scenario,
+    TimeBucket = bin(TimeGenerated, timeBin),
+    ResourceId = column_ifexists("_ResourceId", ""),
+    CorrelationId = column_ifexists("CorrelationId", "")
+| summarize
+    ErrorCount = count(),
+    ErrorMessages = make_set(Message, 5),
+    ResourceId = any(ResourceId),
+    CorrelationId = any(CorrelationId)
+    by Scenario, Namespace, TimeBucket;
+
+// Combine results
+MeterServicePods
+| extend ResultType = "Meter Service Pods"
+| project
+    TimeBucket,
+    Scenario,
+    Service,
+    Namespace,
+    ResultType,
+    Value = strcat(RunningPods, "/", PodCount),
+    LastSeen,  // Use summarized LastSeen, not TimeGenerated
+    ResourceId,
+    CorrelationId
+| union (
+    ServiceObservations
+    | extend ResultType = "Service Object Observed"
+    | project
+        TimeBucket,
+        Scenario,
+        Service,
+        Namespace,
+        ResultType,
+        Value = strcat("records=", ServiceRecords),
+        LastSeen,
+        ResourceId,
+        CorrelationId
+)
+| union (
+    ClientErrors
+    | extend ResultType = "Client Connection Errors", Service = sre_service
+    | project
+        TimeBucket,
+        Scenario,
+        Service,
+        Namespace,
+        ResultType,
+        Value = tostring(ErrorCount),
+        LastSeen = now(),
+        ResourceId,
+        CorrelationId
+)
+| order by ResultType
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPECTED RESULTS & TROUBLESHOOTING
+// ─────────────────────────────────────────────────────────────────────────────
+// Expected results when scenario is active:
+// - Meter Service Pods: 1/1 or more (pods are Running)
+// - Service Object Observed: shows recent service metadata if present
+// - Client Connection Errors: >0 (grid-dashboard or other clients cannot reach meter-service)
+// - Endpoint membership and selector mismatch require kubectl/K8s API validation
+//
+// Pass criteria for SRE Agent diagnosis:
+// - Agent identifies service selector mismatch
+// - Agent correlates "pods running but service unreachable"
+// - Agent recommends checking service selector vs. pod labels
+//
+// Diagnosis complexity: HIGH (silent failure — no crash, no OOM, just unreachable)
+// This tests SRE Agent's ability to analyze configuration mismatches vs. runtime failures.
+//
+// If no results:
+// - Verify scenario is applied: kubectl get svc meter-service -n energy -o yaml | grep selector
+// - Check pod labels: kubectl get pods -n energy -l app=meter-service --show-labels
+// - Verify endpoints: kubectl get endpoints meter-service -n energy

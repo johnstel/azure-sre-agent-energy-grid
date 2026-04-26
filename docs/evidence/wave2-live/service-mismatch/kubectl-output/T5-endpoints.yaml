@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Endpoints
+metadata:
+  annotations:
+    endpoints.kubernetes.io/last-change-trigger-time: "2026-04-26T12:09:28Z"
+  creationTimestamp: "2026-04-26T12:42:14Z"
+  labels:
+    endpoints.kubernetes.io/managed-by: endpoint-controller
+  name: meter-service
+  namespace: energy
+  resourceVersion: "635885"
+  uid: e4cdaffb-1758-489c-b4ac-55911b317dce
+subsets:
+- addresses:
+  - ip: IP_REDACTED
+    nodeName: NODE_REDACTED
+    targetRef:
+      kind: Pod
+      name: meter-service-5b8f45f67f-h7rhc
+      namespace: energy
+      uid: 4cf2259e-4d97-44c4-9b66-06c85b96f010
+  - ip: IP_REDACTED
+    nodeName: NODE_REDACTED
+    targetRef:
+      kind: Pod
+      name: meter-service-5b8f45f67f-85nk2
+      namespace: energy
+      uid: e376477e-08ca-44b0-ab48-6fdf65a863dc
+  ports:
+  - port: 3000
+    protocol: TCP

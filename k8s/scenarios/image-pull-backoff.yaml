@@ -4,8 +4,9 @@
 # The dispatch-service deployment fails after a botched container image
 # release, referencing a non-existent image tag.
 #
-# SRE Agent can diagnose: Image pull failure, suggest checking image name,
-# registry credentials, or network connectivity.
+# Scenario is intended to test whether SRE Agent can diagnose: Image pull
+# failure, and suggest checking image name, registry credentials, or network
+# connectivity.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/image-pull-backoff.yaml

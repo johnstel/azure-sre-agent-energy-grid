@@ -1,0 +1,156 @@
+Name:             meter-service-686c5dbfc7-2zdt6
+Namespace:        energy
+Priority:         0
+Service Account:  default
+Node:             aks-workload-33466352-vmss00000e/10.0.0.126
+Start Time:       Sat, 25 Apr 2026 22:19:29 -0400
+Labels:           app=meter-service
+                  pod-template-hash=686c5dbfc7
+Annotations:      <none>
+Status:           Running
+IP:               10.0.0.150
+IPs:
+  IP:           10.0.0.150
+Controlled By:  ReplicaSet/meter-service-686c5dbfc7
+Containers:
+  meter-service:
+    Container ID:   containerd://bb002efb79b6209d8a2fa49f6ae362c5fb0baf26dfea384da083a0c2c56c986d
+    Image:          ghcr.io/azure-samples/aks-store-demo/order-service:latest
+    Image ID:       ghcr.io/azure-samples/aks-store-demo/order-service@sha256:6a2df159b2fca3b78ec56bd185f72353ba3e422af7d010640a1538f9132b3963
+    Port:           3000/TCP
+    Host Port:      0/TCP
+    State:          Waiting
+      Reason:       CrashLoopBackOff
+    Last State:     Terminated
+      Reason:       OOMKilled
+      Exit Code:    137
+      Started:      Sat, 25 Apr 2026 22:20:18 -0400
+      Finished:     Sat, 25 Apr 2026 22:20:19 -0400
+    Ready:          False
+    Restart Count:  3
+    Limits:
+      cpu:     200m
+      memory:  16Mi
+    Requests:
+      cpu:     100m
+      memory:  8Mi
+    Environment:
+      ORDER_QUEUE_HOSTNAME:  rabbitmq
+      ORDER_QUEUE_PORT:      5672
+      ORDER_QUEUE_USERNAME:  guest
+      ORDER_QUEUE_PASSWORD:  guest
+      ORDER_QUEUE_NAME:      meter-events
+      FASTIFY_ADDRESS:       0.0.0.0
+      NODE_OPTIONS:          --max-old-space-size=64
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-kpnxj (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       False
+  ContainersReady             False
+  PodScheduled                True
+Volumes:
+  kube-api-access-kpnxj:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              nodepool-type=user
+Tolerations:                 node.kubernetes.io/memory-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  80s                default-scheduler  Successfully assigned energy/meter-service-686c5dbfc7-2zdt6 to aks-workload-33466352-vmss00000e
+  Normal   Pulled     79s                kubelet            spec.containers{meter-service}: Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 213ms (214ms including waiting). Image size: 75025121 bytes.
+  Normal   Pulled     77s                kubelet            spec.containers{meter-service}: Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 205ms (205ms including waiting). Image size: 75025121 bytes.
+  Normal   Pulled     61s                kubelet            spec.containers{meter-service}: Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 197ms (197ms including waiting). Image size: 75025121 bytes.
+  Normal   Pulling    32s (x4 over 79s)  kubelet            spec.containers{meter-service}: Pulling image "ghcr.io/azure-samples/aks-store-demo/order-service:latest"
+  Normal   Created    32s (x4 over 79s)  kubelet            spec.containers{meter-service}: Created container: meter-service
+  Normal   Started    32s (x4 over 79s)  kubelet            spec.containers{meter-service}: Started container meter-service
+  Normal   Pulled     32s                kubelet            spec.containers{meter-service}: Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 169ms (169ms including waiting). Image size: 75025121 bytes.
+  Warning  BackOff    4s (x7 over 75s)   kubelet            spec.containers{meter-service}: Back-off restarting failed container meter-service in pod meter-service-686c5dbfc7-2zdt6_energy(da237eda-f9ad-4e34-9f51-e432bd9f2bf4)
+
+
+Name:             meter-service-686c5dbfc7-7rh5k
+Namespace:        energy
+Priority:         0
+Service Account:  default
+Node:             aks-workload-33466352-vmss00000e/10.0.0.126
+Start Time:       Sat, 25 Apr 2026 22:19:29 -0400
+Labels:           app=meter-service
+                  pod-template-hash=686c5dbfc7
+Annotations:      <none>
+Status:           Running
+IP:               10.0.0.130
+IPs:
+  IP:           10.0.0.130
+Controlled By:  ReplicaSet/meter-service-686c5dbfc7
+Containers:
+  meter-service:
+    Container ID:   containerd://389728fc4f543b6c6049a01337a802fde255f3aa423955bc31717eee927effaf
+    Image:          ghcr.io/azure-samples/aks-store-demo/order-service:latest
+    Image ID:       ghcr.io/azure-samples/aks-store-demo/order-service@sha256:6a2df159b2fca3b78ec56bd185f72353ba3e422af7d010640a1538f9132b3963
+    Port:           3000/TCP
+    Host Port:      0/TCP
+    State:          Waiting
+      Reason:       CrashLoopBackOff
+    Last State:     Terminated
+      Reason:       OOMKilled
+      Exit Code:    137
+      Started:      Sat, 25 Apr 2026 22:20:16 -0400
+      Finished:     Sat, 25 Apr 2026 22:20:17 -0400
+    Ready:          False
+    Restart Count:  3
+    Limits:
+      cpu:     200m
+      memory:  16Mi
+    Requests:
+      cpu:     100m
+      memory:  8Mi
+    Environment:
+      ORDER_QUEUE_HOSTNAME:  rabbitmq
+      ORDER_QUEUE_PORT:      5672
+      ORDER_QUEUE_USERNAME:  guest
+      ORDER_QUEUE_PASSWORD:  guest
+      ORDER_QUEUE_NAME:      meter-events
+      FASTIFY_ADDRESS:       0.0.0.0
+      NODE_OPTIONS:          --max-old-space-size=64
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-zvzm6 (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       False
+  ContainersReady             False
+  PodScheduled                True
+Volumes:
+  kube-api-access-zvzm6:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   Burstable
+Node-Selectors:              nodepool-type=user
+Tolerations:                 node.kubernetes.io/memory-pressure:NoSchedule op=Exists
+                             node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  81s                default-scheduler  Successfully assigned energy/meter-service-686c5dbfc7-7rh5k to aks-workload-33466352-vmss00000e
+  Normal   Pulled     79s                kubelet            spec.containers{meter-service}: Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 222ms (222ms including waiting). Image size: 75025121 bytes.
+  Normal   Pulled     76s                kubelet            spec.containers{meter-service}: Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 182ms (182ms including waiting). Image size: 75025121 bytes.
+  Normal   Pulled     60s                kubelet            spec.containers{meter-service}: Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 238ms (238ms including waiting). Image size: 75025121 bytes.
+  Normal   Pulling    34s (x4 over 79s)  kubelet            spec.containers{meter-service}: Pulling image "ghcr.io/azure-samples/aks-store-demo/order-service:latest"
+  Normal   Created    34s (x4 over 79s)  kubelet            spec.containers{meter-service}: Created container: meter-service
+  Normal   Started    34s (x4 over 78s)  kubelet            spec.containers{meter-service}: Started container meter-service
+  Normal   Pulled     34s                kubelet            spec.containers{meter-service}: Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 218ms (218ms including waiting). Image size: 75025121 bytes.
+  Warning  BackOff    8s (x6 over 74s)   kubelet            spec.containers{meter-service}: Back-off restarting failed container meter-service in pod meter-service-686c5dbfc7-7rh5k_energy(73f1f9aa-fbcf-4c7b-9427-8512d15219df)

@@ -121,6 +121,65 @@ function Invoke-AzCliJson {
     }
 }
 
+function Invoke-AzCliJsonArgs {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$Arguments
+    )
+
+    $raw = & az @Arguments 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+
+    if ($exitCode -ne 0) {
+        return [pscustomobject]@{
+            ExitCode = $exitCode
+            Raw      = $raw
+            Json     = $null
+        }
+    }
+
+    $jsonObjectStart = $raw.IndexOf('{')
+    $jsonArrayStart = $raw.IndexOf('[')
+
+    if ($jsonObjectStart -ge 0 -and $jsonArrayStart -ge 0) {
+        $jsonStart = [Math]::Min($jsonObjectStart, $jsonArrayStart)
+    }
+    elseif ($jsonObjectStart -ge 0) {
+        $jsonStart = $jsonObjectStart
+    }
+    elseif ($jsonArrayStart -ge 0) {
+        $jsonStart = $jsonArrayStart
+    }
+    else {
+        $jsonStart = -1
+    }
+
+    if ($jsonStart -ge 0) {
+        $jsonContent = $raw.Substring($jsonStart)
+    }
+    else {
+        $jsonContent = $raw
+    }
+
+    try {
+        $json = $jsonContent | ConvertFrom-Json
+    }
+    catch {
+        return [pscustomobject]@{
+            ExitCode = $exitCode
+            Raw      = $raw
+            Json     = $null
+        }
+    }
+
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Raw      = $raw
+        Json     = $json
+    }
+}
+
 function Get-ArmErrorMessages {
     [CmdletBinding()]
     param(
@@ -505,6 +564,57 @@ $deploymentName = "sre-demo-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 $bicepFile = Join-Path $PSScriptRoot "..\infra\bicep\main.bicep"
 $parametersFile = Join-Path $PSScriptRoot "..\infra\bicep\main.bicepparam"
 
+# Check for existing AKS cluster and detect current VM sizes
+Write-Host "`n🔍 Checking for existing AKS cluster..." -ForegroundColor Yellow
+$aksClusterName = "aks-$WorkloadName"
+
+# Safely query for existing cluster - capture output without throwing on non-zero exit
+$aksShowOutput = az aks show --resource-group $resourceGroupName --name $aksClusterName --output json 2>$null
+$existingAksCluster = $null
+
+if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($aksShowOutput)) {
+    try {
+        $existingAksCluster = $aksShowOutput | ConvertFrom-Json
+    }
+    catch {
+        # JSON parse failed - treat as no cluster
+        $existingAksCluster = $null
+    }
+}
+
+$systemNodeVmSizeParam = $null
+$userNodeVmSizeParam = $null
+$kubernetesVersionParam = $null
+
+if ($existingAksCluster) {
+    Write-Host "  ℹ️  Found existing AKS cluster: $aksClusterName" -ForegroundColor Cyan
+    if ($existingAksCluster.kubernetesVersion) {
+        $kubernetesVersionParam = $existingAksCluster.kubernetesVersion
+        Write-Host "  • Kubernetes version:  $kubernetesVersionParam (preserved)" -ForegroundColor White
+    }
+
+    # Extract VM sizes from existing node pools
+    $systemPool = $existingAksCluster.agentPoolProfiles | Where-Object { $_.mode -eq 'System' } | Select-Object -First 1
+    $userPool = $existingAksCluster.agentPoolProfiles | Where-Object { $_.mode -eq 'User' } | Select-Object -First 1
+
+    if ($systemPool) {
+        $systemNodeVmSizeParam = $systemPool.vmSize
+        Write-Host "  • System pool VM size: $systemNodeVmSizeParam (immutable)" -ForegroundColor White
+    }
+
+    if ($userPool) {
+        $userNodeVmSizeParam = $userPool.vmSize
+        Write-Host "  • User pool VM size:   $userNodeVmSizeParam (immutable)" -ForegroundColor White
+    }
+
+    Write-Host "`n  ⚠️  AKS node pool VM sizes are immutable. Using existing sizes to prevent deployment failure." -ForegroundColor Yellow
+    Write-Host "     Existing Kubernetes version is also preserved to avoid unsupported downgrade attempts." -ForegroundColor Gray
+    Write-Host "     To change VM sizes or recreate from defaults, destroy the cluster or use a different WorkloadName." -ForegroundColor Gray
+}
+else {
+    Write-Host "  ℹ️  No existing AKS cluster found. Will use default VM sizes from parameters file." -ForegroundColor Gray
+}
+
 Write-Host "`n📦 Deployment Configuration:" -ForegroundColor Cyan
 Write-Host "  • Location:        $Location" -ForegroundColor White
 Write-Host "  • Workload Name:   $WorkloadName" -ForegroundColor White
@@ -520,10 +630,27 @@ Write-Host "`n🔍 Validating Bicep template..." -ForegroundColor Yellow
 
 if ($WhatIf) {
     Write-Host "  Running what-if analysis..." -ForegroundColor Gray
+
+    $whatIfParameterArgs = @(
+        $parametersFile
+        "location=$Location"
+        "workloadName=$WorkloadName"
+        "deploySreAgent=$deploySreAgentValue"
+    )
+    if ($kubernetesVersionParam) {
+        $whatIfParameterArgs += "kubernetesVersion=$kubernetesVersionParam"
+    }
+    if ($systemNodeVmSizeParam) {
+        $whatIfParameterArgs += "systemNodeVmSize=$systemNodeVmSizeParam"
+    }
+    if ($userNodeVmSizeParam) {
+        $whatIfParameterArgs += "userNodeVmSize=$userNodeVmSizeParam"
+    }
+
     $whatIfOutput = az deployment sub what-if `
         --location $Location `
         --template-file $bicepFile `
-        --parameters location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue `
+        --parameters @whatIfParameterArgs `
         --name $deploymentName 2>&1 | Out-String
 
     if ($LASTEXITCODE -ne 0) {
@@ -535,7 +662,7 @@ if ($WhatIf) {
     if (-not [string]::IsNullOrWhiteSpace($whatIfOutput)) {
         Write-Host $whatIfOutput.Trim()
     }
-    
+
     Write-Host "`n✅ What-if analysis complete. No changes were made." -ForegroundColor Green
     exit 0
 }
@@ -547,19 +674,42 @@ Write-Host "  This will take approximately 15-25 minutes." -ForegroundColor Gray
 $startTime = Get-Date
 
 try {
-    $createCmd = @(
-        "az deployment sub create",
-        "--location $Location",
-        "--template-file `"$bicepFile`"",
-        "--parameters `"$parametersFile`" location=$Location workloadName=$WorkloadName deploySreAgent=$deploySreAgentValue",
-        "--name $deploymentName",
-        "--only-show-errors",
-        "--output json"
-    ) -join ' '
+    $deployParameterArgs = @(
+        $parametersFile
+        "location=$Location"
+        "workloadName=$WorkloadName"
+        "deploySreAgent=$deploySreAgentValue"
+    )
+    if ($kubernetesVersionParam) {
+        $deployParameterArgs += "kubernetesVersion=$kubernetesVersionParam"
+    }
+    if ($systemNodeVmSizeParam) {
+        $deployParameterArgs += "systemNodeVmSize=$systemNodeVmSizeParam"
+    }
+    if ($userNodeVmSizeParam) {
+        $deployParameterArgs += "userNodeVmSize=$userNodeVmSizeParam"
+    }
+
+    $createArgs = @(
+        'deployment'
+        'sub'
+        'create'
+        '--location'
+        $Location
+        '--template-file'
+        $bicepFile
+        '--parameters'
+    ) + $deployParameterArgs + @(
+        '--name'
+        $deploymentName
+        '--only-show-errors'
+        '--output'
+        'json'
+    )
 
     $deployment = $null
     for ($attempt = 1; $attempt -le 2; $attempt++) {
-        $create = Invoke-AzCliJson -Command $createCmd
+        $create = Invoke-AzCliJsonArgs -Arguments $createArgs
 
         if ($create.ExitCode -eq 0 -and $create.Json) {
             $deployment = $create.Json
@@ -611,7 +761,7 @@ try {
 
     # Output deployment results
     Write-Host "`n📋 Deployment Outputs:" -ForegroundColor Cyan
-    
+
     $outputs = $deployment.properties.outputs
     Write-Host "  • Resource Group:   $($outputs.resourceGroupName.value)" -ForegroundColor White
     Write-Host "  • AKS Cluster:      $($outputs.aksClusterName.value)" -ForegroundColor White
@@ -620,7 +770,7 @@ try {
     Write-Host "  • Key Vault URI:    $($outputs.keyVaultUri.value)" -ForegroundColor White
     Write-Host "  • Log Analytics ID: $($outputs.logAnalyticsWorkspaceId.value)" -ForegroundColor White
     Write-Host "  • App Insights ID:  $($outputs.appInsightsId.value)" -ForegroundColor White
-    
+
     if ($outputs.grafanaDashboardUrl.value) {
         Write-Host "  • Grafana:          $($outputs.grafanaDashboardUrl.value)" -ForegroundColor White
         Write-Host "  • AMW ID:           $($outputs.azureMonitorWorkspaceId.value)" -ForegroundColor White
@@ -681,7 +831,7 @@ if ($outputs.PSObject.Properties.Name -contains 'sreAgentManagedIdentityPrincipa
 if (-not $SkipRbac) {
     Write-Host "`n🔐 Applying RBAC assignments..." -ForegroundColor Yellow
     Write-Host "  ⚠️  Note: If this fails due to subscription policies, run with -SkipRbac" -ForegroundColor Gray
-    
+
     $rbacScript = Join-Path $PSScriptRoot "configure-rbac.ps1"
     if (Test-Path $rbacScript) {
         $rbacParams = @{
@@ -710,7 +860,7 @@ $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
 if (Test-Path $k8sPath) {
     kubectl apply -f $k8sPath
     Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
-    
+
     Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
     $deploymentNamesRaw = kubectl get deployment -n energy -o jsonpath='{.items[*].metadata.name}' 2>$null
     $deploymentNames = @()
@@ -724,7 +874,7 @@ if (Test-Path $k8sPath) {
             Write-Host "  ⚠️  Rollout still in progress for deployment/$deploymentName" -ForegroundColor Yellow
         }
     }
-    
+
     # Wait for LoadBalancer IP
     Write-Host "⏳ Waiting for grid-dashboard external IP..." -ForegroundColor Yellow
     $maxWait = 120
@@ -739,7 +889,7 @@ if (Test-Path $k8sPath) {
         Start-Sleep -Seconds 5
         $waited += 5
     }
-    
+
     if ($storeUrl) {
         Write-Host "  ✅ Grid Dashboard URL: $storeUrl" -ForegroundColor Green
     }
@@ -795,4 +945,3 @@ Write-Host @"
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 "@ -ForegroundColor Cyan
-

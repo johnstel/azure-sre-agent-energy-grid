@@ -1,0 +1,13 @@
+NAME                                READY   STATUS              RESTARTS        AGE     IP           NODE                               NOMINATED NODE   READINESS GATES
+asset-service-c744d6667-9qkj7       1/1     Running             0               3h5m    10.0.0.111   aks-workload-33466352-vmss00000d   <none>           <none>
+asset-service-c744d6667-j8sjr       1/1     Running             0               5m31s   10.0.0.148   aks-workload-33466352-vmss00000e   <none>           <none>
+dispatch-service-5589cf949c-7f87d   1/1     Running             1 (4m42s ago)   5m31s   10.0.0.103   aks-workload-33466352-vmss00000d   <none>           <none>
+dispatch-service-5589cf949c-nm6l9   1/1     Running             0               5m30s   10.0.0.144   aks-workload-33466352-vmss00000e   <none>           <none>
+grid-dashboard-66cb797c94-54qr6     1/1     Running             0               3h5m    10.0.0.100   aks-workload-33466352-vmss00000d   <none>           <none>
+grid-dashboard-66cb797c94-kkksl     1/1     Running             0               3h5m    10.0.0.116   aks-workload-33466352-vmss00000d   <none>           <none>
+load-simulator-57fc84dfdf-fv5td     1/1     Running             0               3h3m    10.0.0.109   aks-workload-33466352-vmss00000d   <none>           <none>
+meter-service-686c5dbfc7-2zdt6      0/1     ContainerCreating   0               2s      <none>       aks-workload-33466352-vmss00000e   <none>           <none>
+meter-service-686c5dbfc7-7rh5k      0/1     ContainerCreating   0               2s      <none>       aks-workload-33466352-vmss00000e   <none>           <none>
+mongodb-d948b8585-8hh27             1/1     Running             0               3h3m    10.0.0.112   aks-workload-33466352-vmss00000d   <none>           <none>
+ops-console-558566cf95-nsqsc        1/1     Running             0               3h5m    10.0.0.105   aks-workload-33466352-vmss00000d   <none>           <none>
+rabbitmq-79d58d7457-jfjnj           1/1     Running             0               3h3m    10.0.0.145   aks-workload-33466352-vmss00000e   <none>           <none>

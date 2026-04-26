@@ -185,6 +185,24 @@ Once connected, you can interact with SRE Agent using natural language:
    - Shows affected pods
    - Recommends removing or modifying the policy
 
+### Troubleshooting: Public LoadBalancer Not Responding
+
+If you break a scenario and the public LoadBalancer stops responding, it's **not** the scenario — it's an Azure networking issue. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#-public-loadbalancer-not-responding) for a complete diagnostic guide.
+
+**Quick check:**
+```bash
+# Does kubectl port-forward work?
+kubectl port-forward -n energy svc/grid-dashboard 18080:80 &
+curl -sI http://127.0.0.1:18080/
+
+# Does in-cluster curl work?
+kubectl run -n energy test --image=curlimages/curl --rm -it -- \
+  curl -sI http://grid-dashboard:80/
+
+# Both work? It's a VNet subnet NSG issue, not your scenario.
+# For detailed K8s service diagnostics, see [KUBERNETES-SERVICE-TROUBLESHOOTING.md](KUBERNETES-SERVICE-TROUBLESHOOTING.md)
+```
+
 ## Advanced Features
 
 ### Scheduled Tasks
@@ -224,6 +242,14 @@ Connect external tools via Model Context Protocol (MCP):
 **Cause:** AKS cluster has restricted inbound network access
 
 **Solution:** Ensure the cluster is not a fully private cluster. SRE Agent needs network access to query Kubernetes objects.
+
+### Public LoadBalancer Not Responding
+
+**Symptom:** Public IPs for grid-dashboard or ops-console don't respond to curl from outside Azure, but internal access works
+
+**Cause:** VNet subnet NSG blocking Internet traffic (NOT Azure Load Balancer misconfiguration)
+
+**Solution:** See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#-public-loadbalancer-not-responding) for detailed diagnostic steps and fixes. TL;DR: Add an NSG rule allowing inbound TCP 80 from Internet to the AKS subnet.
 
 ### Permission Errors
 

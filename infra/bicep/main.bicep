@@ -29,7 +29,7 @@ param location string = 'eastus2'
 param deployObservability bool = true
 
 @description('Deploy baseline Azure Monitor alert rules for AKS and app telemetry')
-param deployAlerts bool = false
+param deployAlerts bool = true
 
 @description('Deploy Azure SRE Agent for AI-powered diagnostics and remediation')
 param deploySreAgent bool = true
@@ -53,6 +53,10 @@ param kubernetesVersion string = '1.32'
 
 @description('AKS system node pool VM size')
 @allowed([
+  'Standard_D2s_v4'
+  'Standard_D4s_v4'
+  'Standard_D2as_v4'
+  'Standard_D4as_v4'
   'Standard_D2s_v5'
   'Standard_D4s_v5'
   'Standard_D2as_v5'
@@ -62,6 +66,10 @@ param systemNodeVmSize string = 'Standard_D2s_v5'
 
 @description('AKS user node pool VM size for workloads')
 @allowed([
+  'Standard_D2s_v4'
+  'Standard_D4s_v4'
+  'Standard_D2as_v4'
+  'Standard_D4as_v4'
   'Standard_D2s_v5'
   'Standard_D4s_v5'
   'Standard_D2as_v5'
@@ -130,7 +138,7 @@ module logAnalytics 'modules/log-analytics.bicep' = {
     name: names.logAnalytics
     location: location
     tags: tags
-    retentionInDays: 30
+    retentionInDays: 90 // Wave 1: Aligned to App Insights for evidence retention
   }
 }
 
@@ -143,6 +151,15 @@ module appInsights 'modules/app-insights.bicep' = {
     location: location
     tags: tags
     workspaceId: logAnalytics.outputs.workspaceId
+  }
+}
+
+// Activity Log Diagnostics (Wave 1: observable foundation)
+module activityLogDiagnostics 'modules/activity-log-diagnostics.bicep' = {
+  name: 'deploy-activity-log-diagnostics'
+  params: {
+    diagnosticSettingName: 'activity-log-${workloadName}'
+    logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
   }
 }
 
@@ -292,3 +309,4 @@ output sreAgentPortalUrl string = deploySreAgent ? sreAgent!.outputs.agentPortal
 output sreAgentName string = deploySreAgent ? sreAgent!.outputs.agentName : ''
 output sreAgentManagedIdentityId string = deploySreAgent ? sreAgent!.outputs.managedIdentityId : ''
 output sreAgentManagedIdentityPrincipalId string = deploySreAgent ? sreAgent!.outputs.managedIdentityPrincipalId : ''
+output activityLogDiagnosticSettingName string = activityLogDiagnostics.outputs.diagnosticSettingName

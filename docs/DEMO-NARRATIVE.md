@@ -8,7 +8,7 @@
 
 ## The Story in One Sentence
 
-> "Azure SRE Agent turns a 15-minute, 5-tool manual investigation into a single conversational prompt — with every proposed action visible and approval-gated before execution."
+> "Azure SRE Agent can reduce a multi-tool manual investigation into a conversational diagnosis path — with remediation kept operator-controlled in this demo."
 
 ---
 
@@ -32,12 +32,12 @@ Show the healthy energy grid:
 | Tier | SRE Agent Config | What It Can Do | Who Approves |
 |------|-----------------|----------------|--------------|
 | **Diagnosis Only** | `mode: 'Review'`, `accessLevel: 'Low'` | Read logs, query metrics, analyze state | N/A — read-only |
-| **Propose & Approve** | `mode: 'Review'`, `accessLevel: 'High'` | Diagnose + propose remediation actions | ✅ Human approves every action |
+| **Recommend & Execute** | `mode: 'Review'`, `accessLevel: 'High'` | Diagnose + recommend remediation actions | ✅ Operator executes unless a real Preview approval UI/API is captured |
 | **Autonomous** | `mode: 'Auto'`, `accessLevel: 'High'` | Diagnose + execute without approval | ❌ Not demonstrated in this lab |
 
-> **Key message**: "SRE Agent proposes actions; humans approve them. Proposals are visible in the portal, operational telemetry is configured to App Insights, ARM-level actions appear in the Activity Log, and nothing executes without your sign-off. You choose the trust level."
+> **Key message**: "SRE Agent recommends actions; the operator executes them in this demo unless a real Preview approval UI/API is captured. Operational telemetry is configured to App Insights, ARM-level actions appear in the Activity Log, and autonomous remediation is not demonstrated. You choose the trust level."
 
-**This demo runs in Propose & Approve mode** — the agent recommends, the operator decides.
+**This demo runs in Recommend & Execute mode** — the agent recommends, the operator decides and executes.
 
 ---
 
@@ -106,8 +106,8 @@ If during any scenario SRE Agent proposes an action:
 ### The Close
 
 "What we've shown:
-1. **AI-assisted diagnosis** that traces cascading failures in seconds, not minutes
-2. **Human-in-the-loop controls** — nothing executes without your approval
+1. **AI-assisted diagnosis** intended to reduce manual multi-tool triage
+2. **Human-in-the-loop controls** — the operator executes remediation in this demo unless a real Preview approval UI/API is captured
 3. **Transparent permissions** — you control what the agent can see and do
 4. **Auditable by design** — operational telemetry is configured to App Insights, ARM actions appear in the Activity Log, and we capture evidence per demo run (exact conversation/action schema is SCHEMA_TBD per Preview)
 
@@ -145,12 +145,12 @@ For a 10-minute demo, use only scenarios 1 and 2. For a 5-minute demo, use scena
 
 | # | Question | Prepared Answer |
 |---|----------|-----------------|
-| 1 | "Can it break things?" | "In Review mode, nothing executes without your approval. The agent proposes; you decide." |
+| 1 | "Can it break things?" | "In this Review-mode demo, treat agent output as recommendations. The operator decides what to execute; do not claim a specific approval/denial API unless portal evidence exists." |
 | 2 | "What permissions does it need?" | "Minimum: Reader + Log Analytics Reader (`accessLevel: 'Low'`). For remediation: add Contributor (`accessLevel: 'High'`). See our RBAC matrix in CAPABILITY-CONTRACTS.md §10." |
 | 3 | "Is this production-ready?" | "SRE Agent is in Public Preview. The demo lab uses broad permissions for convenience — see our demo-vs-production RBAC guidance for what production looks like." |
 | 4 | "What about auto-remediation?" | "Auto mode exists but we deliberately run in Review mode. Auto requires a separate security review — rollback procedures, blast radius containment, and kill-switch documentation." |
 | 5 | "Where's the audit trail?" | "SRE Agent operational telemetry is configured to App Insights; ARM-level actions appear in the Activity Log. Exact conversation/action fields are SCHEMA_TBD until verified in the deployed Preview service. We capture KQL evidence for every demo run." |
-| 6 | "What if the agent is wrong?" | "In Review mode, you see the proposal before it executes. If it's wrong, reject it — nothing happens. The agent learns from the conversation context." |
+| 6 | "What if the agent is wrong?" | "In Review mode for this demo, treat the output as a recommendation. If it's wrong, the operator does not execute it. Do not claim a specific reject/deny API unless the Preview portal exposes it and you capture evidence." |
 | 7 | "Does it replace my SRE team?" | "No. It replaces the first 15 minutes of manual triage. Your SREs still make the decisions — they just get the diagnosis faster." |
 | 8 | "How does it know about my infrastructure?" | "It reads your Azure resource graph, Container Insights logs, and App Insights telemetry. It has the same view as an SRE with Reader access." |
 | 9 | "What about data privacy?" | "SRE Agent operates within your Azure tenant. Conversation data handling follows Azure's standard data processing terms. See Microsoft's Preview terms for specifics." |

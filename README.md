@@ -13,12 +13,12 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 
 ## 🛡️ Trust & Safety Model
 
-> **Azure SRE Agent is in Public Preview.** This demo runs in **Review mode** — the agent proposes actions, humans approve them. Nothing executes without your sign-off.
+> **Azure SRE Agent is in Public Preview.** This demo runs in **Review mode** — the agent recommends actions and the operator executes them unless a real Preview approval UI/API is captured during portal validation. Nothing should be presented as autonomous remediation.
 
 | Trust Tier | Configuration | What the Agent Can Do | Approval |
 |------------|--------------|----------------------|----------|
 | **Diagnosis Only** | `accessLevel: 'Low'` | Read logs, query metrics, analyze state | N/A — read-only |
-| **Propose & Approve** | `accessLevel: 'High'`, `mode: 'Review'` | Diagnose + propose remediation | ✅ Human approves every action |
+| **Recommend & Execute** | `accessLevel: 'High'`, `mode: 'Review'` | Diagnose + recommend remediation | ✅ Operator executes unless a real Preview approval UI/API is captured |
 | **Autonomous** | `accessLevel: 'High'`, `mode: 'Auto'` | Diagnose + execute autonomously | ❌ **Not demonstrated** |
 
 This lab deploys the **Propose & Approve** tier. For the full RBAC matrix (demo vs. production), security guardrails, and safe language guidance, see:
@@ -116,7 +116,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 
 ## 🔧 Available Scenarios
 
-| Scenario | Energy Narrative | SRE Agent Diagnoses |
+| Scenario | Energy Narrative | Scenario Is Designed To Test Whether SRE Agent Can Diagnose |
 |----------|-----------------|---------------------|
 | OOMKilled | Meter service overwhelmed by smart meter data spike | Memory exhaustion, limit recommendations |
 | CrashLoop | Asset service crashes — invalid grid configuration | Exit codes, log analysis |

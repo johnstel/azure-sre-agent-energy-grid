@@ -1,0 +1,83 @@
+// =============================================================================
+// Scenario Verification: OOMKilled — Meter Service Memory Exhaustion
+// =============================================================================
+// Scenario ID: oom-killed
+// Purpose: Verify OOMKilled scenario is active and diagnosable
+// Expected signals: OOMKilled events, pod restarts, memory limit exceeded
+// Time range: Last 30 minutes (scenario typically manifests within 30-60 seconds)
+//
+// USAGE:
+//   1. kubectl apply -f k8s/scenarios/oom-killed.yaml
+//   2. Wait 30-60 seconds for OOMKilled event to occur
+//   3. Run this query in Log Analytics workspace
+//   4. Verify OOMKilled events are present for meter-service
+//
+// SCHEMA: KubeEvents, KubePodInventory — Azure Monitor Container Insights (Stable)
+// Required projected columns: TimeBucket, ResourceId, CorrelationId (per Security MF-3)
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARAMETERS — Modify before running
+// ─────────────────────────────────────────────────────────────────────────────
+let sre_scenario = "oom-killed";
+let sre_namespace = "energy";
+let sre_service = "meter-service";
+let TimeRange = 30m;
+let timeBin = 2m;              // Parameter: Time bucket granularity for restart trending
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUERY LOGIC
+// ─────────────────────────────────────────────────────────────────────────────
+
+// OOMKilled events for meter-service
+KubeEvents
+| where TimeGenerated > ago(TimeRange)
+| where Namespace == sre_namespace
+| where Name contains sre_service
+| where Reason == "OOMKilled"
+| extend
+    Scenario = sre_scenario,
+    Service = sre_service,
+    ResourceId = column_ifexists("_ResourceId", ""),  // AKS cluster resource ID
+    CorrelationId = column_ifexists("CorrelationId", ""),  // Container Insights events may not have CorrelationId
+    TimeBucket = bin(TimeGenerated, timeBin)
+| join kind=leftouter (
+    // Join with pod restart counts
+    KubePodInventory
+    | where TimeGenerated > ago(TimeRange)
+    | where Namespace == sre_namespace
+    | where Name contains sre_service
+    | summarize
+        RestartCount = max(ContainerRestartCount),
+        CurrentStatus = arg_max(TimeGenerated, PodStatus)
+        by Name, Namespace
+) on $left.Name == $right.Name, $left.Namespace == $right.Namespace
+| project
+    TimeBucket,
+    TimeGenerated,
+    Scenario,
+    Service,
+    Namespace,
+    PodName = Name,
+    Reason,
+    Message,
+    EventCount = Count,
+    RestartCount,
+    CurrentStatus,
+    ResourceId,
+    CorrelationId
+| order by TimeGenerated desc
+| take 10
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPECTED RESULTS & TROUBLESHOOTING
+// ─────────────────────────────────────────────────────────────────────────────
+// Expected results when scenario is active:
+// - 1+ OOMKilled events for meter-service
+// - RestartCount > 0 (likely 2-5 restarts within 30 minutes)
+// - CurrentStatus likely "Running" or "CrashLoopBackOff"
+//
+// If no results:
+// - Verify scenario is applied: kubectl get pods -n energy | grep meter-service
+// - Verify Container Insights is enabled: az aks show -g <rg> -n <cluster> --query addonProfiles.omsagent.enabled
+// - Wait longer (telemetry ingestion may take 2-5 minutes)

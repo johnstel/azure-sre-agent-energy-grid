@@ -1,0 +1,121 @@
+LAST SEEN   TYPE      REASON                   OBJECT                                   MESSAGE
+12m         Warning   FailedScheduling         pod/rabbitmq-79d58d7457-g59zg            0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Normal    ScalingReplicaSet        deployment/rabbitmq                      Scaled up replica set rabbitmq-79d58d7457 from 0 to 1
+12m         Normal    SuccessfulCreate         replicaset/rabbitmq-79d58d7457           Created pod: rabbitmq-79d58d7457-g59zg
+12m         Normal    WaitForFirstConsumer     persistentvolumeclaim/mongodb-data-pvc   waiting for first consumer to be created before binding
+12m         Normal    ScalingReplicaSet        deployment/mongodb                       Scaled up replica set mongodb-d948b8585 from 0 to 1
+12m         Normal    SuccessfulCreate         replicaset/mongodb-d948b8585             Created pod: mongodb-d948b8585-kzcjv
+12m         Warning   FailedScheduling         pod/mongodb-d948b8585-kzcjv              0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Warning   FailedScheduling         pod/asset-service-c744d6667-lgwwt        0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Warning   FailedScheduling         pod/asset-service-c744d6667-56pqq        0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Normal    SuccessfulCreate         replicaset/asset-service-c744d6667       Created pod: asset-service-c744d6667-56pqq
+12m         Normal    SuccessfulCreate         replicaset/asset-service-c744d6667       Created pod: asset-service-c744d6667-lgwwt
+12m         Normal    ScalingReplicaSet        deployment/asset-service                 Scaled up replica set asset-service-c744d6667 from 0 to 2
+12m         Normal    SuccessfulCreate         replicaset/meter-service-5b8f45f67f      Created pod: meter-service-5b8f45f67f-x8m57
+12m         Warning   FailedScheduling         pod/meter-service-5b8f45f67f-5tzlj       0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Normal    SuccessfulCreate         replicaset/meter-service-5b8f45f67f      Created pod: meter-service-5b8f45f67f-5tzlj
+12m         Normal    ScalingReplicaSet        deployment/meter-service                 Scaled up replica set meter-service-5b8f45f67f from 0 to 2
+12m         Warning   FailedScheduling         pod/meter-service-5b8f45f67f-x8m57       0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Normal    NotTriggerScaleUp        pod/meter-service-5b8f45f67f-5tzlj       pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+12m         Normal    NotTriggerScaleUp        pod/asset-service-c744d6667-lgwwt        pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+12m         Normal    NotTriggerScaleUp        pod/meter-service-5b8f45f67f-x8m57       pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+12m         Normal    NotTriggerScaleUp        pod/mongodb-d948b8585-kzcjv              pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+12m         Normal    NotTriggerScaleUp        pod/rabbitmq-79d58d7457-g59zg            pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+12m         Normal    NotTriggerScaleUp        pod/asset-service-c744d6667-56pqq        pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+12m         Warning   FailedScheduling         pod/dispatch-service-5589cf949c-76sb4    0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Normal    ScalingReplicaSet        deployment/dispatch-service              Scaled up replica set dispatch-service-5589cf949c from 0 to 2
+12m         Normal    SuccessfulCreate         replicaset/dispatch-service-5589cf949c   Created pod: dispatch-service-5589cf949c-76sb4
+12m         Normal    SuccessfulCreate         replicaset/dispatch-service-5589cf949c   Created pod: dispatch-service-5589cf949c-szzdd
+12m         Warning   FailedScheduling         pod/dispatch-service-5589cf949c-szzdd    0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Normal    EnsuringLoadBalancer     service/grid-dashboard                   Ensuring load balancer
+12m         Normal    SuccessfulCreate         replicaset/grid-dashboard-66cb797c94     Created pod: grid-dashboard-66cb797c94-66qgc
+12m         Warning   FailedScheduling         pod/grid-dashboard-66cb797c94-66qgc      0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Normal    SuccessfulCreate         replicaset/grid-dashboard-66cb797c94     Created pod: grid-dashboard-66cb797c94-2g8fb
+12m         Warning   FailedScheduling         pod/grid-dashboard-66cb797c94-2g8fb      0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+12m         Normal    ScalingReplicaSet        deployment/grid-dashboard                Scaled up replica set grid-dashboard-66cb797c94 from 0 to 2
+11m         Warning   FailedScheduling         pod/ops-console-558566cf95-qcw2f         0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+11m         Normal    SuccessfulCreate         replicaset/ops-console-558566cf95        Created pod: ops-console-558566cf95-qcw2f
+11m         Normal    ScalingReplicaSet        deployment/ops-console                   Scaled up replica set ops-console-558566cf95 from 0 to 1
+11m         Warning   FailedScheduling         pod/load-simulator-57fc84dfdf-svs25      0/3 nodes are available: 1 node(s) didn't match Pod's node affinity/selector, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 3 Preemption is not helpful for scheduling.
+11m         Normal    ScalingReplicaSet        deployment/load-simulator                Scaled up replica set load-simulator-57fc84dfdf from 0 to 1
+11m         Normal    SuccessfulCreate         replicaset/load-simulator-57fc84dfdf     Created pod: load-simulator-57fc84dfdf-svs25
+11m         Normal    NotTriggerScaleUp        pod/dispatch-service-5589cf949c-szzdd    pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+11m         Normal    NotTriggerScaleUp        pod/load-simulator-57fc84dfdf-svs25      pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+11m         Normal    NotTriggerScaleUp        pod/grid-dashboard-66cb797c94-2g8fb      pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+11m         Normal    NotTriggerScaleUp        pod/dispatch-service-5589cf949c-76sb4    pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+11m         Normal    NotTriggerScaleUp        pod/grid-dashboard-66cb797c94-66qgc      pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+11m         Normal    NotTriggerScaleUp        pod/ops-console-558566cf95-qcw2f         pod didn't trigger scale-up: 1 node(s) didn't match Pod's node affinity/selector
+11m         Normal    EnsuredLoadBalancer      service/grid-dashboard                   Ensured load balancer
+11m         Normal    EnsuringLoadBalancer     service/ops-console                      Ensuring load balancer
+11m         Normal    EnsuredLoadBalancer      service/ops-console                      Ensured load balancer
+7m32s       Normal    WaitForPodScheduled      persistentvolumeclaim/mongodb-data-pvc   waiting for pod mongodb-d948b8585-kzcjv to be scheduled
+7m24s       Normal    Scheduled                pod/grid-dashboard-66cb797c94-2g8fb      Successfully assigned energy/grid-dashboard-66cb797c94-2g8fb to aks-workload-52238159-vmss000003
+7m24s       Normal    Scheduled                pod/rabbitmq-79d58d7457-g59zg            Successfully assigned energy/rabbitmq-79d58d7457-g59zg to aks-workload-52238159-vmss000003
+7m24s       Normal    Scheduled                pod/asset-service-c744d6667-56pqq        Successfully assigned energy/asset-service-c744d6667-56pqq to aks-workload-52238159-vmss000003
+7m24s       Normal    Scheduled                pod/meter-service-5b8f45f67f-x8m57       Successfully assigned energy/meter-service-5b8f45f67f-x8m57 to aks-workload-52238159-vmss000003
+7m24s       Normal    Scheduled                pod/grid-dashboard-66cb797c94-66qgc      Successfully assigned energy/grid-dashboard-66cb797c94-66qgc to aks-workload-52238159-vmss000003
+7m24s       Normal    Provisioning             persistentvolumeclaim/mongodb-data-pvc   External provisioner is provisioning volume for claim "energy/mongodb-data-pvc"
+7m24s       Normal    ExternalProvisioning     persistentvolumeclaim/mongodb-data-pvc   Waiting for a volume to be created either by the external provisioner 'disk.csi.azure.com' or manually by the system administrator. If volume creation is delayed, please verify that the provisioner is running and correctly registered.
+7m24s       Normal    Scheduled                pod/dispatch-service-5589cf949c-76sb4    Successfully assigned energy/dispatch-service-5589cf949c-76sb4 to aks-workload-52238159-vmss000003
+7m24s       Normal    Scheduled                pod/meter-service-5b8f45f67f-5tzlj       Successfully assigned energy/meter-service-5b8f45f67f-5tzlj to aks-workload-52238159-vmss000003
+7m24s       Normal    Scheduled                pod/asset-service-c744d6667-lgwwt        Successfully assigned energy/asset-service-c744d6667-lgwwt to aks-workload-52238159-vmss000003
+7m24s       Normal    Scheduled                pod/dispatch-service-5589cf949c-szzdd    Successfully assigned energy/dispatch-service-5589cf949c-szzdd to aks-workload-52238159-vmss000003
+7m24s       Normal    Scheduled                pod/load-simulator-57fc84dfdf-svs25      Successfully assigned energy/load-simulator-57fc84dfdf-svs25 to aks-workload-52238159-vmss000003
+7m24s       Normal    Scheduled                pod/ops-console-558566cf95-qcw2f         Successfully assigned energy/ops-console-558566cf95-qcw2f to aks-workload-52238159-vmss000003
+7m23s       Normal    Pulling                  pod/rabbitmq-79d58d7457-g59zg            Pulling image "rabbitmq:3.11-management-alpine"
+7m23s       Normal    ProvisioningSucceeded    persistentvolumeclaim/mongodb-data-pvc   Successfully provisioned volume pvc-9539b2d1-7f29-4a25-b5d1-efcab47f22c1
+7m22s       Normal    Pulling                  pod/ops-console-558566cf95-qcw2f         Pulling image "nginx:alpine"
+7m22s       Normal    Pulling                  pod/asset-service-c744d6667-lgwwt        Pulling image "ghcr.io/azure-samples/aks-store-demo/product-service:latest"
+7m22s       Normal    Pulling                  pod/dispatch-service-5589cf949c-szzdd    Pulling image "ghcr.io/azure-samples/aks-store-demo/makeline-service:latest"
+7m22s       Normal    Pulling                  pod/grid-dashboard-66cb797c94-2g8fb      Pulling image "nginx:alpine"
+7m22s       Normal    Pulling                  pod/grid-dashboard-66cb797c94-66qgc      Pulling image "nginx:alpine"
+7m22s       Normal    Pulling                  pod/asset-service-c744d6667-56pqq        Pulling image "ghcr.io/azure-samples/aks-store-demo/product-service:latest"
+7m22s       Normal    Scheduled                pod/mongodb-d948b8585-kzcjv              Successfully assigned energy/mongodb-d948b8585-kzcjv to aks-workload-52238159-vmss000003
+7m21s       Normal    Pulling                  pod/load-simulator-57fc84dfdf-svs25      Pulling image "ghcr.io/azure-samples/aks-store-demo/virtual-customer:latest"
+7m21s       Normal    Pulling                  pod/meter-service-5b8f45f67f-5tzlj       Pulling image "ghcr.io/azure-samples/aks-store-demo/order-service:latest"
+7m21s       Normal    Pulling                  pod/meter-service-5b8f45f67f-x8m57       Pulling image "ghcr.io/azure-samples/aks-store-demo/order-service:latest"
+7m21s       Normal    Pulling                  pod/dispatch-service-5589cf949c-76sb4    Pulling image "ghcr.io/azure-samples/aks-store-demo/makeline-service:latest"
+7m16s       Normal    Pulled                   pod/dispatch-service-5589cf949c-szzdd    Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/makeline-service:latest" in 6.352s (6.352s including waiting). Image size: 14820165 bytes.
+7m16s       Normal    Pulled                   pod/dispatch-service-5589cf949c-76sb4    Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/makeline-service:latest" in 5.673s (5.673s including waiting). Image size: 14820165 bytes.
+7m16s       Normal    Created                  pod/dispatch-service-5589cf949c-76sb4    Created container: dispatch-service
+7m16s       Normal    Created                  pod/dispatch-service-5589cf949c-szzdd    Created container: dispatch-service
+7m15s       Normal    Started                  pod/dispatch-service-5589cf949c-szzdd    Started container dispatch-service
+7m15s       Normal    Started                  pod/dispatch-service-5589cf949c-76sb4    Started container dispatch-service
+7m14s       Normal    Pulled                   pod/asset-service-c744d6667-56pqq        Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/product-service:latest" in 8.59s (8.59s including waiting). Image size: 43712575 bytes.
+7m14s       Normal    Created                  pod/asset-service-c744d6667-56pqq        Created container: asset-service
+7m14s       Normal    Pulled                   pod/asset-service-c744d6667-lgwwt        Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/product-service:latest" in 8.377s (8.377s including waiting). Image size: 43712575 bytes.
+7m14s       Normal    Created                  pod/asset-service-c744d6667-lgwwt        Created container: asset-service
+7m14s       Normal    Started                  pod/load-simulator-57fc84dfdf-svs25      Started container load-simulator
+7m14s       Normal    Created                  pod/load-simulator-57fc84dfdf-svs25      Created container: load-simulator
+7m14s       Normal    Pulled                   pod/load-simulator-57fc84dfdf-svs25      Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/virtual-customer:latest" in 6.416s (6.416s including waiting). Image size: 35278630 bytes.
+7m13s       Normal    Created                  pod/grid-dashboard-66cb797c94-2g8fb      Created container: grid-dashboard
+7m13s       Normal    Started                  pod/asset-service-c744d6667-lgwwt        Started container asset-service
+7m13s       Normal    Started                  pod/asset-service-c744d6667-56pqq        Started container asset-service
+7m13s       Normal    Started                  pod/grid-dashboard-66cb797c94-66qgc      Started container grid-dashboard
+7m13s       Normal    Created                  pod/grid-dashboard-66cb797c94-66qgc      Created container: grid-dashboard
+7m13s       Normal    Pulled                   pod/grid-dashboard-66cb797c94-66qgc      Successfully pulled image "nginx:alpine" in 8.699s (8.699s including waiting). Image size: 26013346 bytes.
+7m13s       Normal    Started                  pod/ops-console-558566cf95-qcw2f         Started container ops-console
+7m13s       Normal    Started                  pod/grid-dashboard-66cb797c94-2g8fb      Started container grid-dashboard
+7m13s       Normal    Created                  pod/ops-console-558566cf95-qcw2f         Created container: ops-console
+7m13s       Normal    Pulled                   pod/grid-dashboard-66cb797c94-2g8fb      Successfully pulled image "nginx:alpine" in 8.757s (8.757s including waiting). Image size: 26013346 bytes.
+7m13s       Normal    Pulled                   pod/ops-console-558566cf95-qcw2f         Successfully pulled image "nginx:alpine" in 8.409s (8.409s including waiting). Image size: 26013346 bytes.
+7m12s       Normal    Started                  pod/rabbitmq-79d58d7457-g59zg            Started container rabbitmq
+7m12s       Normal    Created                  pod/rabbitmq-79d58d7457-g59zg            Created container: rabbitmq
+7m12s       Normal    Pulled                   pod/rabbitmq-79d58d7457-g59zg            Successfully pulled image "rabbitmq:3.11-management-alpine" in 11.049s (11.049s including waiting). Image size: 86219699 bytes.
+7m10s       Warning   Unhealthy                pod/grid-dashboard-66cb797c94-2g8fb      Readiness probe failed: Get "http://10.0.0.115:8080/health": dial tcp 10.0.0.115:8080: connect: connection refused
+7m10s       Warning   Unhealthy                pod/grid-dashboard-66cb797c94-66qgc      Readiness probe failed: Get "http://10.0.0.113:8080/health": dial tcp 10.0.0.113:8080: connect: connection refused
+7m8s        Normal    SuccessfulAttachVolume   pod/mongodb-d948b8585-kzcjv              AttachVolume.Attach succeeded for volume "pvc-9539b2d1-7f29-4a25-b5d1-efcab47f22c1"
+7m3s        Normal    Pulled                   pod/meter-service-5b8f45f67f-5tzlj       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 17.798s (17.798s including waiting). Image size: 75025121 bytes.
+7m3s        Normal    Pulled                   pod/meter-service-5b8f45f67f-x8m57       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 18.114s (18.114s including waiting). Image size: 75025121 bytes.
+7m2s        Normal    Created                  pod/meter-service-5b8f45f67f-x8m57       Created container: meter-service
+7m2s        Normal    Created                  pod/meter-service-5b8f45f67f-5tzlj       Created container: meter-service
+7m2s        Normal    Started                  pod/meter-service-5b8f45f67f-5tzlj       Started container meter-service
+7m2s        Normal    Started                  pod/meter-service-5b8f45f67f-x8m57       Started container meter-service
+6m58s       Normal    Pulling                  pod/mongodb-d948b8585-kzcjv              Pulling image "mongo:4.4"
+6m53s       Warning   Unhealthy                pod/dispatch-service-5589cf949c-76sb4    Liveness probe failed: Get "http://10.0.0.118:3001/health": dial tcp 10.0.0.118:3001: connect: connection refused
+6m53s       Warning   Unhealthy                pod/dispatch-service-5589cf949c-szzdd    Liveness probe failed: Get "http://10.0.0.125:3001/health": dial tcp 10.0.0.125:3001: connect: connection refused
+6m48s       Normal    Created                  pod/mongodb-d948b8585-kzcjv              Created container: mongodb
+6m48s       Normal    Pulled                   pod/mongodb-d948b8585-kzcjv              Successfully pulled image "mongo:4.4" in 10.076s (10.076s including waiting). Image size: 166163173 bytes.
+6m48s       Normal    Started                  pod/mongodb-d948b8585-kzcjv              Started container mongodb
+6m47s       Warning   Unhealthy                pod/dispatch-service-5589cf949c-76sb4    Readiness probe failed: Get "http://10.0.0.118:3001/health": dial tcp 10.0.0.118:3001: connect: connection refused
+6m47s       Warning   Unhealthy                pod/dispatch-service-5589cf949c-szzdd    Readiness probe failed: Get "http://10.0.0.125:3001/health": dial tcp 10.0.0.125:3001: connect: connection refused

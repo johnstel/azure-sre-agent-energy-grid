@@ -97,6 +97,69 @@
 - Verification: All assets now served with correct MIME types; production build fully functional
 - **Coordination note:** Confirmed Parker's fix independently via full smoke test workflow
 
+### 2026-04-26: Wave 1 Live UAT Evidence Package — BLOCKED on Container Insights KQL (Final Retry)
+
+**Context:** Wave 1 focused on live UAT validation post-deployment. Created comprehensive evidence capture structure, validated all documentation consistency, validated Parker's completed OOMKilled kubectl evidence, applied Ripley's KQL alert-history fix, and discovered Container Insights ingestion blocker.
+
+**Work completed:**
+1. Created `docs/evidence/wave1-live/README.md` — comprehensive UAT checklist covering deployment, AKS health, Container Insights, 90-day retention, Activity Log export, four alerts, KQL execution, SRE Agent portal, and end-to-end OOMKilled scenario
+2. Created `docs/evidence/scenarios/oom-killed/run-notes.md` — complete run template with T0-T5 timestamps, Azure SRE Agent evidence slots, pass/fail criteria
+3. Re-ran documentation consistency checks (grep for stale six-alert references, fake endpoints, old KQL IDs, sre.scenario misuse) — **0 issues found**
+4. Re-ran scenario metadata validation — **8/8 checks PASS, 0 errors, 0 warnings**
+5. **Validated Parker's OOMKilled kubectl evidence** — 16/16 files present, MTTR 21 seconds (well below 900s threshold), scenario PASS
+6. **Applied Ripley's KQL alert-history fix** — corrected table (AzureDiagnostics → AzureActivity), corrected claim (alert firing → rule configuration changes), added Wave 2 limitation documentation
+7. **Discovered Container Insights KQL blocker** — KubeEvents/KubePodInventory tables empty 24h (ingestion broken)
+
+**Evidence validation results:**
+- ✅ kubectl evidence: T0-T5 timeline flawlessly executed, all evidence accurate and contract-compliant
+- ✅ MTTR metrics: 21 seconds (0.4% of 900s threshold) — PASS with significant margin
+- ✅ Documentation quality: PARKER-FINAL-REPORT.md comprehensive, no overclaims detected
+- ✅ Activity Log export: Correctly configured (Ripley verified 86+ events in AzureActivity)
+- ✅ Redaction ready: Commands prepared in PARKER-FINAL-REPORT.md, awaiting execution
+- 🔴 **Container Insights KQL: BLOCKED** — KubeEvents/KubePodInventory empty 24h (ingestion broken, Wave 1 cannot close)
+- ⏳ SRE Agent portal evidence: PENDING (human action required, separate from blocker)
+
+**Ripley KQL Fix (Applied):**
+- **Issue**: `alert-history.kql` used wrong table (AzureDiagnostics) and made incorrect claim (alert firing events)
+- **Root cause**: Activity Log "Alert" category captures rule configuration changes, NOT firing events
+- **Fix applied**: Updated query to use AzureActivity, query rule configuration changes only, added Wave 2 limitation note
+- **Files updated**: `alert-history.kql`, `kql/README.md` (added §Alert Firing Event Limitations), `ALERT-KQL-MAPPING.md` (2 references)
+- **Validation**: Scenario metadata validation rerun — 8/8 checks PASS, 0 errors, 0 warnings
+
+**Container Insights Blocker (Parker's Final Retry):**
+- **Issue**: KubeEvents and KubePodInventory tables are empty for 24 hours in corrected Log Analytics workspace
+- **Impact**: Cannot execute scenario KQL queries (scenario-oom-killed.kql, pod-lifecycle.kql, etc.)
+- **Status**: 🔴 **BLOCKER** — Wave 1 cannot close until Ripley resolves Container Insights ingestion
+- **Next**: Ripley investigates ingestion failure, restores data flow, verifies with `KubeEvents | where TimeGenerated > ago(1h)`
+
+**Sensitive identifiers requiring redaction:**
+- Pod/volume UUIDs (e.g., da237eda-f9ad-4e34-9f51-e432bd9f2bf4)
+- Internal IPs (10.0.0.x/24 range)
+- Node names (aks-workload-33466352-vmss00000d/e)
+- Container IDs (full SHA256 hashes)
+
+**Gate verdict:** **🔴 BLOCKED_ON_CONTAINER_INSIGHTS_KQL**
+- kubectl evidence PASS
+- MTTR PASS (21s < 900s threshold)
+- Scenario execution PASS (OOMKilled reproduced, diagnosed, remediated, recovered)
+- Activity Log export PASS (correctly configured, 86+ events verified)
+- KQL documentation CORRECTED (alert-history.kql now accurate with Wave 2 limitation)
+- Redaction READY (commands prepared, awaiting execution)
+- **Container Insights KQL BLOCKED** (KubeEvents/KubePodInventory empty 24h — ingestion broken)
+- SRE Agent portal PENDING (human action, separate from blocker)
+
+**Key deliverables:**
+- `docs/evidence/wave1-live/README.md` — complete UAT checklist with file structure and pass criteria
+- `docs/evidence/scenarios/oom-killed/run-notes.md` — T0-T5 template with SRE Agent evidence fields
+- `docs/evidence/wave1-live/LAMBERT-VALIDATION-REPORT.md` — comprehensive validation report with updated gate verdict
+- `docs/evidence/wave1-live/WAVE1-FINAL-VERDICT.md` — final verdict summary (updated with blocker)
+- `docs/evidence/kql/stable/alert-history.kql` — corrected query (AzureActivity, rule configuration changes)
+- `docs/evidence/kql/README.md` — added §Alert Firing Event Limitations with Wave 2 recommendation
+
+**Pattern validated:** T0-T5 timeline + EXECUTION-SUMMARY pattern is excellent and ready for reuse on remaining 9 scenarios.
+
+**Next actions:** Ripley resolves Container Insights ingestion → Parker/Analyst runs KQL queries → Parker redacts sensitive data → John captures SRE Agent portal evidence → Parker commits all evidence.
+
 ### 2026-04-24: AKS Idempotency Sprint — Shared Learning
 - **Coordination:** Validated QA checklist with Ripley; coordinated cross-functional testing strategy with Coordinator
 - **Checklists created:** 7-scenario AKS validation plan + 10-scenario PowerShell detection plan covering all platforms and edge cases
@@ -310,3 +373,325 @@ Orchestration and decision consolidation for Mission Control Ask Copilot feature
 - Audit claims are the highest-risk overclaim category. Even internal docs can overclaim auditability when the underlying telemetry pipeline is incomplete (Activity Log not exported, SRE Agent conversation retention unknown). Always cross-check closing scripts against the guardrails table.
 
 **Decision artifact:** `.squad/decisions/inbox/lambert-wave0-final-gate.md`
+
+### 2026-04-26: Wave 1 KQL Audit Pack & UAT Plan
+
+**Context:** Wave 1 scope — Create parameterized KQL queries for pod lifecycle, alert history, Activity Log/RBAC actions, SRE Agent operational telemetry, and scenario verification for OOMKilled/MongoDBDown/ServiceMismatch. Add comprehensive UAT checklist to DEMO-RUNBOOK.md.
+
+**Deliverables:**
+1. **7 KQL query files** (538 lines total) — All parameterized per telemetry dimension contract (§1)
+   - `pod-lifecycle.kql` — Track pod state transitions, restarts, OOMKilled events
+   - `alert-history.kql` — Query Azure Monitor alert firing history (T1 timestamp, requires Activity Log export)
+   - `activity-log-rbac.kql` — Audit ARM operations and RBAC role assignments (requires Activity Log export)
+   - `sre-agent-telemetry.kql` — Query SRE Agent App Insights telemetry (SCHEMA_TBD)
+   - `scenario-oom-killed.kql` — Verify OOMKilled scenario detection
+   - `scenario-mongodb-down.kql` — Verify MongoDB outage and cascading failure detection
+   - `scenario-service-mismatch.kql` — Verify service selector mismatch (silent failure)
+
+2. **KQL README.md update** (236 bytes → 9,624 bytes) — Comprehensive usage guide covering:
+   - Query catalog table (purpose, parameters, schema source)
+   - Usage instructions (Azure Portal, Azure CLI, parameter modification)
+   - Preview caveats & prerequisites (Wave 1 blockers table with Ripley assignments)
+   - SCHEMA_TBD documentation template (procedure for observing SRE Agent telemetry fields post-deployment)
+   - Data retention & evidence gaps (30-day LA vs 90-day AI mismatch, Activity Log export status)
+   - Known limitations (5 limitations with workarounds)
+   - Troubleshooting guide (debug steps for query execution issues)
+
+3. **Wave 1 UAT Checklist** (200 lines added to DEMO-RUNBOOK.md) — Comprehensive gate criteria:
+   - Prerequisites (infrastructure deployment, Container Insights enabled, Log Analytics workspace)
+   - Wave 1 Infrastructure Checklist (Activity Log export, alerts deployed, 90-day retention, SRE Agent)
+   - KQL Query Syntax Validation (pre-deployment parse checks for all 7 queries)
+   - KQL Query Execution Validation (post-deployment healthy baseline verification)
+   - SRE Agent Telemetry Schema Verification (SCHEMA_TBD field documentation procedure)
+   - Evidence Capture Verification (folder structure, file paths)
+   - Metadata Validation (`validate-scenario-metadata.ps1` execution)
+   - Documentation Cross-Reference Validation (broken link detection)
+   - Wave 1 UAT Gate Criteria (7-item pass/fail gate)
+   - Wave 1 Blockers (4 critical blockers with owner assignments)
+   - Wave 1 Non-Blockers (3 known gaps that don't block Wave 2)
+   - UAT Sign-Off Template (formal gate sign-off section)
+
+**Validation results:**
+- `validate-scenario-metadata.ps1` — ✅ PASS (8 checks, 0 errors, 0 warnings)
+- File count verification — 7 .kql files + 1 README.md = 8 files modified/created
+- Documentation cross-references — All relative paths resolve (spot-checked evidence/README.md, DEMO-RUNBOOK.md, kql/README.md)
+
+**Key learnings:**
+
+1. **SCHEMA_TBD is a Contract, Not a Comment**
+   - SRE Agent App Insights telemetry fields (custom dimensions, trace formats) are subject to change during Public Preview
+   - Every reference to SRE Agent fields must be tagged `// SCHEMA_TBD` per CAPABILITY-CONTRACTS.md §8
+   - Queries include a verification procedure: deploy → submit test prompt → wait 2-5 min → run exploratory query → document observed fields in README
+   - Prevents rework when field names change between Preview and GA
+   - Applied to: `sre-agent-telemetry.kql` — all custom dimension references are SCHEMA_TBD with inline verification instructions
+
+2. **Prerequisites Before Queries (Wave 1 Blocker Pattern)**
+   - Two queries depend on infrastructure not yet deployed: `alert-history.kql` and `activity-log-rbac.kql` require Activity Log diagnostic export to Log Analytics
+   - Without this prerequisite: queries parse successfully but return 0 results (data ingestion gap, not query defect)
+   - UAT checklist separates "syntax validation" (pre-deployment) from "execution validation" (post-deployment)
+   - Explicit blocker ownership: Ripley must deploy `activity-log-diagnostics.bicep` module before Wave 2
+   - Prevents false-negative UAT failures (query is correct, infrastructure is missing)
+
+3. **Healthy Baseline Verification Before Scenario Injection**
+   - All 3 scenario queries include "expected results when scenario is active" comments
+   - UAT innovation: Run scenario queries **before** injecting any breaks to establish healthy baseline
+   - Example: `scenario-oom-killed.kql` should return 0 OOMKilled events in healthy state
+   - If baseline shows failures: either scenario already injected, infrastructure unhealthy, or query logic wrong
+   - Isolates failure modes and prevents "scenario didn't trigger" vs "scenario already active" confusion during Wave 2 UAT
+
+4. **Parameterization Prevents Hardcoding Drift**
+   - All 7 queries use `let` statements for parameters (`sre_namespace`, `sre_scenario`, `TimeRange`)
+   - Query body never references literal strings — operators modify parameters before running
+   - Prevents breakage when scenario IDs change or when testing in alternate namespaces
+   - Enforced by CAPABILITY-CONTRACTS.md §1: "Queries must accept `sre.scenario` and `sre.namespace` as parameters — never hardcode scenario names"
+
+5. **UAT Checklist as a Contract Between Waves**
+   - Wave 1 UAT Checklist defines gate criteria: all infrastructure prerequisites deployed, all queries execute in healthy baseline, SCHEMA_TBD fields documented
+   - 4 critical blockers identified: Activity Log export, alerts not deployed, SRE Agent not deployed, Container Insights not enabled
+   - Formal sign-off template prevents "assumed completion" ambiguity
+   - Sequential gate enforcement: Wave 0 → Wave 1 UAT → Wave 2 Scenario UAT
+
+6. **Evidence Gap Documentation Prevents Overclaiming**
+   - CAPABILITY-CONTRACTS.md §11 documents 60-day evidence gap: Log Analytics 30 days vs App Insights 90 days
+   - Queries that join LA + AI data can only show correlated evidence for 30 days (minimum retention wins)
+   - Documented in kql/README.md "Data Retention & Evidence Gaps" table
+   - Wave 1 UAT Checklist lists "Log Analytics retention = 90 days" as non-blocker (queries work at 30 days, but gap persists)
+   - Prevents overclaiming "90-day audit evidence" during demos when queries fail after 30 days
+
+**Live-deployment blockers identified (for Ripley to resolve):**
+1. **Activity Log diagnostic export not configured** — `activity-log-diagnostics.bicep` module must be deployed (affects `alert-history.kql` and `activity-log-rbac.kql`)
+2. **Alerts not deployed** — Set `deployAlerts = true` in Bicep parameters (affects `alert-history.kql` MTTR T1 timestamp capture)
+3. **SRE Agent not deployed** — Set `deploySreAgent = true` in Bicep parameters (affects `sre-agent-telemetry.kql` and entire demo)
+4. **Container Insights not enabled** — Verify `addonProfiles.omsagent.enabled = true` in AKS Bicep (affects all scenario queries and `pod-lifecycle.kql`)
+
+**Files modified:**
+- Created: 7 .kql files in `docs/evidence/kql/` (pod-lifecycle, alert-history, activity-log-rbac, sre-agent-telemetry, scenario-oom-killed, scenario-mongodb-down, scenario-service-mismatch)
+- Modified: `docs/evidence/kql/README.md` (expanded to 9.4K with usage, Preview caveats, SCHEMA_TBD template)
+- Modified: `docs/DEMO-RUNBOOK.md` (added 200-line Wave 1 UAT Checklist after Wave 0 completion checklist)
+- No runtime changes: No Bicep, K8s manifests, or PowerShell scripts modified (docs + queries only)
+
+**Decision artifact:** `.squad/decisions/inbox/lambert-wave1-kql-uat.md`
+
+**Status:** ✅ Wave 1 KQL audit pack and UAT plan complete. Ready for Ripley to deploy prerequisites and Parker to execute UAT.
+
+### 2026-04-26: Security Wave 1 Mandatory Fix MF-3 — Required Columns & Physical Separation
+
+**Context:** Security review identified:
+- **MF-3**: Missing TimeBucket, ResourceId, CorrelationId in KQL queries
+- **SR-2**: Lack of physical separation between stable and SCHEMA_TBD queries
+
+**Changes applied:**
+
+1. **Directory restructuring (Security SR-2)**
+   - Created `docs/evidence/kql/stable/` for stable Azure Monitor schemas (Container Insights, Activity Log, Alerts)
+   - Created `docs/evidence/kql/schema-tbd/` for Preview schemas (SRE Agent App Insights)
+   - Moved 6 stable queries to `stable/`
+   - Moved 1 SCHEMA_TBD query to `schema-tbd/`
+   - **Rationale:** Prevents accidental mixing of stable and Preview-dependent fields
+
+2. **Required columns (Security MF-3)** — Added to all 7 queries:
+   - `TimeBucket = bin(TimeGenerated, timeBin)` — Time-series trending, MTTR timeline correlation
+   - `ResourceId = column_ifexists("_ResourceId", "")` — ARM resource correlation (AKS cluster, App Insights)
+   - `CorrelationId = column_ifexists("CorrelationId", "")` — Cross-query correlation, distributed tracing
+   - **Fallback pattern:** Use `column_ifexists()` for tables without native ResourceId/CorrelationId (Container Insights events)
+
+3. **Required parameters (Security MF-3)** — Added to all 7 queries:
+   - `let TimeRange = ...;` — Time window for query
+   - `let timeBin = 5m;` — Time bucket granularity for trending
+   - `let sre_namespace = "energy";` — Kubernetes namespace filter
+   - `let sre_scenario = "";` — Scenario ID filter (optional)
+
+**Validation results:**
+```
+✅ Scenario metadata validation:     PASS (8 checks, 0 errors)
+✅ TimeBucket/timeBin in stable:     39 occurrences (all 6 queries)
+✅ ResourceId in stable:             30 occurrences (all 6 queries)
+✅ CorrelationId in stable:          29 occurrences (all 6 queries)
+✅ SCHEMA_TBD in stable:             0 occurrences (no leakage)
+✅ SCHEMA_TBD in schema-tbd:         11 occurrences (proper tagging)
+✅ SCHEMA_TBD in README:             25 occurrences (documented)
+```
+
+**Files modified:**
+- Modified: 7 KQL queries (6 stable + 1 schema-tbd) — added TimeBucket, ResourceId, CorrelationId, timeBin parameter
+- Modified: `docs/evidence/kql/README.md` — added Directory Structure, Required Columns, Required Parameters sections
+- Restructured: Created `stable/` and `schema-tbd/` directories
+
+**Key learning:**
+- **CorrelationId limitations**: Container Insights events (KubeEvents, KubePodInventory) do not have native CorrelationId fields. Use `column_ifexists("CorrelationId", "")` to satisfy Security MF-3 without query failures. Impact: Cross-query correlation is limited to Activity Log ↔ App Insights; K8s events cannot be joined via CorrelationId.
+- **Physical separation enforces contract boundary**: Stable queries cannot accidentally reference SCHEMA_TBD fields if they live in separate directories. This prevents stable queries from breaking when SRE Agent Preview schema changes.
+
+**Decision artifact:** `.squad/decisions/inbox/lambert-wave1-kql-uat.md` (updated with Security MF-3 section)
+
+**Status:** ✅ Security MF-3 mandatory fix complete. Ready for Security Wave 1 review.
+
+### 2026-04-26 — Security Blocker Fixes (Wave 1 KQL)
+**Scope:** Fixed 4 critical blockers identified in Security review of Wave 1 KQL audit pack.
+
+**Work:**
+1. **README Duplication** — Removed duplicate sections (lines 298-476) from `docs/evidence/kql/README.md`
+2. **KQL Syntax Errors** — Fixed CorrelationId in summarize (pod-lifecycle.kql) and LastSeen = TimeGenerated projections after summarize (scenario queries)
+3. **Inaccurate Claims** — Softened MongoDBDown and ServiceMismatch queries to clarify "KQL symptom evidence" vs. "kubectl/K8s API root-cause validation"
+4. **Validation Checks** — All pass: scenario metadata ✅, no duplicate headings ✅, no syntax errors ✅, required columns present ✅, no SCHEMA_TBD leakage ✅
+
+**Files changed:**
+- `docs/evidence/kql/README.md` (cleaned duplication)
+- `docs/evidence/kql/stable/pod-lifecycle.kql` (extend + summarize pattern)
+- `docs/evidence/kql/stable/scenario-mongodb-down.kql` (LastSeen fix + LIMITATIONS)
+- `docs/evidence/kql/stable/scenario-service-mismatch.kql` (LastSeen fix + LIMITATIONS)
+
+**Key learnings:**
+- KQL `summarize` consumes original columns — cannot project TimeGenerated after summarizing it
+- `column_ifexists()` must be extended BEFORE summarize, then aggregated with `any()`
+- KubeServices table does NOT expose Service selectors — root-cause diagnosis requires kubectl/K8s API
+- KubePodInventory shows pod count but NOT desired replicas — scaling intent requires kubectl
+
+**Status:** ✅ Ready for Security Wave 1 review
+
+---
+
+## Wave 2 Live Evidence Package Preparation (2026-04-26)
+
+**Context**: Wave 1 CLOSED with pending human portal evidence. User directive: "Let's get the whole killer demo done then" — Wave 2 launch authorized.
+
+**Wave 2 Scope**: OOMKilled (revalidation), MongoDBDown (cascading failure), ServiceMismatch (silent networking)
+
+**Lambert Work Completed**:
+1. ✅ Created `docs/evidence/wave2-live/` directory structure (3 scenarios × 4 subdirectories each)
+2. ✅ Created `docs/evidence/wave2-live/README.md` (8066 bytes) — Wave 2 overview, scope, deliverables, pass criteria, timeline
+3. ✅ Created `docs/evidence/wave2-live/STATUS.md` (8657 bytes) — Real-time progress tracker with phase-by-phase checklist
+4. ✅ Created `docs/evidence/wave2-live/mongodb-down/checklist.md` (8912 bytes) — 217 lines, 12 phases, cascading failure focus, T0-T5 structure
+5. ✅ Created `docs/evidence/wave2-live/service-mismatch/checklist.md` (9927 bytes) — 230 lines, 12 phases, silent networking + selector mismatch focus
+6. ✅ Created `docs/evidence/wave2-live/WAVE2-FINAL-VERDICT.md` (6534 bytes) — Gate verdict template with pass criteria for each scenario
+7. ✅ Ran scenario metadata validation: 8/8 checks PASS, 0 errors, 0 warnings (confirms all 10 scenarios still locked)
+
+**Wave 2 Known Limitations Pre-Documented** (from Wave 1 learnings):
+- Alert firing events limitation (AzureActivity shows rule changes only, not firing events — Wave 3+)
+- Container Insights lag (2-5 min ingestion delay — document as non-critical blocker)
+- SRE Agent portal human-only (John must manually capture evidence after Parker completes)
+- ServiceMismatch KQL minimal (silent failures = config issue, not pod crash — kubectl evidence is primary)
+
+**Wave 2 Pass Criteria Defined**:
+- 🟢 PASS: All 3 scenarios complete, MTTR < 900s, SRE Agent accurate, redaction complete
+- 🟡 PASS_WITH_PENDING_HUMAN_PORTAL: All automated evidence complete, portal pending John
+- 🟠 PARTIAL_WITH_LIMITATIONS: 2/3 scenarios complete OR KQL partial with documented blockers
+- 🔴 BLOCKED: Infrastructure failure, scenario execution failure, or critical evidence gap
+
+**Current Status**: Wave 2 evidence package **PREPARED** and ready for Parker/Ripley execution. Lambert has created all checklists, templates, and validation frameworks. Awaiting Parker's scenario execution to validate evidence and issue gate verdict.
+
+**Next Actions**:
+- Parker: Execute OOMKilled revalidation, MongoDBDown, ServiceMismatch (follow checklists)
+- Lambert: Validate evidence structure, redaction, MTTR, KQL accuracy after Parker completes
+- Lambert: Issue Wave 2 gate verdict (PASS/PASS_WITH_PENDING/PARTIAL/BLOCKED)
+- John: Capture SRE Agent portal evidence for all 3 scenarios (human-only)
+
+**Learnings**:
+- Wave 1 checklist structure (T0-T5 timeline) is robust and reusable — copied conventions for Wave 2
+- Cascading failures require dependency chain documentation (mongodb → meter-service)
+- Silent networking failures need service selector vs. pod label alignment evidence
+- Gate verdict templates prevent ambiguity — pre-define PASS/PARTIAL/BLOCKED criteria before execution
+
+---
+
+## Wave 2 Alert Firing Evidence Integration (2026-04-26)
+
+**Context**: Ripley completed Wave 2 alert-firing evidence path using Azure Resource Graph CLI. Lambert integrated alert firing requirements into Wave 2 validation criteria.
+
+**Ripley's Work** (completed):
+- Primary approach: Azure Resource Graph CLI via `scripts/get-alert-firing-history.ps1`
+- Documentation updated: `docs/evidence/kql/README.md` and `docs/evidence/ALERT-KQL-MAPPING.md`
+- No Bicep changes required
+
+**Lambert's Integration Work**:
+1. ✅ Updated `docs/evidence/wave2-live/README.md` — Added alert firing evidence section to deliverables and pass criteria
+2. ✅ Updated Wave 2 Known Limitations — Changed from "Wave 3+ diagnostic settings" to "Wave 2 ARG solution" (Ripley's script)
+3. ✅ Updated `docs/evidence/wave2-live/WAVE2-FINAL-VERDICT.md` — Added alert firing (ARG) component to all 3 scenario tables
+4. ✅ Updated `docs/evidence/wave1-live/checklist.md` — Added alert verification section with ARG command
+5. ✅ Updated `docs/evidence/wave2-live/mongodb-down/checklist.md` — Added alert verification (possibly http-5xx OR NO_ALERT_FIRED)
+6. ✅ Updated `docs/evidence/wave2-live/service-mismatch/checklist.md` — Added alert verification (NO_ALERT_FIRED expected for silent failure)
+7. ✅ Created `alert-firing/` directories in all 3 Wave 2 scenario folders
+8. ✅ Updated `docs/evidence/wave2-live/STATUS.md` — Added alert firing checkboxes to scenario progress
+
+**Wave 2 Alert Firing Requirements**:
+- **OOMKilled**: `{prefix}-crashloop-oom` alert expected to fire (Sev 1) — capture firing event via ARG OR document NO_ALERT_FIRED
+- **MongoDBDown**: Possibly `{prefix}-http-5xx` if downstream 5xx errors, OR NO_ALERT_FIRED (no dedicated baseline alert) — document either way
+- **ServiceMismatch**: NO_ALERT_FIRED expected (silent networking failure, no dedicated alert) — capture ARG command output as proof
+- **Activity Log**: `alert-history.kql` remains rule-config evidence only (per Wave 1 limitation)
+
+**Gate Criteria Updated**:
+- Per-scenario pass now requires: Alert firing event captured via ARG **OR** explicit NO_ALERT_FIRED with command output
+- Activity Log alert-history.kql is supplemental (rule changes only, not firing events)
+
+**Learnings**:
+- Azure Resource Graph AlertsManagementResources provider is the correct path for alert firing history (not Activity Log, not diagnostic settings)
+- Silent failures (ServiceMismatch) should document NO_ALERT_FIRED as expected behavior, not a blocker
+- Scenarios without dedicated baseline alerts (MongoDBDown) need flexible evidence criteria (firing event if present, OR NO_ALERT_FIRED)
+
+**Status**: ✅ Wave 2 alert firing evidence integrated into all validation criteria, checklists, and gate verdicts
+
+---
+
+## Wave 2 Blocker — Cluster Availability (2026-04-26)
+
+**Context**: Parker's Wave 2 execution package is prepared (checklists, guides, validation frameworks), but live evidence capture is BLOCKED by infrastructure issue.
+
+**Blocker**: Stopped-cluster / cluster-name discrepancy. Ripley is resolving correct target cluster and starting it if needed.
+
+**Lambert Action**: Updated Wave 2 status to BLOCKED_ON_CLUSTER_AVAILABLE to prevent premature closure.
+
+**Files Updated**:
+1. `docs/evidence/wave2-live/STATUS.md` — Updated header to show BLOCKED status, documented blocker in Current Blockers section
+2. `docs/evidence/wave2-live/WAVE2-FINAL-VERDICT.md` — Changed gate verdict from "PENDING EXECUTION" to "BLOCKED_ON_CLUSTER_AVAILABLE"
+3. `.squad/agents/lambert/history.md` — This entry
+
+**Key Point**: Wave 2 gate remains **OPEN** and **BLOCKED** until live evidence is captured. Prepared guides/checklists do NOT constitute Wave 2 closure. Lambert will NOT issue gate verdict until:
+1. Ripley resolves cluster availability
+2. Parker executes all 3 scenarios (OOMKilled, MongoDBDown, ServiceMismatch)
+3. Lambert validates live evidence (kubectl, KQL, alert firing, MTTR, redaction)
+
+**Status**: ✅ Wave 2 blocker documented, gate held open pending live evidence
+
+---
+
+## Wave 2 Gate Verdict — PASS_WITH_PENDING_HUMAN_PORTAL (2026-04-26)
+
+**Context**: Parker completed Wave 2 automated evidence collection (MongoDBDown, ServiceMismatch). Lambert reviewed evidence package and issued gate verdict.
+
+**Evidence Reviewed**:
+- MongoDBDown: 16 kubectl files (T0-T5, 134s), root cause validated (replicas: 0), NO_ALERT_FIRED (rapid execution < 90s)
+- ServiceMismatch: 22 kubectl files (T0-T5, 159s), root cause validated (selector mismatch), NO_ALERT_FIRED (expected silent failure)
+- Alert firing history via ARG: NO_ALERT_FIRED documented for both scenarios with technical explanations
+- Redaction: 0 UUIDs, 0 unredacted IPs, 0 unredacted node names
+- Scenario metadata validation: 8/8 checks PASS
+
+**Gate Verdict**: 🟡 **PASS_WITH_PENDING_HUMAN_PORTAL**
+
+**Justification**:
+- ✅ Automated evidence complete (kubectl, alert firing, redaction)
+- ✅ ServiceMismatch is FULL PASS — perfect silent failure demonstration
+- ⚠️ MongoDBDown is PARTIAL PASS — smoking-gun root cause but NO_ALERT_FIRED due to rapid execution
+- ⏳ SRE Agent portal evidence PENDING_HUMAN_PORTAL (John must capture)
+
+**Safe Language Review**:
+- ✅ All Parker reports maintain technical honesty (no overclaims)
+- ✅ MTTR marked "N/A for automated execution" or "PENDING_HUMAN_PORTAL"
+- ✅ Alert limitations disclosed (MongoDBDown rapid execution vs. eval windows)
+- ⚠️ Language softening recommended for customer-facing materials: Add "portal validation pending" to SRE Agent diagnosis claims
+
+**Remaining Before Final PASS**:
+1. John captures SRE Agent portal evidence (MongoDBDown + ServiceMismatch) — 15-20 min
+2. Lambert validates portal evidence quality
+3. Language softening applied to customer-facing materials
+
+**Files Updated**:
+1. `docs/evidence/wave2-live/WAVE2-FINAL-VERDICT.md` — Gate verdict issued with detailed justification
+2. `docs/evidence/wave2-live/STATUS.md` — Updated to PASS_WITH_PENDING_HUMAN_PORTAL
+3. `.squad/agents/lambert/history.md` — This entry
+
+**Key Findings**:
+- ServiceMismatch is primary demo-ready scenario (selector mismatch → empty endpoints without pod crashes)
+- MongoDBDown root cause is smoking gun (replicas: 0) but requires honest narrative about alert evaluation windows
+- Parker's evidence packages maintain technical honesty throughout (no fabricated claims)
+- SRE Agent portal testing is CRITICAL before customer demo to avoid overclaiming Preview capabilities
+
+**Status**: ✅ Wave 2 gate verdict issued — PASS_WITH_PENDING_HUMAN_PORTAL

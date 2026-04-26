@@ -1,0 +1,46 @@
+name: Validate Scenario Metadata
+
+# Validates consistency between scenario metadata files and K8s manifests
+# Prevents drift between CAPABILITY-CONTRACTS.md and scenario-manifest.yaml
+# Wave 1 closure blocker - identified by Dallas
+
+on:
+  push:
+    paths:
+      - 'docs/evidence/scenarios/scenario-manifest.yaml'
+      - 'docs/CAPABILITY-CONTRACTS.md'
+      - 'k8s/scenarios/**'
+      - 'scripts/validate-scenario-metadata.ps1'
+      - '.github/workflows/validate-scenarios.yml'
+  pull_request:
+    paths:
+      - 'docs/evidence/scenarios/scenario-manifest.yaml'
+      - 'docs/CAPABILITY-CONTRACTS.md'
+      - 'k8s/scenarios/**'
+      - 'scripts/validate-scenario-metadata.ps1'
+      - '.github/workflows/validate-scenarios.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Scenario Metadata
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run scenario metadata validation
+        shell: pwsh
+        run: |
+          Write-Host "Running scenario metadata validation in strict mode..."
+          ./scripts/validate-scenario-metadata.ps1 -Strict
+
+      - name: Validation summary
+        if: success()
+        run: |
+          echo "✅ Scenario metadata validation passed"
+          echo "All 10 scenarios validated successfully"

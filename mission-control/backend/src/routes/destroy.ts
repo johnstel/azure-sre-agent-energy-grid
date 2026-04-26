@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { JobManager } from '../services/JobManager.js';
-import { getPwshCommand, getScriptPath } from '../utils/paths.js';
+import { resolvePwsh, getScriptPath } from '../utils/paths.js';
 
 export function registerDestroyRoutes(app: FastifyInstance, jobManager: JobManager): void {
   app.post<{
@@ -23,7 +23,8 @@ export function registerDestroyRoutes(app: FastifyInstance, jobManager: JobManag
     ];
 
     try {
-      const job = jobManager.start('destroy', getPwshCommand(), args);
+      const pwshCmd = await resolvePwsh(); // Robust resolution
+      const job = jobManager.start('destroy', pwshCmd, args);
       return reply.status(202).send(job);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

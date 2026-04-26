@@ -1,8 +1,20 @@
 <template>
-  <section>
-    <h2 class="text-sm font-medium uppercase tracking-wider mb-6" style="color: var(--muted);">
-      Pod Monitor
-    </h2>
+  <section id="pods" class="mission-panel">
+    <div class="panel-heading">
+      <div class="panel-heading__copy">
+        <span class="panel-eyebrow">04 · Live grid telemetry</span>
+        <h2 class="panel-title">Pod Monitor</h2>
+        <p class="panel-description">
+          Track Kubernetes pod health, restart pressure, and recent events from a continuously refreshed operations view.
+        </p>
+      </div>
+      <div class="panel-actions">
+        <span class="badge badge-info">Polling 5s</span>
+        <span class="badge" :class="unhealthyPods > 0 ? 'badge-warning' : 'badge-online'">
+          {{ healthyPods }}/{{ pods.length }} healthy
+        </span>
+      </div>
+    </div>
 
     <!-- Loading -->
     <div v-if="podLoading && pods.length === 0" class="loading text-sm text-center py-8">
@@ -14,11 +26,11 @@
       <div
         v-for="pod in pods"
         :key="pod.name"
-        class="card"
+        class="card card--telemetry"
         :style="{ borderLeftWidth: '3px', borderLeftColor: podBorderColor(pod) }"
       >
-        <div class="flex items-center justify-between mb-2">
-          <span class="text-sm font-semibold truncate" style="color: var(--text);">{{ pod.name }}</span>
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <span class="text-sm font-bold truncate pr-3 mono-label" style="color: var(--text);">{{ pod.name }}</span>
           <span
             class="badge"
             :class="podBadgeClass(pod)"
@@ -27,20 +39,20 @@
           </span>
         </div>
         <div class="grid grid-cols-3 gap-2 text-xs" style="color: var(--muted);">
-          <div>
-            <span class="block font-medium">Ready</span>
+          <div class="telemetry-metric">
+            <span>Ready</span>
             <span :style="{ color: pod.ready ? 'var(--green)' : 'var(--red)' }">
-              {{ pod.ready ? 'Yes' : 'No' }}
+              {{ pod.ready ? 'YES' : 'NO' }}
             </span>
           </div>
-          <div>
-            <span class="block font-medium">Restarts</span>
+          <div class="telemetry-metric">
+            <span>Restarts</span>
             <span :style="{ color: pod.restarts > 0 ? 'var(--amber)' : 'var(--text)' }">
               {{ pod.restarts }}
             </span>
           </div>
-          <div>
-            <span class="block font-medium">Age</span>
+          <div class="telemetry-metric">
+            <span>Age</span>
             <span>{{ pod.age }}</span>
           </div>
         </div>
@@ -53,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useApi } from '@/composables/useApi';
 import { usePolling } from '@/composables/usePolling';
 import type { Pod, KubeEvent } from '@/types/api';
@@ -64,6 +76,11 @@ const { getPods, getEvents } = useApi();
 const pods = ref<Pod[]>([]);
 const events = ref<KubeEvent[]>([]);
 const podLoading = ref(true);
+
+const healthyPods = computed(() =>
+  pods.value.filter(pod => pod.status === 'Running' && pod.ready).length
+);
+const unhealthyPods = computed(() => Math.max(pods.value.length - healthyPods.value, 0));
 
 const podPoller = usePolling(async () => {
   const res = await getPods();

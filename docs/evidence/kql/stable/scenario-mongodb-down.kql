@@ -1,0 +1,161 @@
+// =============================================================================
+// Scenario Verification: MongoDBDown — Meter Database Outage (Cascading Failure)
+// =============================================================================
+// Scenario ID: mongodb-down
+// Purpose: Verify MongoDB outage scenario is active and cascading failure is detectable
+// Expected signals: MongoDB pod observations absent or stale, dispatch-service errors, service object present/absent
+// Root cause validation: kubectl/K8s API needed to verify replica scaling intent
+// Time range: Last 30 minutes (cascading impact takes 1-2 minutes to manifest)
+//
+// LIMITATIONS:
+//   - KQL can show symptom evidence: recent pod observations, service object observations, dependent errors
+//   - KQL CANNOT prove desired replica count, scaling intent, or endpoint membership (requires kubectl/K8s API)
+//   - For root cause validation, use: kubectl get deploy mongodb -n energy -o yaml | grep replicas
+//
+// USAGE:
+//   1. kubectl apply -f k8s/scenarios/mongodb-down.yaml
+//   2. Wait 60-120 seconds for cascading failures to manifest
+//   3. Run this query in Log Analytics workspace
+//   4. Verify symptom evidence: MongoDB pod observations absent/stale, service observations, dependent errors
+//   5. Confirm root cause with: kubectl get deploy mongodb -n energy
+//
+// SCHEMA: KubePodInventory, KubeEvents, KubeServices — Azure Monitor Container Insights (Stable)
+// Required projected columns: TimeBucket, ResourceId, CorrelationId (per Security MF-3)
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARAMETERS — Modify before running
+// ─────────────────────────────────────────────────────────────────────────────
+let sre_scenario = "mongodb-down";
+let sre_namespace = "energy";
+let sre_component = "mongodb";
+let TimeRange = 30m;
+let timeBin = 5m;              // Parameter: Time bucket granularity
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUERY LOGIC
+// ─────────────────────────────────────────────────────────────────────────────
+
+// MongoDB pod observations. This is not authoritative desired/current replica count;
+// use kubectl/K8s API to validate current deployment replicas.
+let MongoDBPodObservations = KubePodInventory
+| where TimeGenerated > ago(TimeRange)
+| where Namespace == sre_namespace
+| where Name contains sre_component
+| summarize
+    ObservedPodNames = dcount(Name),
+    ObservationRows = count(),
+    LastSeen = max(TimeGenerated),
+    ResourceId = any(_ResourceId)  // AKS cluster resource ID
+    by Namespace
+| extend
+    Scenario = sre_scenario,
+    Component = sre_component,
+    TimeBucket = bin(LastSeen, timeBin),
+    CorrelationId = "";  // Pod inventory does not have CorrelationId
+
+// Service object observations. KubeServices exposes service metadata, not endpoint membership.
+let ServiceObservations = KubeServices
+| where TimeGenerated > ago(TimeRange)
+| where Namespace == sre_namespace
+| where ServiceName contains sre_component
+| extend
+    Scenario = sre_scenario,
+    Component = sre_component,
+    ServiceObserved = 1,
+    TimeBucket = bin(TimeGenerated, timeBin),
+    ResourceId = column_ifexists("_ResourceId", ""),
+    CorrelationId = ""  // Service data does not have CorrelationId
+| summarize
+    ServiceRecords = count(),
+    LastSeen = max(TimeGenerated),
+    ResourceId = any(ResourceId),
+    CorrelationId = any(CorrelationId)
+    by Scenario, Component, Namespace, ServiceName, TimeBucket;
+
+// Dependent service error events (dispatch-service, meter-service)
+let DependentServiceErrors = KubeEvents
+| where TimeGenerated > ago(TimeRange)
+| where Namespace == sre_namespace
+| where Name contains "dispatch" or Name contains "meter-service"
+| where Reason in ("BackOff", "Failed", "FailedScheduling", "Unhealthy")
+| extend
+    Scenario = sre_scenario,
+    DependentService = case(
+        Name contains "dispatch", "dispatch-service",
+        Name contains "meter", "meter-service",
+        "unknown"
+    ),
+    TimeBucket = bin(TimeGenerated, timeBin),
+    ResourceId = column_ifexists("_ResourceId", ""),
+    CorrelationId = column_ifexists("CorrelationId", "")
+| summarize
+    ErrorCount = count(),
+    ErrorReasons = make_set(Reason),
+    LastError = max(TimeGenerated),
+    ResourceId = any(ResourceId),
+    CorrelationId = any(CorrelationId)
+    by Scenario, DependentService, Namespace, TimeBucket;
+
+// Combine results
+MongoDBPodObservations
+| extend ResultType = "MongoDB Pod Observations"
+| project
+    TimeBucket,
+    Scenario,
+    Component,
+    Namespace,
+    ResultType,
+    Value = strcat("observedPodNames=", ObservedPodNames, "; rows=", ObservationRows),
+    LastSeen,  // Use summarized LastSeen, not TimeGenerated
+    ResourceId,
+    CorrelationId
+| union (
+    ServiceObservations
+    | extend ResultType = "Service Object Observed"
+    | project
+        TimeBucket,
+        Scenario,
+        Component = ServiceName,
+        Namespace,
+        ResultType,
+        Value = strcat("records=", ServiceRecords),
+        LastSeen,
+        ResourceId,
+        CorrelationId
+)
+| union (
+    DependentServiceErrors
+    | extend ResultType = "Dependent Service Errors", Component = DependentService
+    | project
+        TimeBucket,
+        Scenario,
+        Component,
+        Namespace,
+        ResultType,
+        Value = tostring(ErrorCount),
+        LastSeen = LastError,
+        ResourceId,
+        CorrelationId
+)
+| order by ResultType, Component
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPECTED RESULTS & TROUBLESHOOTING
+// ─────────────────────────────────────────────────────────────────────────────
+// Expected results when scenario is active:
+// - MongoDB Pod Observations: absent/stale or fewer recent observations than healthy baseline
+// - Service Object Observed: shows recent service metadata if present
+// - Dependent Service Errors: >0 for dispatch-service and/or meter-service
+// - Endpoint membership and desired replica count require kubectl/K8s API validation
+//
+// Pass criteria for SRE Agent diagnosis:
+// - Agent identifies MongoDB pod observations are absent/stale and validates replica intent through K8s API
+// - Agent traces dependency chain (dispatch → MongoDB)
+// - Agent recommends scaling MongoDB deployment back to 1 replica
+//
+// If no results:
+// - Verify scenario is applied: kubectl get deployment mongodb -n energy
+// - Check for scaling events: kubectl get events -n energy | grep mongodb
+// - Verify dependent services are configured to use MongoDB
+// - Verify endpoints with: kubectl get endpoints mongodb -n energy

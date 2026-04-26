@@ -1,0 +1,2 @@
+NAME                      READY   STATUS    RESTARTS   AGE    IP           NODE                               NOMINATED NODE   READINESS GATES
+mongodb-d948b8585-wnvx7   1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>

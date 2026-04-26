@@ -12,6 +12,8 @@ import { registerDeployRoutes } from './routes/deploy.js';
 import { registerDestroyRoutes } from './routes/destroy.js';
 import { registerPodRoutes } from './routes/pods.js';
 import { registerScenarioRoutes } from './routes/scenarios.js';
+import { registerAssistantRoutes } from './routes/assistant.js';
+import { registerPortalValidationRoutes } from './routes/portal-validations.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = 3333;
@@ -66,7 +68,6 @@ async function start() {
     await app.register(fastifyStatic, {
       root: frontendDist,
       prefix: '/',
-      wildcard: false,
     });
   }
 
@@ -76,6 +77,8 @@ async function start() {
   registerDestroyRoutes(app, jobManager);
   registerPodRoutes(app);
   registerScenarioRoutes(app);
+  registerAssistantRoutes(app, jobManager);
+  registerPortalValidationRoutes(app);
 
   // SPA fallback — must be after API routes
   if (existsSync(frontendDist)) {

@@ -1,0 +1,13 @@
+NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE                               NOMINATED NODE   READINESS GATES
+asset-service-c744d6667-56pqq       1/1     Running   0          14m   10.0.0.100   aks-workload-52238159-vmss000003   <none>           <none>
+asset-service-c744d6667-lgwwt       1/1     Running   0          14m   10.0.0.11    aks-workload-52238159-vmss000003   <none>           <none>
+dispatch-service-5589cf949c-76sb4   1/1     Running   0          14m   10.0.0.118   aks-workload-52238159-vmss000003   <none>           <none>
+dispatch-service-5589cf949c-szzdd   1/1     Running   0          14m   10.0.0.125   aks-workload-52238159-vmss000003   <none>           <none>
+grid-dashboard-66cb797c94-2g8fb     1/1     Running   0          14m   10.0.0.115   aks-workload-52238159-vmss000003   <none>           <none>
+grid-dashboard-66cb797c94-66qgc     1/1     Running   0          14m   10.0.0.113   aks-workload-52238159-vmss000003   <none>           <none>
+load-simulator-57fc84dfdf-svs25     1/1     Running   0          14m   10.0.0.120   aks-workload-52238159-vmss000003   <none>           <none>
+meter-service-5b8f45f67f-dkd5c      1/1     Running   0          44s   10.0.0.103   aks-workload-52238159-vmss000003   <none>           <none>
+meter-service-5b8f45f67f-tpfq6      1/1     Running   0          36s   10.0.0.106   aks-workload-52238159-vmss000003   <none>           <none>
+mongodb-d948b8585-kzcjv             1/1     Running   0          14m   10.0.0.109   aks-workload-52238159-vmss000003   <none>           <none>
+ops-console-558566cf95-qcw2f        1/1     Running   0          14m   10.0.0.114   aks-workload-52238159-vmss000003   <none>           <none>
+rabbitmq-79d58d7457-g59zg           1/1     Running   0          14m   10.0.0.108   aks-workload-52238159-vmss000003   <none>           <none>

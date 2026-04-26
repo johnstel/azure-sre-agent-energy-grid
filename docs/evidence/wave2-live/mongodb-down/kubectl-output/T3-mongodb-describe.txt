@@ -1,0 +1,45 @@
+Name:                   mongodb
+Namespace:              energy
+CreationTimestamp:      Sat, 25 Apr 2026 13:07:00 -0400
+Labels:                 app=mongodb
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=mongodb
+Replicas:               1 desired | 0 updated | 0 total | 0 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=mongodb
+  Containers:
+   mongodb:
+    Image:      mongo:4.4
+    Port:       27017/TCP
+    Host Port:  0/TCP
+    Limits:
+      cpu:     500m
+      memory:  512Mi
+    Requests:
+      cpu:        100m
+      memory:     256Mi
+    Environment:  <none>
+    Mounts:
+      /data/db from mongodb-data (rw)
+  Volumes:
+   mongodb-data:
+    Type:          PersistentVolumeClaim (a reference to a PersistentVolumeClaim in the same namespace)
+    ClaimName:     mongodb-data-pvc
+    ReadOnly:      false
+  Node-Selectors:  nodepool-type=user
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Progressing    True    NewReplicaSetAvailable
+  Available      True    MinimumReplicasAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   mongodb-d948b8585 (1/1 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  1s    deployment-controller  Scaled down replica set mongodb-d948b8585 from 1 to 0
+  Normal  ScalingReplicaSet  0s    deployment-controller  Scaled up replica set mongodb-d948b8585 from 0 to 1

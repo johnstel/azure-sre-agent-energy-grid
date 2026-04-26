@@ -1,0 +1,28 @@
+flowchart LR
+    operator["Human Operator"]
+    portal["Azure SRE Agent Portal"]
+    agent["Azure SRE Agent\nmode: Review"]
+    logs["Log Analytics\nContainer Insights + Activity Log"]
+    appi["Application Insights\nSCHEMA_TBD preview telemetry"]
+    aks["AKS energy namespace"]
+    arm["Azure Resource Manager"]
+
+    operator -->|"asks diagnosis questions"| portal
+    portal --> agent
+    agent -->|"read telemetry"| logs
+    agent -->|"read preview telemetry if emitted"| appi
+    agent -->|"inspect cluster state"| aks
+    agent -->|"read resource metadata"| arm
+    agent -. "recommendation only until human acts" .-> operator
+    operator -->|"approves / executes remediation"| arm
+    operator -->|"kubectl or scenario scripts"| aks
+
+    classDef human fill:#fef3c7,stroke:#92400e,color:#111827
+    classDef agent fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    classDef data fill:#dcfce7,stroke:#166534,color:#111827
+    classDef resource fill:#f3e8ff,stroke:#7e22ce,color:#111827
+
+    class operator human
+    class portal,agent agent
+    class logs,appi data
+    class aks,arm resource

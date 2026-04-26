@@ -12,14 +12,16 @@ This document provides estimated costs for running the Azure SRE Agent Energy Gr
 | **AKS Nodes (System)** | ~$4.70 | ~$140 | 2x Standard_D2s_v5 |
 | **AKS Nodes (User)** | ~$7.00 | ~$210 | 3x Standard_D2s_v5 |
 | **Container Registry** | ~$0.17 | ~$5 | Basic tier |
-| **Log Analytics** | ~$1-2 | ~$30-50 | Based on data ingestion |
+| **Log Analytics** | ~$1.50-2.50 | ~$40-60 | 90-day retention (Wave 1) + Activity Log |
 | **Application Insights** | ~$0.30-0.70 | ~$10-20 | Based on data volume |
 | **Managed Grafana** | ~$2.50 | ~$75 | Standard tier |
 | **Azure Monitor (Prometheus)** | ~$0.50 | ~$15 | Based on metrics volume |
 | **Key Vault** | ~$0.10 | ~$3 | Minimal operations |
 | **SRE Agent** | ~$10-13 | ~$292-400 | Base + execution costs |
-| **Total (without SRE Agent)** | **~$22-28** | **~$650-850** | |
-| **Total (with SRE Agent)** | **~$32-38** | **~$950-1,150** | |
+| **Total (without SRE Agent)** | **~$24-30** | **~$660-870** | Wave 1 config |
+| **Total (with SRE Agent)** | **~$34-40** | **~$970-1,170** | Wave 1 config |
+
+> **Wave 1 Changes:** 90-day Log Analytics retention and Activity Log export add ~$10-15/month vs. Wave 0 minimal config. This supports ARM-level audit correlation for demo evidence once live UAT verifies Activity Log export and Log Analytics retention.
 
 ## Detailed Cost Breakdown
 
@@ -63,10 +65,16 @@ Cost is based on data ingestion:
 
 **Expected usage for demo:** 1-3 GB/day = $0-50/month
 
+**Wave 1 retention:** 90 days (aligned with App Insights for evidence consistency)
+
+**Retention cost impact:**
+- 90 days vs. 30 days adds ~$8-12/month in retained data costs
+- Supports ARM-level audit correlation per capability contracts after live retention/export validation
+
 **Cost-Saving Options:**
-- Set retention to 30 days (minimum)
-- Filter unnecessary log types
 - Use commitment tiers for predictable workloads
+- Filter unnecessary log types (keep Container Insights, Activity Log, alerts)
+- Production deployments can adjust retention based on compliance needs
 
 ### Application Insights
 
@@ -76,6 +84,19 @@ Cost is based on data ingestion:
 | First 5 GB/month | Free |
 
 **Expected usage for demo:** ~$10-20/month
+
+### Activity Log Export (Wave 1)
+
+**What it does:** Exports subscription-level ARM operations to Log Analytics for SRE Agent-related ARM audit correlation.
+
+**Cost:**
+- No separate charge for Activity Log itself (included in subscription)
+- Data ingestion cost: ~$2-5/month (Activity Log typically generates 0.5-2 GB/month)
+- Retention cost: Included in Log Analytics retention (90 days)
+
+**Why it's needed:**
+- Enables SRE Agent to correlate K8s failures with ARM deployments, RBAC denials, or policy violations
+- Supports change and RBAC correlation during complex scenario analysis
 
 ### Azure Managed Grafana
 

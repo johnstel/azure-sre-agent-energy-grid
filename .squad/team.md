@@ -26,4 +26,5 @@
 - **Created:** 2026-04-24
 - **Stack:** Azure Bicep IaC, Kubernetes manifests, PowerShell scripts, Dev Containers
 - **Description:** Azure SRE Agent demo lab — deploys a simulated energy grid platform onto AKS with intentionally breakable scenarios for demonstrating AI-powered SRE diagnosis. No app source code; services run from public container images defined in K8s manifests.
-- **Contractor Policy:** Bring in specialist contractor agents (SRE, Security, DevOps, etc.) from the bench for reviews and expertise as needed.
+- **Contractor Policy:** Use `.squad/copilot-default-inventory.md` as the discovery catalog before selecting expert contractors or skills. Bring in contractors deliberately for creative/design, architecture, security/governance, business/demo, SRE/observability, public docs, or reviewer-gate work. Creative contractor work uses Opus 4.6, produces verbose developer handoffs, and includes diagrams when useful.
+- **Vendoring Policy:** Keep the default Copilot inventory lightweight. Copy/vendor full agent prompts or skill bodies into `.squad/skills/` or project agent charters only when a specific capability is needed repeatedly or requires energy-grid customization, with provenance and review metadata.

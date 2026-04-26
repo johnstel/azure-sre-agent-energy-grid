@@ -1,0 +1,2 @@
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS         IMAGES                                                         SELECTOR
+dispatch-service   2/2     2            2           19h   dispatch-service   ghcr.io/azure-samples/aks-store-demo/makeline-service:latest   app=dispatch-service

@@ -1,0 +1,2 @@
+NAME      READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES      SELECTOR
+mongodb   0/0     0            0           19h   mongodb      mongo:4.4   app=mongodb

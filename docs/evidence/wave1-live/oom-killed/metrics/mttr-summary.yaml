@@ -1,0 +1,34 @@
+scenario: oom-killed
+T0_baseline: "2026-04-26T02:19:27Z"
+T1_scenario_applied: "2026-04-26T02:19:27Z"
+T2_first_oomkilled: "2026-04-26T02:20:27Z"
+T3_diagnosis_complete: "2026-04-26T02:20:48Z"
+T4_fix_applied: "2026-04-26T02:20:48Z"
+T5_recovery_verified: "2026-04-26T02:21:18Z"
+
+# Time calculations (in seconds)
+# T2 - T1 = Detection time (time from scenario apply to first OOMKilled)
+detection_time_seconds: 60
+
+# T4 - T2 = MTTR (time from first OOMKilled to fix applied)
+mttr_seconds: 21
+
+# T5 - T4 = Recovery time (time from fix applied to full recovery)
+recovery_time_seconds: 30
+
+# T5 - T1 = Total incident time
+total_time_seconds: 111
+
+# Pass criteria: MTTR < 900 seconds (15 minutes)
+pass_criteria_met: true
+mttr_threshold_seconds: 900
+
+# Observations
+observations: |
+  - OOMKilled occurred within 60 seconds of scenario application
+  - Both meter-service pods entered OOMKilled state with 3 restarts each
+  - Memory limit of 16Mi was confirmed in pod describe output
+  - Fix applied immediately after diagnosis (T3 to T4: ~0 seconds)
+  - Recovery was complete within 30 seconds of fix application
+  - MTTR of 21 seconds is well below the 15-minute threshold
+  - No residual OOMKilled events after recovery

@@ -1,0 +1,28 @@
+apiVersion: v1
+items:
+- addressType: IPv4
+  apiVersion: discovery.k8s.io/v1
+  endpoints: null
+  kind: EndpointSlice
+  metadata:
+    creationTimestamp: "2026-04-26T12:42:14Z"
+    generateName: meter-service-
+    generation: 2
+    labels:
+      endpointslice.kubernetes.io/managed-by: endpointslice-controller.k8s.io
+      kubernetes.io/service-name: meter-service
+    name: meter-service-sszxn
+    namespace: energy
+    ownerReferences:
+    - apiVersion: v1
+      blockOwnerDeletion: true
+      controller: true
+      kind: Service
+      name: meter-service
+      uid: 035e9042-6957-4918-86a7-3470fa66fa92
+    resourceVersion: "635054"
+    uid: ab9947bf-4d68-462f-a8a5-ce1bf31fb143
+  ports: null
+kind: List
+metadata:
+  resourceVersion: ""

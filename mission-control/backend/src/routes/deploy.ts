@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { JobManager } from '../services/JobManager.js';
-import { getPwshCommand, getScriptPath } from '../utils/paths.js';
+import { resolvePwsh, getScriptPath } from '../utils/paths.js';
 
 export function registerDeployRoutes(app: FastifyInstance, jobManager: JobManager): void {
   app.post<{
@@ -20,9 +20,12 @@ export function registerDeployRoutes(app: FastifyInstance, jobManager: JobManage
       });
     }
 
+    const scriptPath = getScriptPath('deploy.ps1');
+    const pwshCmd = await resolvePwsh(); // Robust resolution
+
     const args = [
       '-NoProfile', '-ExecutionPolicy', 'Bypass',
-      '-File', getScriptPath('deploy.ps1'),
+      '-File', scriptPath,
       '-Location', location,
       '-WorkloadName', workloadName,
       '-Yes',
@@ -30,8 +33,34 @@ export function registerDeployRoutes(app: FastifyInstance, jobManager: JobManage
     if (skipRbac) args.push('-SkipRbac');
     if (skipSreAgent) args.push('-SkipSreAgent');
 
+    // Build verbose prelude logs
+    const timestamp = new Date().toISOString();
+    const preludeLogs = [
+      '',
+      '═══════════════════════════════════════════════════════════════════',
+      '[Mission Control] Deploy request received',
+      `[Mission Control] Timestamp: ${timestamp}`,
+      '───────────────────────────────────────────────────────────────────',
+      '[Mission Control] Configuration:',
+      `  • Location:        ${location}`,
+      `  • Workload Name:   ${workloadName}`,
+      `  • Skip RBAC:       ${skipRbac}`,
+      `  • Skip SRE Agent:  ${skipSreAgent}`,
+      '───────────────────────────────────────────────────────────────────',
+      '[Mission Control] Execution:',
+      `  • Script Path:     ${scriptPath}`,
+      `  • PowerShell Cmd:  ${pwshCmd}`,
+      `  • Full Command:    ${pwshCmd} ${args.join(' ')}`,
+      '───────────────────────────────────────────────────────────────────',
+      '[Mission Control] Azure SRE Agent Information:',
+      '  ⚠ Supported Regions: eastus2, swedencentral, australiaeast',
+      '  ℹ Current deployment region: ' + location,
+      '═══════════════════════════════════════════════════════════════════',
+      '',
+    ];
+
     try {
-      const job = jobManager.start('deploy', getPwshCommand(), args);
+      const job = jobManager.start('deploy', pwshCmd, args, { preludeLogs });
       return reply.status(202).send(job);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

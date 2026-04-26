@@ -1,0 +1,20 @@
+scenario: ServiceMismatch
+verdict: N/A_AUTOMATED_EXECUTION
+mttr_seconds: null
+human_detection_time: null
+human_diagnosis_time: null
+human_remediation_time: null
+explanation: |
+  ServiceMismatch is a silent failure scenario with no automated alert firing.
+  This evidence package demonstrates the scenario behavior (selector mismatch → empty endpoints)
+  and confirms NO_ALERT_FIRED is expected. MTTR is not applicable for automated kubectl-based execution.
+  In production, SRE Agent portal diagnosis would be the human interaction phase.
+  Evidence collection for SRE Agent response time requires manual portal testing (PENDING_HUMAN_PORTAL).
+automation_notes: |
+  - T0: Healthy baseline (selector=meter-service, 2 endpoints)
+  - T1: kubectl patch to selector=meter-service-v2
+  - T2: Endpoints immediately empty (selector mismatch confirmed)
+  - T3: Root cause validated (2 pods Running with app=meter-service, svc wants v2)
+  - T4: Restored selector to meter-service
+  - T5: Endpoints repopulated (2 endpoints recovered)
+  - Total automated execution: ~150 seconds

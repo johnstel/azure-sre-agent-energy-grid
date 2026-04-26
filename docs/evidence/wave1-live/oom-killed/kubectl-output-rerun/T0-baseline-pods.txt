@@ -1,0 +1,13 @@
+NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE                               NOMINATED NODE   READINESS GATES
+asset-service-c744d6667-56pqq       1/1     Running   0          12m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+asset-service-c744d6667-lgwwt       1/1     Running   0          12m   <REDACTED_IP>    <REDACTED_NODE>   <none>           <none>
+dispatch-service-5589cf949c-76sb4   1/1     Running   0          12m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+dispatch-service-5589cf949c-szzdd   1/1     Running   0          12m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+grid-dashboard-66cb797c94-2g8fb     1/1     Running   0          12m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+grid-dashboard-66cb797c94-66qgc     1/1     Running   0          12m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+load-simulator-57fc84dfdf-svs25     1/1     Running   0          11m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+meter-service-5b8f45f67f-5tzlj      1/1     Running   0          12m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+meter-service-5b8f45f67f-x8m57      1/1     Running   0          12m   <REDACTED_IP>    <REDACTED_NODE>   <none>           <none>
+mongodb-d948b8585-kzcjv             1/1     Running   0          12m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+ops-console-558566cf95-qcw2f        1/1     Running   0          11m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+rabbitmq-79d58d7457-g59zg           1/1     Running   0          12m   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>

@@ -1,0 +1,73 @@
+// =============================================================================
+// Alert Rule Configuration History — CORRECTED FOR WAVE 1
+// =============================================================================
+// Purpose: Query Azure Monitor alert RULE CHANGES (not firing events)
+// Use case: Audit when alerts were created/updated/deleted
+//
+// LIMITATION: Activity Log "Alert" category captures rule create/update/delete,
+//             NOT alert firing events. For firing events, use:
+//             - Azure Resource Graph (AlertsManagementResources)
+//             - Alert diagnostic settings → AlertEvidence table (Wave 2)
+//
+// Parameters:
+//   - TimeRange: Time window for analysis (default: 24h)
+//   - timeBin: Time bucket granularity for trending (default: 15m)
+//
+// SCHEMA: AzureActivity (Activity Log) — Azure Monitor (Stable)
+// Required projected columns: TimeBucket, ResourceId, CorrelationId (per Security MF-3)
+//
+// PREREQUISITE: Activity Log diagnostic export to Log Analytics (DEPLOYED ✅)
+// Wave 1 verified export is correctly configured; AzureActivity contains 86+ events.
+// See: docs/CAPABILITY-CONTRACTS.md §11
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARAMETERS — Modify before running
+// ─────────────────────────────────────────────────────────────────────────────
+let TimeRange = 24h;           // Parameter: Time window
+let timeBin = 15m;             // Parameter: Time bucket granularity
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUERY LOGIC — Alert Rule Configuration Changes
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Query alert rule configuration changes from Activity Log (via AzureActivity)
+// Shows when alert rules were created, updated, or deleted (NOT when alerts fired)
+AzureActivity
+| where TimeGenerated > ago(TimeRange)
+| where CategoryValue == "Administrative"
+| where OperationNameValue contains "MICROSOFT.INSIGHTS/SCHEDULEDQUERYRULES"
+| extend
+    AlertRuleName = tostring(split(ResourceId, "/")[-1]),
+    Operation = case(
+        OperationNameValue contains "WRITE", "CreateOrUpdate",
+        OperationNameValue contains "DELETE", "Delete",
+        "Other"
+    ),
+    ResourceId = column_ifexists("_ResourceId", ResourceId),
+    CorrelationId = column_ifexists("CorrelationId", "")
+| extend
+    TimeBucket = bin(TimeGenerated, timeBin)
+| project
+    TimeBucket,
+    TimeGenerated,
+    AlertRuleName,
+    Operation,
+    ActivityStatusValue,
+    ResourceGroup,
+    SubscriptionId,
+    ResourceId,
+    CorrelationId
+| order by TimeGenerated desc
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPECTED RESULTS
+// ─────────────────────────────────────────────────────────────────────────────
+// Shows when alert rules were created, updated, or deleted.
+// Does NOT show when alerts fired.
+//
+// For alert firing events, use:
+// - Azure Resource Graph: az graph query -q "alertsmanagementresources | where type == 'microsoft.alertsmanagement/alerts'"
+// - Or configure alert diagnostic settings (Wave 2) to send firing events to AlertEvidence table
+//
+// For Wave 1 UAT: Verify query syntax runs without error. Results show rule configuration changes only.

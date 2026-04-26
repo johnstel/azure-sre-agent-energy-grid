@@ -1,0 +1,757 @@
+# =============================================================================
+# Energy Grid Demo Lab — Scenario Metadata Manifest (Wave 0)
+# =============================================================================
+#
+# PURPOSE: External metadata source of truth for all 10 breakable scenarios
+#
+# This manifest locks the stable metadata schema before Wave 1 implementation.
+# It provides structured metadata for alerts, runbooks, KQL queries, SLO tags,
+# and MTTR measurement without modifying runtime K8s manifests.
+#
+# WAVE 0 CONSTRAINT: Do NOT propagate this metadata into K8s manifests yet.
+# Later waves (1/2) may add annotations to k8s/scenarios/*.yaml after approval.
+#
+# DRIFT RISK: This is a docs-only file. Changes to K8s manifests must be
+# manually synchronized here. See README.md for drift mitigation strategy.
+#
+# VERSION: 1.1.0 (2026-04-26)
+# LAST UPDATED: 2026-04-26
+# =============================================================================
+
+version: "1.1.0"
+schema_version: "2026-04-25"
+
+# =============================================================================
+# ALL 10 SCENARIOS — Complete Wave 0 Metadata
+# =============================================================================
+# All 10 scenarios have complete Wave 0 metadata entries below.
+#
+# Three scenarios (oom-killed, mongodb-down, service-mismatch) are designated
+# as "reference scenarios" for Wave 2 SRE Agent validation because they
+# represent different complexity tiers (simple/complex/subtle).
+#
+# The remaining 7 scenarios have identical metadata completeness and are
+# ready for Wave 1+ implementation.
+
+scenarios:
+  # ---------------------------------------------------------------------------
+  # SCENARIO 1: OOMKilled — Meter Service Memory Exhaustion
+  # ---------------------------------------------------------------------------
+  - id: oom-killed
+    number: 1
+    title: "Meter Service Memory Exhaustion"
+    severity: critical
+
+    affected_services:
+      - meter-service
+
+    affected_components:
+      - api
+
+    expected_signals:
+      - OOMKilled
+      - pod restarts
+      - container memory limit exceeded
+      - CrashLoopBackOff (after repeated failures)
+
+    root_cause_category: resource-exhaustion
+
+    runbook_id: RB-001-oom-killed
+
+    # SLO target reserved (Wave 5 implementation)
+    slo_impact: availability
+    slo_target: "99.9%"
+
+    change_source: deployment
+    change_description: "Deployed meter-service with extremely low memory limits (16Mi) to simulate smart meter data spike overwhelming the service"
+
+    k8s_manifest: k8s/scenarios/oom-killed.yaml
+
+    fix_command: kubectl apply -f k8s/base/application.yaml
+
+    # Pass criteria: SRE Agent successfully identifies the issue
+    expected_pass_criteria:
+      - SRE Agent detects OOMKilled events
+      - SRE Agent identifies memory limits are too low
+      - SRE Agent recommends increasing memory limits
+      - MTTR < 15 minutes (baseline for manual diagnosis)
+
+    # Fail criteria: SRE Agent misses the root cause
+    expected_fail_criteria:
+      - SRE Agent does not mention OOMKilled
+      - SRE Agent recommends non-memory-related fixes
+      - SRE Agent cannot trace pod restart pattern
+
+    # Evidence folder for this scenario
+    evidence_folder: docs/evidence/scenarios/oom-killed
+
+    # Wave 1 KQL evidence files
+    audit_evidence:
+      - docs/evidence/kql/stable/scenario-oom-killed.kql
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    # Planned scenario-specific alert metadata; Wave 1 deploys baseline alerts only.
+    alert_name: meter-service-oom
+    alert_severity: Sev 1 (Error)
+
+    # Capability tags for Wave planning
+    capabilities:
+      - diagnosis
+      - alert-correlation
+      - runbook-linkage
+      - mttr-measurement
+      - slo-tracking
+
+    # Narrative context for demo
+    energy_narrative: "Smart meter data spike during peak demand overwhelms the meter-service. Pod starts, runs briefly, then gets killed by OOM Killer. Kubernetes restarts the pod, cycle repeats."
+
+    mttr_baseline: "15m"
+
+    sre_agent_prompts:
+      - "Why is the meter-service pod restarting repeatedly?"
+      - "I see OOMKilled events. What memory should I allocate for meter data processing?"
+      - "Diagnose the memory issues in the energy namespace"
+
+  # ---------------------------------------------------------------------------
+  # SCENARIO 9: MongoDB Down — Meter Database Outage (Cascading Failure)
+  # ---------------------------------------------------------------------------
+  - id: mongodb-down
+    number: 9
+    title: "Meter Database Outage (Cascading Failure)"
+    severity: critical
+
+    affected_services:
+      - mongodb
+      - meter-service
+      - dispatch-service
+
+    affected_components:
+      - database
+      - api
+      - worker
+
+    expected_signals:
+      - deployment scaled to 0 replicas
+      - service endpoints empty
+      - dependent services degraded
+      - connection timeout errors
+      - queue backlog in RabbitMQ
+
+    root_cause_category: dependency
+
+    runbook_id: RB-009-mongodb-down
+
+    slo_impact: availability
+    slo_target: "99.9%"
+
+    change_source: scale-event
+    change_description: "MongoDB deployment scaled to 0 replicas, causing cascading failures across dispatch-service and meter-service"
+
+    k8s_manifest: k8s/scenarios/mongodb-down.yaml
+
+    fix_command: kubectl apply -f k8s/base/application.yaml
+
+    expected_pass_criteria:
+      - SRE Agent traces dependency chain (dispatch → MongoDB)
+      - SRE Agent identifies MongoDB replicas = 0
+      - SRE Agent detects cascading impact on multiple services
+      - SRE Agent recommends scaling MongoDB back up
+      - MTTR < 30 minutes (complex dependency tracing)
+
+    expected_fail_criteria:
+      - SRE Agent only diagnoses surface symptoms (dispatch errors)
+      - SRE Agent does not identify MongoDB as root cause
+      - SRE Agent cannot correlate dependent service failures
+
+    evidence_folder: docs/evidence/scenarios/mongodb-down
+
+    audit_evidence:
+      - docs/evidence/kql/stable/scenario-mongodb-down.kql
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    alert_name: mongodb-unavailable
+    alert_severity: Sev 0 (Critical)
+
+    capabilities:
+      - diagnosis
+      - dependency-tracing
+      - cascading-failure-analysis
+      - alert-correlation
+      - mttr-measurement
+
+    energy_narrative: "Meter database goes offline after accidental scale-to-zero. Dispatch service can't process meter readings, data queues indefinitely in RabbitMQ. New readings submitted but never processed, creating data loss risk."
+
+    mttr_baseline: "30m"
+
+    sre_agent_prompts:
+      - "Smart meter data isn't being processed — what's wrong?"
+      - "Why is dispatch-service reporting database connection failures?"
+      - "Trace the dependency chain causing meter reading backlog"
+      - "What happened to MongoDB in the last 30 minutes?"
+
+  # ---------------------------------------------------------------------------
+  # SCENARIO 10: Service Mismatch — Meter Service Routing Failure
+  # ---------------------------------------------------------------------------
+  - id: service-mismatch
+    number: 10
+    title: "Meter Service Routing Failure (Selector Mismatch)"
+    severity: critical
+
+    affected_services:
+      - meter-service
+
+    affected_components:
+      - network
+      - service
+
+    expected_signals:
+      - service endpoints empty
+      - selector mismatch
+      - pods Running but service unreachable
+      - silent networking failure
+
+    root_cause_category: configuration
+
+    runbook_id: RB-010-service-mismatch
+
+    slo_impact: availability
+    slo_target: "99.9%"
+
+    change_source: config-change
+    change_description: "After 'v2 upgrade' Service selector changed to target meter-service-v2, but actual pods still labeled meter-service"
+
+    k8s_manifest: k8s/scenarios/service-mismatch.yaml
+
+    fix_command: kubectl apply -f k8s/base/application.yaml
+
+    expected_pass_criteria:
+      - SRE Agent detects Service endpoints are empty
+      - SRE Agent identifies selector mismatch between Service and Deployment
+      - SRE Agent recommends correcting the selector
+      - SRE Agent distinguishes this from pod health issues
+      - MTTR < 20 minutes (subtle networking issue)
+
+    expected_fail_criteria:
+      - SRE Agent assumes pods are unhealthy (they're actually fine)
+      - SRE Agent does not check Service endpoint configuration
+      - SRE Agent misses the label/selector mismatch
+
+    evidence_folder: docs/evidence/scenarios/service-mismatch
+
+    audit_evidence:
+      - docs/evidence/kql/stable/scenario-service-mismatch.kql
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    alert_name: meter-service-no-endpoints
+    alert_severity: Sev 1 (Error)
+
+    capabilities:
+      - diagnosis
+      - subtle-failure-detection
+      - configuration-validation
+      - alert-correlation
+
+    energy_narrative: "After a botched 'v2 upgrade', meter-service Service selector targets meter-service-v2 pods that don't exist. All pods show Running/Ready (no crashes), grid dashboard loads fine (client-side app), but submitting meter readings fails silently."
+
+    mttr_baseline: "20m"
+
+    sre_agent_prompts:
+      - "Grid dashboard loads but meter readings fail — what's broken?"
+      - "Why does meter-service Service have zero endpoints?"
+      - "All pods are Running but service is unreachable — diagnose"
+      - "Check for Service selector mismatches in the energy namespace"
+
+  # ===========================================================================
+  # REMAINING SCENARIOS (Standard Metadata)
+  # ===========================================================================
+
+  # ---------------------------------------------------------------------------
+  # SCENARIO 2: CrashLoop — Asset Service Configuration Failure
+  # ---------------------------------------------------------------------------
+  - id: crash-loop
+    number: 2
+    title: "Asset Service Configuration Failure"
+    severity: critical
+
+    affected_services:
+      - asset-service
+
+    affected_components:
+      - api
+
+    expected_signals:
+      - CrashLoopBackOff
+      - container exit code 1
+      - repeated restarts
+      - startup failure
+
+    root_cause_category: configuration
+
+    runbook_id: RB-002-crash-loop
+
+    slo_impact: availability
+    slo_target: "99.9%"
+
+    change_source: deployment
+    change_description: "Asset service deployed with invalid grid configuration, causing immediate exit on startup"
+
+    k8s_manifest: k8s/scenarios/crash-loop.yaml
+
+    fix_command: kubectl apply -f k8s/base/application.yaml
+
+    expected_pass_criteria:
+      - SRE Agent identifies CrashLoopBackOff state
+      - SRE Agent shows container exit code
+      - SRE Agent retrieves and analyzes container logs
+      - SRE Agent recommends checking configuration
+
+    expected_fail_criteria:
+      - SRE Agent does not retrieve exit code
+      - SRE Agent cannot access container logs
+      - SRE Agent misses configuration issue
+
+    evidence_folder: docs/evidence/scenarios/crash-loop
+
+    audit_evidence:
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    alert_name: asset-service-crash
+    alert_severity: Sev 1 (Error)
+
+    capabilities:
+      - diagnosis
+      - log-analysis
+      - configuration-validation
+
+    energy_narrative: "Asset service crashes on startup due to invalid grid configuration. Container starts, runs invalid command, exits with code 1. Kubernetes keeps restarting, enters CrashLoopBackOff."
+
+    mttr_baseline: "15m"
+
+    sre_agent_prompts:
+      - "Why is asset-service in CrashLoopBackOff?"
+      - "Show me the logs for the crashing asset catalog pods"
+      - "What's causing exit code 1 in the energy asset service?"
+
+  # ---------------------------------------------------------------------------
+  # SCENARIO 3: ImagePullBackOff — Failed Dispatch Service Deployment
+  # ---------------------------------------------------------------------------
+  - id: image-pull-backoff
+    number: 3
+    title: "Failed Dispatch Service Deployment (Image Pull Error)"
+    severity: critical
+
+    affected_services:
+      - dispatch-service
+
+    affected_components:
+      - registry
+      - deployment
+
+    expected_signals:
+      - ImagePullBackOff
+      - ErrImagePull
+      - image not found
+      - registry pull failure
+
+    root_cause_category: image
+
+    runbook_id: RB-003-ImagePullBackOff
+
+    slo_impact: availability
+    slo_target: "99.9%"
+
+    change_source: deployment
+    change_description: "Dispatch service deployment references non-existent image tag (nonexistent-tag-v999)"
+
+    k8s_manifest: k8s/scenarios/image-pull-backoff.yaml
+
+    fix_command: kubectl apply -f k8s/base/application.yaml
+
+    expected_pass_criteria:
+      - SRE Agent detects ImagePullBackOff state
+      - SRE Agent identifies image tag issue
+      - SRE Agent recommends checking image name/tag
+      - SRE Agent suggests registry connectivity check
+
+    expected_fail_criteria:
+      - SRE Agent does not identify image pull failure
+      - SRE Agent misses invalid image tag
+
+    evidence_folder: docs/evidence/scenarios/image-pull-backoff
+
+    audit_evidence:
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    alert_name: dispatch-service-image-pull
+    alert_severity: Sev 1 (Error)
+
+    capabilities:
+      - diagnosis
+      - registry-troubleshooting
+
+    energy_narrative: "Dispatch service deployment fails after botched container image release. Kubelet can't pull nonexistent image from registry, pod stays in ImagePullBackOff."
+
+    mttr_baseline: "10m"
+
+    sre_agent_prompts:
+      - "Why can't my dispatch-service pods start? I see ImagePullBackOff"
+      - "Help me troubleshoot the container image issue for energy dispatch"
+      - "What's wrong with the dispatch-service deployment?"
+
+  # ---------------------------------------------------------------------------
+  # SCENARIO 4: High CPU — Grid Frequency Calculation Overload
+  # ---------------------------------------------------------------------------
+  - id: high-cpu
+    number: 4
+    title: "Grid Frequency Calculation Overload"
+    severity: warning
+
+    affected_services:
+      - frequency-calc-overload
+
+    affected_components:
+      - compute
+
+    expected_signals:
+      - high CPU utilization
+      - resource contention
+      - throttling
+      - performance degradation
+
+    root_cause_category: resource-exhaustion
+
+    runbook_id: RB-004-HighCPU
+
+    slo_impact: latency
+    slo_target: "<500ms p95"
+
+    change_source: deployment
+    change_description: "Extreme weather triggers intensive grid frequency calculations, consuming excessive CPU"
+
+    k8s_manifest: k8s/scenarios/high-cpu.yaml
+
+    fix_command: kubectl delete deployment frequency-calc-overload -n energy
+
+    expected_pass_criteria:
+      - SRE Agent detects high CPU usage
+      - SRE Agent identifies resource-intensive workload
+      - SRE Agent recommends scaling or resource limits
+      - SRE Agent detects impact on other workloads
+
+    expected_fail_criteria:
+      - SRE Agent does not detect CPU contention
+      - SRE Agent misses performance impact
+
+    evidence_folder: docs/evidence/scenarios/high-cpu
+
+    audit_evidence:
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    alert_name: frequency-calc-high-cpu
+    alert_severity: Sev 2 (Warning)
+
+    capabilities:
+      - diagnosis
+      - performance-analysis
+      - capacity-planning
+
+    energy_narrative: "Extreme weather event triggers intensive grid frequency calculations, consuming excessive CPU. Other workloads may slow down due to resource contention."
+
+    mttr_baseline: "10m"
+
+    sre_agent_prompts:
+      - "What's causing high CPU usage in the energy namespace?"
+      - "Are any workloads experiencing CPU throttling?"
+      - "Analyze CPU resource contention and recommend scaling"
+
+  # ---------------------------------------------------------------------------
+  # SCENARIO 5: Pending Pods — Substation Monitor Can't Schedule
+  # ---------------------------------------------------------------------------
+  - id: pending-pods
+    number: 5
+    title: "Substation Monitor Can't Schedule"
+    severity: warning
+
+    affected_services:
+      - substation-monitor
+
+    affected_components:
+      - scheduler
+      - cluster-capacity
+
+    expected_signals:
+      - pods Pending
+      - insufficient resources
+      - unschedulable
+      - FailedScheduling events
+
+    root_cause_category: scheduling
+
+    runbook_id: RB-005-PendingPods
+
+    slo_impact: availability
+    slo_target: "99.9%"
+
+    change_source: deployment
+    change_description: "Substation monitoring pods request more resources (32Gi memory, 8 CPU) than cluster has available"
+
+    k8s_manifest: k8s/scenarios/pending-pods.yaml
+
+    fix_command: kubectl delete deployment substation-monitor -n energy
+
+    expected_pass_criteria:
+      - SRE Agent detects pods in Pending state
+      - SRE Agent identifies insufficient resources
+      - SRE Agent recommends scaling cluster or reducing requests
+      - SRE Agent shows FailedScheduling events
+
+    expected_fail_criteria:
+      - SRE Agent does not identify scheduling failure
+      - SRE Agent misses resource constraint
+
+    evidence_folder: docs/evidence/scenarios/pending-pods
+
+    audit_evidence:
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    alert_name: substation-monitor-pending
+    alert_severity: Sev 2 (Warning)
+
+    capabilities:
+      - diagnosis
+      - capacity-planning
+      - scheduler-analysis
+
+    energy_narrative: "New substation monitoring pods request excessive resources. Cluster capacity exhausted, pods remain stuck in Pending state."
+
+    mttr_baseline: "10m"
+
+    sre_agent_prompts:
+      - "Why are substation-monitor pods stuck in Pending?"
+      - "Do I have enough cluster capacity for this workload?"
+      - "Show me scheduler events for failed pod placements"
+
+  # ---------------------------------------------------------------------------
+  # SCENARIO 6: Probe Failure — Grid Health Monitor Misconfigured
+  # ---------------------------------------------------------------------------
+  - id: probe-failure
+    number: 6
+    title: "Grid Health Monitor Misconfigured Probes"
+    severity: warning
+
+    affected_services:
+      - grid-health-monitor
+
+    affected_components:
+      - probes
+      - health-check
+
+    expected_signals:
+      - failed liveness probe
+      - failed readiness probe
+      - pod restarts
+      - probe endpoint not found
+
+    root_cause_category: probe
+
+    runbook_id: RB-006-ProbeFailure
+
+    slo_impact: availability
+    slo_target: "99.9%"
+
+    change_source: config-change
+    change_description: "Grid health monitoring probe misconfigured after maintenance window, pointing to nonexistent /health/nonexistent endpoint"
+
+    k8s_manifest: k8s/scenarios/probe-failure.yaml
+
+    fix_command: kubectl delete deployment grid-health-monitor -n energy
+
+    expected_pass_criteria:
+      - SRE Agent detects failed liveness/readiness probes
+      - SRE Agent identifies probe endpoint issue
+      - SRE Agent recommends checking application health endpoint
+      - SRE Agent shows probe configuration
+
+    expected_fail_criteria:
+      - SRE Agent does not identify probe configuration
+      - SRE Agent misses health endpoint issue
+
+    evidence_folder: docs/evidence/scenarios/probe-failure
+
+    audit_evidence:
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    alert_name: grid-health-monitor-probe-failure
+    alert_severity: Sev 2 (Warning)
+
+    capabilities:
+      - diagnosis
+      - configuration-validation
+      - health-check-analysis
+
+    energy_narrative: "Grid health monitoring probe misconfigured after maintenance. Kubernetes continuously restarts pod due to failed probes."
+
+    mttr_baseline: "10m"
+
+    sre_agent_prompts:
+      - "Why is grid-health-monitor restarting repeatedly?"
+      - "Show me probe failures in the energy namespace"
+      - "Check liveness and readiness probe configuration"
+
+  # ---------------------------------------------------------------------------
+  # SCENARIO 7: Network Block — Meter Service Isolated
+  # ---------------------------------------------------------------------------
+  - id: network-block
+    number: 7
+    title: "Meter Service Isolated by Network Policy"
+    severity: critical
+
+    affected_services:
+      - meter-service
+
+    affected_components:
+      - network
+      - network-policy
+
+    expected_signals:
+      - network policy blocking traffic
+      - connection timeouts
+      - service unreachable
+      - zero ingress/egress allowed
+
+    root_cause_category: networking
+
+    runbook_id: RB-007-network-block
+
+    slo_impact: availability
+    slo_target: "99.9%"
+
+    change_source: manual-kubectl
+    change_description: "Security policy update gone wrong, NetworkPolicy denies all ingress and egress traffic for meter-service"
+
+    k8s_manifest: k8s/scenarios/network-block.yaml
+
+    fix_command: kubectl delete networkpolicy deny-meter-service -n energy
+
+    expected_pass_criteria:
+      - SRE Agent detects network policy blocking traffic
+      - SRE Agent identifies overly restrictive policy
+      - SRE Agent recommends checking/removing NetworkPolicy
+      - SRE Agent shows affected services
+
+    expected_fail_criteria:
+      - SRE Agent does not identify NetworkPolicy
+      - SRE Agent misses network isolation root cause
+
+    evidence_folder: docs/evidence/scenarios/network-block
+
+    audit_evidence:
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    alert_name: meter-service-isolated
+    alert_severity: Sev 1 (Error)
+
+    capabilities:
+      - diagnosis
+      - network-policy-analysis
+      - connectivity-testing
+
+    energy_narrative: "Security policy update gone wrong isolates meter-service from grid. NetworkPolicy blocks all ingress and egress traffic."
+
+    mttr_baseline: "15m"
+
+    sre_agent_prompts:
+      - "Meter service is unreachable — check for network policies"
+      - "Why can't other services connect to meter-service?"
+      - "Show me active NetworkPolicies affecting the energy namespace"
+
+  # ---------------------------------------------------------------------------
+  # SCENARIO 8: Missing Config — Grid Zone Configuration Missing
+  # ---------------------------------------------------------------------------
+  - id: missing-config
+    number: 8
+    title: "Grid Zone Configuration Missing"
+    severity: warning
+
+    affected_services:
+      - grid-zone-config
+
+    affected_components:
+      - configuration
+      - configmap
+
+    expected_signals:
+      - CreateContainerConfigError
+      - configmap not found
+      - pod failing to start
+      - volume mount error
+
+    root_cause_category: configuration
+
+    runbook_id: RB-008-MissingConfig
+
+    slo_impact: availability
+    slo_target: "99.9%"
+
+    change_source: config-change
+    change_description: "Grid zone configuration missing after environment promotion, pod references non-existent ConfigMaps"
+
+    k8s_manifest: k8s/scenarios/missing-config.yaml
+
+    fix_command: kubectl delete deployment grid-zone-config -n energy
+
+    expected_pass_criteria:
+      - SRE Agent detects missing ConfigMap
+      - SRE Agent identifies CreateContainerConfigError
+      - SRE Agent recommends creating ConfigMap
+      - SRE Agent shows ConfigMap references
+
+    expected_fail_criteria:
+      - SRE Agent does not identify missing ConfigMap
+      - SRE Agent misses configuration dependency
+
+    evidence_folder: docs/evidence/scenarios/missing-config
+
+    audit_evidence:
+      - docs/evidence/kql/stable/pod-lifecycle.kql
+      - docs/evidence/kql/stable/alert-history.kql
+
+    alert_name: grid-zone-config-missing
+    alert_severity: Sev 2 (Warning)
+
+    capabilities:
+      - diagnosis
+      - configuration-validation
+      - dependency-checking
+
+    energy_narrative: "Grid zone configuration missing after environment promotion. Pod fails to start due to missing ConfigMaps."
+
+    mttr_baseline: "10m"
+
+    sre_agent_prompts:
+      - "Why won't grid-zone-config pods start?"
+      - "Check for missing ConfigMaps in the energy namespace"
+      - "Diagnose CreateContainerConfigError failures"
+
+# =============================================================================
+# METADATA SCHEMA VERSION HISTORY
+# =============================================================================
+#
+# 1.0.0 (2026-04-25) — Initial Wave 0 lock
+#   - Locked 10 scenario IDs (oom-killed → missing-config)
+#   - Locked root_cause_category taxonomy
+#   - Locked severity levels (critical, warning, info)
+#   - Reserved runbook IDs (RB-001 → RB-010)
+#   - Reserved SLO impact categories
+#   - Defined capability tags for wave planning
+#
+# =============================================================================

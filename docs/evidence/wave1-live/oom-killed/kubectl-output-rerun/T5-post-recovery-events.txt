@@ -1,0 +1,50 @@
+9m17s       Normal    Created                  pod/mongodb-d948b8585-kzcjv              Created container: mongodb
+9m17s       Normal    Pulled                   pod/mongodb-d948b8585-kzcjv              Successfully pulled image "mongo:4.4" in 10.076s (10.076s including waiting). Image size: 166163173 bytes.
+9m16s       Warning   Unhealthy                pod/dispatch-service-5589cf949c-76sb4    Readiness probe failed: Get "http://<REDACTED_IP>:3001/health": dial tcp <REDACTED_IP>:3001: connect: connection refused
+9m16s       Warning   Unhealthy                pod/dispatch-service-5589cf949c-szzdd    Readiness probe failed: Get "http://<REDACTED_IP>:3001/health": dial tcp <REDACTED_IP>:3001: connect: connection refused
+2m28s       Normal    SuccessfulDelete         replicaset/meter-service-5b8f45f67f      Deleted pod: meter-service-5b8f45f67f-x8m57
+2m28s       Normal    ScalingReplicaSet        deployment/meter-service                 Scaled down replica set meter-service-5b8f45f67f from 2 to 0
+2m28s       Normal    Killing                  pod/meter-service-5b8f45f67f-5tzlj       Stopping container meter-service
+2m28s       Normal    Killing                  pod/meter-service-5b8f45f67f-x8m57       Stopping container meter-service
+2m28s       Normal    SuccessfulDelete         replicaset/meter-service-5b8f45f67f      Deleted pod: meter-service-5b8f45f67f-5tzlj
+2m26s       Normal    Scheduled                pod/meter-service-686c5dbfc7-gds69       Successfully assigned energy/meter-service-686c5dbfc7-gds69 to <REDACTED_NODE>
+2m26s       Normal    SuccessfulCreate         replicaset/meter-service-686c5dbfc7      Created pod: meter-service-686c5dbfc7-mfvgw
+2m26s       Normal    SuccessfulCreate         replicaset/meter-service-686c5dbfc7      Created pod: meter-service-686c5dbfc7-gds69
+2m26s       Normal    ScalingReplicaSet        deployment/meter-service                 Scaled up replica set meter-service-686c5dbfc7 from 0 to 2
+2m26s       Normal    Scheduled                pod/meter-service-686c5dbfc7-mfvgw       Successfully assigned energy/meter-service-686c5dbfc7-mfvgw to <REDACTED_NODE>
+2m25s       Normal    Pulled                   pod/meter-service-686c5dbfc7-mfvgw       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 160ms (160ms including waiting). Image size: 75025121 bytes.
+2m25s       Normal    Pulled                   pod/meter-service-686c5dbfc7-gds69       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 206ms (206ms including waiting). Image size: 75025121 bytes.
+2m23s       Normal    Pulled                   pod/meter-service-686c5dbfc7-gds69       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 221ms (221ms including waiting). Image size: 75025121 bytes.
+2m23s       Normal    Pulled                   pod/meter-service-686c5dbfc7-mfvgw       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 256ms (256ms including waiting). Image size: 75025121 bytes.
+2m7s        Normal    Pulled                   pod/meter-service-686c5dbfc7-mfvgw       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 153ms (153ms including waiting). Image size: 75025121 bytes.
+101s        Normal    Pulled                   pod/meter-service-686c5dbfc7-gds69       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 162ms (162ms including waiting). Image size: 75025121 bytes.
+97s         Normal    Pulled                   pod/meter-service-686c5dbfc7-mfvgw       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 165ms (165ms including waiting). Image size: 75025121 bytes.
+53s         Normal    Pulled                   pod/meter-service-686c5dbfc7-mfvgw       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 171ms (171ms including waiting). Image size: 75025121 bytes.
+53s         Normal    Pulling                  pod/meter-service-686c5dbfc7-mfvgw       Pulling image "ghcr.io/azure-samples/aks-store-demo/order-service:latest"
+53s         Normal    Created                  pod/meter-service-686c5dbfc7-mfvgw       Created container: meter-service
+52s         Normal    Started                  pod/meter-service-686c5dbfc7-mfvgw       Started container meter-service
+47s         Normal    Created                  pod/meter-service-686c5dbfc7-gds69       Created container: meter-service
+47s         Normal    Pulled                   pod/meter-service-686c5dbfc7-gds69       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 156ms (156ms including waiting). Image size: 75025121 bytes.
+47s         Normal    Pulling                  pod/meter-service-686c5dbfc7-gds69       Pulling image "ghcr.io/azure-samples/aks-store-demo/order-service:latest"
+46s         Normal    Started                  pod/meter-service-686c5dbfc7-gds69       Started container meter-service
+45s         Normal    Scheduled                pod/meter-service-5b8f45f67f-dkd5c       Successfully assigned energy/meter-service-5b8f45f67f-dkd5c to <REDACTED_NODE>
+45s         Normal    SuccessfulCreate         replicaset/meter-service-5b8f45f67f      Created pod: meter-service-5b8f45f67f-dkd5c
+45s         Normal    ScalingReplicaSet        deployment/meter-service                 Scaled up replica set meter-service-5b8f45f67f from 0 to 1
+44s         Normal    Pulling                  pod/meter-service-5b8f45f67f-dkd5c       Pulling image "ghcr.io/azure-samples/aks-store-demo/order-service:latest"
+44s         Normal    Pulled                   pod/meter-service-5b8f45f67f-dkd5c       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 149ms (149ms including waiting). Image size: 75025121 bytes.
+44s         Normal    Created                  pod/meter-service-5b8f45f67f-dkd5c       Created container: meter-service
+43s         Normal    Started                  pod/meter-service-5b8f45f67f-dkd5c       Started container meter-service
+38s         Warning   BackOff                  pod/meter-service-686c5dbfc7-mfvgw       Back-off restarting failed container meter-service in pod meter-service-686c5dbfc7-mfvgw_energy(<REDACTED_UUID>)
+37s         Normal    Scheduled                pod/meter-service-5b8f45f67f-tpfq6       Successfully assigned energy/meter-service-5b8f45f67f-tpfq6 to <REDACTED_NODE>
+37s         Normal    ScalingReplicaSet        deployment/meter-service                 Scaled up replica set meter-service-5b8f45f67f from 1 to 2
+37s         Normal    ScalingReplicaSet        deployment/meter-service                 Scaled down replica set meter-service-686c5dbfc7 from 2 to 1
+37s         Normal    SuccessfulDelete         replicaset/meter-service-686c5dbfc7      Deleted pod: meter-service-686c5dbfc7-mfvgw
+37s         Normal    SuccessfulCreate         replicaset/meter-service-5b8f45f67f      Created pod: meter-service-5b8f45f67f-tpfq6
+37s         Warning   FailedScheduling         pod/meter-service-5b8f45f67f-tpfq6       0/3 nodes are available: 1 Insufficient cpu, 2 node(s) had untolerated taint(s). no new claims to deallocate, preemption: 0/3 nodes are available: 1 No preemption victims found for incoming pod, 2 Preemption is not helpful for scheduling.
+36s         Normal    Started                  pod/meter-service-5b8f45f67f-tpfq6       Started container meter-service
+36s         Normal    Created                  pod/meter-service-5b8f45f67f-tpfq6       Created container: meter-service
+36s         Normal    Pulled                   pod/meter-service-5b8f45f67f-tpfq6       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 170ms (170ms including waiting). Image size: 75025121 bytes.
+36s         Normal    Pulling                  pod/meter-service-5b8f45f67f-tpfq6       Pulling image "ghcr.io/azure-samples/aks-store-demo/order-service:latest"
+31s         Warning   BackOff                  pod/meter-service-686c5dbfc7-gds69       Back-off restarting failed container meter-service in pod meter-service-686c5dbfc7-gds69_energy(<REDACTED_UUID>)
+28s         Normal    ScalingReplicaSet        deployment/meter-service                 Scaled down replica set meter-service-686c5dbfc7 from 1 to 0
+28s         Normal    SuccessfulDelete         replicaset/meter-service-686c5dbfc7      Deleted pod: meter-service-686c5dbfc7-gds69

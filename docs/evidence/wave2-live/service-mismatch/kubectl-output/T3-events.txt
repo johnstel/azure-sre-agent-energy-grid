@@ -1,0 +1,30 @@
+34m         Normal    Created                        pod/load-simulator-57fc84dfdf-4962f     Created container: load-simulator
+34m         Normal    Started                        pod/dispatch-service-5589cf949c-mxbp6   Started container dispatch-service
+34m         Normal    Pulled                         pod/asset-service-c744d6667-fzdfb       Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/product-service:latest" in 12.494s (12.495s including waiting). Image size: 43712575 bytes.
+34m         Normal    Started                        pod/asset-service-c744d6667-fzdfb       Started container asset-service
+34m         Normal    Pulled                         pod/grid-dashboard-66cb797c94-jpm4n     Successfully pulled image "nginx:alpine" in 15.232s (15.232s including waiting). Image size: 26013346 bytes.
+34m         Normal    Pulled                         pod/grid-dashboard-66cb797c94-wksmz     Successfully pulled image "nginx:alpine" in 15.073s (15.073s including waiting). Image size: 26013346 bytes.
+34m         Normal    Started                        pod/grid-dashboard-66cb797c94-wksmz     Started container grid-dashboard
+34m         Normal    Created                        pod/grid-dashboard-66cb797c94-jpm4n     Created container: grid-dashboard
+34m         Normal    Started                        pod/grid-dashboard-66cb797c94-jpm4n     Started container grid-dashboard
+34m         Normal    Created                        pod/grid-dashboard-66cb797c94-wksmz     Created container: grid-dashboard
+33m         Normal    Pulled                         pod/meter-service-5b8f45f67f-h7rhc      Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 24.474s (24.474s including waiting). Image size: 75025121 bytes.
+33m         Normal    Pulled                         pod/meter-service-5b8f45f67f-85nk2      Successfully pulled image "ghcr.io/azure-samples/aks-store-demo/order-service:latest" in 24.573s (24.573s including waiting). Image size: 75025121 bytes.
+33m         Normal    Created                        pod/meter-service-5b8f45f67f-h7rhc      Created container: meter-service
+33m         Normal    Started                        pod/meter-service-5b8f45f67f-85nk2      Started container meter-service
+33m         Normal    Started                        pod/meter-service-5b8f45f67f-h7rhc      Started container meter-service
+33m         Normal    Created                        pod/meter-service-5b8f45f67f-85nk2      Created container: meter-service
+26m         Normal    ScalingReplicaSet              deployment/mongodb                      Scaled down replica set mongodb-d948b8585 from 1 to 0
+26m         Normal    SuccessfulDelete               replicaset/mongodb-d948b8585            Deleted pod: mongodb-d948b8585-wnvx7
+26m         Normal    Killing                        pod/mongodb-d948b8585-wnvx7             Stopping container mongodb
+26m         Normal    ScalingReplicaSet              deployment/mongodb                      Scaled up replica set mongodb-d948b8585 from 0 to 1
+26m         Normal    Scheduled                      pod/mongodb-d948b8585-ptjjt             Successfully assigned energy/mongodb-d948b8585-ptjjt to NODE_REDACTED
+26m         Warning   FailedAttachVolume             pod/mongodb-d948b8585-ptjjt             Multi-Attach error for volume "pvc-6eb214d1-f9ea-4805-bc26-d0e417e907c3" Volume is already exclusively attached to one node and can't be attached to another
+26m         Normal    SuccessfulCreate               replicaset/mongodb-d948b8585            Created pod: mongodb-d948b8585-ptjjt
+25m         Normal    SuccessfulAttachVolume         pod/mongodb-d948b8585-ptjjt             AttachVolume.Attach succeeded for volume "pvc-6eb214d1-f9ea-4805-bc26-d0e417e907c3"
+25m         Normal    Pulling                        pod/mongodb-d948b8585-ptjjt             Pulling image "mongo:4.4"
+25m         Normal    Pulled                         pod/mongodb-d948b8585-ptjjt             Successfully pulled image "mongo:4.4" in 7.71s (7.71s including waiting). Image size: 166163173 bytes.
+25m         Normal    Started                        pod/mongodb-d948b8585-ptjjt             Started container mongodb
+25m         Normal    Created                        pod/mongodb-d948b8585-ptjjt             Created container: mongodb
+4m51s       Warning   Unhealthy                      pod/rabbitmq-79d58d7457-j4zdc           Readiness probe failed: command timed out: "rabbitmq-diagnostics check_port_connectivity" timed out after 10s
+4m49s       Warning   Unhealthy                      pod/rabbitmq-79d58d7457-j4zdc           Liveness probe failed: command timed out: "rabbitmq-diagnostics check_port_connectivity" timed out after 15s

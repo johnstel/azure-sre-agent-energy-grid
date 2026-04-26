@@ -25,7 +25,7 @@ export class JobManager extends EventEmitter {
     label: string,
     command: string,
     args: string[],
-    options?: ExecuteOptions,
+    options?: ExecuteOptions & { preludeLogs?: string[] },
   ): Job {
     // Enforce single active destructive job
     const active = this.getActiveJob();
@@ -46,6 +46,20 @@ export class JobManager extends EventEmitter {
     };
 
     this.jobs.set(id, job);
+
+    // Emit job created log
+    const createdLog = `[Mission Control] Job created: ${label} (${id})`;
+    job.logs.push(createdLog);
+    this.emit('job:stdout', { jobId: id, data: createdLog + '\n' });
+
+    // Add prelude logs if provided
+    if (options?.preludeLogs) {
+      for (const line of options.preludeLogs) {
+        job.logs.push(line);
+        this.emit('job:stdout', { jobId: id, data: line + '\n' });
+      }
+    }
+
     this.emit('job:created', this.toPublic(job));
 
     // Start async execution
@@ -72,6 +86,12 @@ export class JobManager extends EventEmitter {
     job.status = 'cancelled';
     job.completedAt = new Date().toISOString();
     job.executor = null;
+
+    // Emit cancellation log
+    const cancelLog = `[Mission Control] Job cancelled at ${job.completedAt}`;
+    job.logs.push(cancelLog);
+    this.emit('job:stdout', { jobId, data: cancelLog + '\n' });
+
     this.emit('job:complete', this.toPublic(job));
     logger.info({ jobId }, 'Job cancelled');
     return true;
@@ -110,6 +130,11 @@ export class JobManager extends EventEmitter {
     job.executor = executor;
     job.status = 'running';
 
+    // Emit status change log
+    const startLog = `[Mission Control] Process started at ${new Date().toISOString()}`;
+    job.logs.push(startLog);
+    this.emit('job:stdout', { jobId: job.requestId, data: startLog + '\n' });
+
     this.emit('job:start', this.toPublic(job));
     logger.info({ jobId: job.requestId, command, args }, 'Job started');
 
@@ -132,6 +157,15 @@ export class JobManager extends EventEmitter {
       job.completedAt = new Date().toISOString();
       job.executor = null;
 
+      // Emit completion status log
+      const completionLog = `[Mission Control] Process completed with exit code ${result.exitCode} at ${job.completedAt}`;
+      job.logs.push(completionLog);
+      this.emit('job:stdout', { jobId: job.requestId, data: completionLog + '\n' });
+
+      const statusLog = `[Mission Control] Job ${job.status}: ${job.command}`;
+      job.logs.push(statusLog);
+      this.emit('job:stdout', { jobId: job.requestId, data: statusLog + '\n' });
+
       this.emit('job:complete', this.toPublic(job));
       logger.info({ jobId: job.requestId, exitCode: result.exitCode }, 'Job complete');
     } catch (err) {
@@ -143,7 +177,14 @@ export class JobManager extends EventEmitter {
       job.executor = null;
 
       const message = err instanceof Error ? err.message : String(err);
-      job.logs.push(`Error: ${message}`);
+      const errorLog = `[Mission Control] Error: ${message}`;
+      job.logs.push(errorLog);
+      this.emit('job:stdout', { jobId: job.requestId, data: errorLog + '\n' });
+
+      const failLog = `[Mission Control] Job failed at ${job.completedAt}`;
+      job.logs.push(failLog);
+      this.emit('job:stdout', { jobId: job.requestId, data: failLog + '\n' });
+
       this.emit('job:complete', this.toPublic(job));
       logger.error({ jobId: job.requestId, err: message }, 'Job failed');
     }

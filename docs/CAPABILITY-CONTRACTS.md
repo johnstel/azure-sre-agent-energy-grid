@@ -108,11 +108,11 @@ Every breakable scenario must have a metadata block (YAML front matter or struct
 
 ### Deployment status
 
-> **Current (Wave 0):** `deployAlerts = false` (default off)  
-> **Wave 1 target:** Enable by default for demo environments  
+> **Wave 0 baseline:** `deployAlerts = false` (default off)
+> **Wave 1 implementation:** `deployAlerts = true` for demo environments
 > **Production:** Customers decide based on incident workflow integration
 
-Alerts are defined but not deployed by default to reduce noise during initial lab setup. Wave 1 will enable them for demos.
+Wave 1 deploys the four baseline demo alerts by default. Production deployments should decide whether to enable these alerts based on their incident workflow and action-group integration.
 
 ### Name format (Wave 0 implementation)
 
@@ -175,7 +175,7 @@ Every alert must include these custom properties for query correlation:
 }
 ```
 
-> **Wave 0 implementation:** Only `source` and `workload` are currently set (see `infra/bicep/modules/alerts.bicep:29-32`).  
+> **Wave 0 implementation:** Only `source` and `workload` are currently set (see `infra/bicep/modules/alerts.bicep:29-32`).
 > **Wave 1 enhancement:** Add `sre.scenario`, `sre.service`, `demo_scenario`, and `runbook_url` when runbooks exist.
 
 This prevents premature schema commitment before telemetry dimensions (§1) are fully integrated.
@@ -264,7 +264,7 @@ The demo supports three access profiles. Each corresponds to a distinct configur
 | Profile | SRE Agent Mode | Access Level | Human Approval | Use Case |
 |---------|---------------|--------------|----------------|----------|
 | `review-readonly` | `Review` | `Low` | N/A (read ops only) | Diagnosis-only demos; safe for untrusted audiences |
-| `review-remediate` | `Review` | `High` | ✅ Required for writes | **Default demo profile** — agent recommends, human approves |
+| `review-remediate` | `Review` | `High` | ✅ Required for writes | **Default demo profile** — agent recommends, operator executes unless a real Preview approval UI/API is captured |
 | `auto-remediate` | `Auto` | `High` | ❌ Agent acts autonomously | Advanced demo only; document risk prominently |
 
 > **Current state**: The Bicep deployment uses `mode: 'Review'` and `accessLevel: 'High'` — this maps to `review-remediate`. See `infra/bicep/modules/sre-agent.bicep:92-96`.
@@ -283,9 +283,9 @@ The deployment uses a **Bicep-first, script-fallback** strategy:
 | AKS RBAC Cluster Admin | AKS cluster | SRE Agent Managed Identity | PowerShell script | Full K8s RBAC (demo only) |
 | Key Vault Secrets Officer | Key Vault | SRE Agent Managed Identity | PowerShell script | Read/write secrets (demo only) |
 
-> **Source of truth:**  
-> 1. **Bicep modules** (`infra/bicep/modules/sre-agent.bicep`) — Primary, always attempted  
-> 2. **PowerShell script** (`scripts/configure-rbac.ps1`) — Fallback for subscription policy restrictions  
+> **Source of truth:**
+> 1. **Bicep modules** (`infra/bicep/modules/sre-agent.bicep`) — Primary, always attempted
+> 2. **PowerShell script** (`scripts/configure-rbac.ps1`) — Fallback for subscription policy restrictions
 > 3. **Manual portal** — Not used; all RBAC is code-defined
 
 > **Why both?** Some Azure subscriptions block ARM-based role assignments via policy. The script provides a workaround path while maintaining infrastructure-as-code principles.
@@ -369,7 +369,7 @@ traces
 
 This demo proves **Review mode only**. Auto mode exists but is out of scope for this wave.
 
-No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'` and `accessLevel: 'High'`, which means the agent may recommend remediation but a human operator remains responsible for approving or executing write actions.
+No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'` and `accessLevel: 'High'`, which means the agent may recommend remediation but a human operator remains responsible for executing write actions. If the Azure SRE Agent Preview portal exposes a specific approval/denial UX in this environment, capture it as evidence before mentioning it; otherwise use “agent recommends, operator executes.”
 
 Any future Auto mode demo requires a separate security review with evidence of:
 
@@ -404,17 +404,17 @@ The current demo profile intentionally grants broad roles through `scripts/confi
 
 | Source | Current Retention | KQL Queryable | Export Configured | Production Recommendation |
 |--------|-------------------|---------------|-------------------|---------------------------|
-| Log Analytics (Container Insights) | 30 days | Yes | N/A (is destination) | Align to 90 days in Wave 1 |
+| Log Analytics (Container Insights) | 90 days configured in Bicep | Yes | N/A (is destination) | Verify deployed retention during UAT |
 | App Insights (SRE Agent telemetry) | 90 days | Yes | Wired to LA workspace | Sufficient |
-| Activity Log (ARM operations) | 90 days (platform default) | No — not exported to LA | No diagnostic setting | Add diagnostic setting export in Wave 1 |
+| Activity Log (ARM operations) | 90 days platform retention; export configured in Bicep | Yes after diagnostic setting deployment | `activity-log-diagnostics.bicep` | Verify export and ingestion during UAT |
 | Key Vault audit | 7 days soft-delete | No | No diagnostic setting | Enable diagnostic setting; extend soft-delete to 90 days |
 | SRE Agent conversations | Unknown (Preview service) | Unknown | Unknown | Track Microsoft Preview data handling docs |
 
-> **Wave 1 fix:** The 30-day Log Analytics vs. 90-day App Insights misalignment creates a 60-day evidence gap. Align Log Analytics retention to 90 days and export Activity Log and Key Vault audit events to the workspace.
+> **Wave 1 implementation:** Log Analytics retention is configured to 90 days and Activity Log export is defined in Bicep. Do not claim complete 90-day audit evidence until live UAT verifies the deployed retention setting and Activity Log records arrive in Log Analytics.
 
-### Activity Log export prerequisite
+### Activity Log export validation prerequisite
 
-All demo deployments MUST export Activity Log to Log Analytics with these categories once the Wave 1 diagnostic module lands:
+All demo deployments MUST export Activity Log to Log Analytics with these categories:
 
 - Administrative, Security, ServiceHealth, Alert, Recommendation, Policy, Autoscale, ResourceHealth
 
@@ -424,9 +424,9 @@ All demo deployments MUST export Activity Log to Log Analytics with these catego
 
 **Ownership:**
 
-- Module creation: Ripley (Wave 1)
-- Cost impact documentation: Ripley updates `docs/COSTS.md`
-- Integration validation: Parker (SRE) verifies SRE Agent can query Activity Log
+- Module creation: Ripley (Wave 1) — complete in Bicep
+- Cost impact documentation: Ripley updates `docs/COSTS.md` — complete
+- Integration validation: Parker/SRE verifies Activity Log export is queryable after deployment
 
 ---
 
@@ -469,7 +469,7 @@ Each wave must pass its gate criteria before the next wave begins. Dallas review
 - [ ] `SCHEMA_TBD` rule documented in §8 and formalized as S0-4 in §12.
 - [ ] Review vs. Auto mode claim boundary documented in §9 (S0-1).
 - [ ] Demo vs. production RBAC matrix documented in §10 (S0-2).
-- [ ] Data retention evidence gap and Activity Log prerequisite documented in §11 (S0-3).
+- [ ] Data retention and Activity Log live-validation requirements documented in §11 (S0-3).
 - [ ] Demo-only shortcuts inventory documented in §13 (S0-5).
 - [ ] No runtime infrastructure changes (Bicep, K8s, scripts) in this wave.
 
@@ -523,7 +523,7 @@ These rules prevent wasted effort from building on unstable foundations.
 | Do not document overbroad demo RBAC as required production RBAC | §6, §10 | Any |
 | Do not claim auto-remediation is demonstrated by this lab | §9 | Any |
 | Do not present demo-only security shortcuts as production guidance | §13 | Any |
-| Do not claim complete 90-day audit evidence until retention/export gaps are closed | §11 | Wave 1 |
+| Do not claim complete 90-day audit evidence until retention/export is deployed and validated | §11 | Wave 1 |
 | Do not hardcode scenario names into reusable queries — use `sre.scenario` parameter | §1 | Any |
 
 ---

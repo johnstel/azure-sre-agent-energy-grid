@@ -11,8 +11,9 @@
 # - But submitting meter readings fails silently (meter-service unreachable)
 # - SRE Agent must check Service endpoints, not just pod status
 #
-# SRE Agent can diagnose: Empty endpoints, selector mismatch between Service
-# and Deployment labels, recommend correcting the selector.
+# Scenario is intended to test whether SRE Agent can diagnose: Empty endpoints,
+# selector mismatch between Service and Deployment labels, and recommend
+# correcting the selector.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/service-mismatch.yaml
@@ -29,6 +30,15 @@ metadata:
   labels:
     scenario: service-mismatch
     sre-demo: breakable
+  annotations:
+    sre.scenario: service-mismatch
+    sre.service: meter-service
+    sre.namespace: energy
+    sre.component: service
+    sre.runbook_id: RB-010-service-mismatch
+    sre.root_cause_category: configuration
+    sre.change_source: config-change
+    sre.version: "2026-04-25"
 spec:
   selector:
     # BREAKING CHANGE: Selector doesn't match any existing pods

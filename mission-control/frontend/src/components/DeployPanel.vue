@@ -1,17 +1,26 @@
 <template>
-  <section>
-    <h2 class="text-sm font-medium uppercase tracking-wider mb-6" style="color: var(--muted);">
-      Deploy Infrastructure
-    </h2>
+  <section id="deploy" class="mission-panel">
+    <div class="panel-heading">
+      <div class="panel-heading__copy">
+        <span class="panel-eyebrow">02 · Provision</span>
+        <h2 class="panel-title">Deploy Infrastructure</h2>
+        <p class="panel-description">
+          Launch the Azure SRE lab footprint with clear regional intent and live job output for operator confidence.
+        </p>
+      </div>
+      <div class="panel-actions">
+        <span class="badge" :class="jobBadgeClass">{{ jobStatusLabel }}</span>
+      </div>
+    </div>
 
-    <div class="card mb-6">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+    <div class="card card--control mb-4">
+      <div class="control-grid mb-4">
         <!-- Location -->
         <div>
-          <label class="block text-xs font-medium mb-1" style="color: var(--muted);">Location</label>
+          <label class="field-label">Location</label>
           <select
             v-model="location"
-            class="w-full rounded-lg px-3 py-2 text-sm"
+            class="field-control w-full rounded-lg px-3 py-2 text-sm"
             style="background: var(--surface); color: var(--text); border: 1px solid var(--card-border);"
           >
             <option value="eastus2">East US 2</option>
@@ -20,17 +29,29 @@
           </select>
         </div>
 
+        <!-- Workload -->
+        <div>
+          <label class="field-label">Workload Name</label>
+          <input
+            v-model="workloadName"
+            type="text"
+            class="field-control w-full rounded-lg px-3 py-2 text-sm"
+            style="background: var(--surface); color: var(--text); border: 1px solid var(--card-border);"
+            placeholder="srelab"
+          />
+        </div>
+
         <!-- Skip RBAC -->
-        <div class="flex items-end gap-2">
-          <label class="flex items-center gap-2 text-xs cursor-pointer" style="color: var(--muted);">
+        <div class="flex items-end">
+          <label class="control-check w-full cursor-pointer">
             <input type="checkbox" v-model="skipRbac" class="rounded" />
             Skip RBAC
           </label>
         </div>
 
         <!-- Skip SRE Agent -->
-        <div class="flex items-end gap-2">
-          <label class="flex items-center gap-2 text-xs cursor-pointer" style="color: var(--muted);">
+        <div class="flex items-end">
+          <label class="control-check w-full cursor-pointer">
             <input type="checkbox" v-model="skipSreAgent" class="rounded" />
             Skip SRE Agent
           </label>
@@ -38,8 +59,7 @@
       </div>
 
       <button
-        class="px-6 py-2.5 text-sm font-semibold rounded-lg transition-opacity"
-        style="background: var(--accent); color: var(--bg);"
+        class="command-button command-button--primary px-6 py-2.5 text-sm"
         :disabled="jobRunning"
         :style="{ opacity: jobRunning ? 0.5 : 1 }"
         @click="startDeploy"
@@ -70,20 +90,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useApi } from '@/composables/useApi';
 import { useWebSocket } from '@/composables/useWebSocket';
+import type { Job } from '@/types/api';
 import Terminal from './Terminal.vue';
 
 const { deploy } = useApi();
 
 const location = ref('eastus2');
+const workloadName = ref('srelab');
 const skipRbac = ref(false);
 const skipSreAgent = ref(false);
 const jobRunning = ref(false);
 const jobStatus = ref<string | null>(null);
 const requestId = ref<string | null>(null);
 const terminalLines = ref<string[]>([]);
+
+const jobStatusLabel = computed(() => {
+  if (jobRunning.value) return 'Running';
+  if (!jobStatus.value) return 'Ready to deploy';
+  return jobStatus.value;
+});
+
+const jobBadgeClass = computed(() => {
+  if (jobRunning.value || jobStatus.value === 'running') return 'badge-warning';
+  if (jobStatus.value === 'completed') return 'badge-online';
+  if (jobStatus.value === 'failed') return 'badge-offline';
+  if (jobStatus.value === 'pending') return 'badge-info';
+  return 'badge-neutral';
+});
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const { data: wsData, connect } = useWebSocket(`${wsProtocol}//${window.location.host}/ws`);
@@ -92,25 +128,41 @@ connect();
 watch(wsData, (msg: unknown) => {
   if (!msg || typeof msg !== 'object') return;
   const m = msg as Record<string, unknown>;
-  if (m.requestId !== requestId.value) return;
+  const eventJobId = typeof m.jobId === 'string'
+    ? m.jobId
+    : typeof m.job === 'object' && m.job !== null
+      ? (m.job as Job).requestId
+      : undefined;
+  if (eventJobId !== requestId.value) return;
 
   if (m.type === 'job:stdout' || m.type === 'job:stderr') {
     terminalLines.value.push(String(m.data ?? ''));
   }
   if (m.type === 'job:complete') {
-    jobStatus.value = m.exitCode === 0 ? 'completed' : 'failed';
+    const job = m.job as Job | undefined;
+    jobStatus.value = job?.status ?? 'failed';
     jobRunning.value = false;
   }
 });
 
 async function startDeploy() {
-  terminalLines.value = [];
+  terminalLines.value = [
+    `[Mission Control] Submitting deploy request for ${workloadName.value || 'srelab'} in ${location.value}...`,
+  ];
   jobRunning.value = true;
   jobStatus.value = 'pending';
+  requestId.value = null;
   try {
-    const res = await deploy({ location: location.value, skipConfirmation: true });
+    const res = await deploy({
+      location: location.value,
+      workloadName: workloadName.value || 'srelab',
+      skipRbac: skipRbac.value,
+      skipSreAgent: skipSreAgent.value,
+      skipConfirmation: true,
+    });
     requestId.value = res.requestId;
-    jobStatus.value = 'running';
+    jobStatus.value = res.status;
+    terminalLines.value = [...terminalLines.value, ...res.logs];
   } catch (e) {
     jobStatus.value = 'failed';
     jobRunning.value = false;

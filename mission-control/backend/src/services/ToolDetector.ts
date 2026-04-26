@@ -1,13 +1,13 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { platform } from 'node:os';
 import type { ToolStatus } from '../types/index.js';
+import { resolvePwsh } from '../utils/paths.js';
 
 const execFileAsync = promisify(execFile);
 
 interface ToolProbe {
   name: string;
-  command: string;
+  command: string | (() => Promise<string>);
   args: string[];
   parseVersion: (stdout: string) => string;
 }
@@ -15,7 +15,7 @@ interface ToolProbe {
 const TOOLS: ToolProbe[] = [
   {
     name: 'pwsh',
-    command: platform() === 'win32' ? 'pwsh.exe' : 'pwsh',
+    command: resolvePwsh, // Async resolver for robust path detection
     args: ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()'],
     parseVersion: (out) => out.trim(),
   },
@@ -49,7 +49,10 @@ const TOOLS: ToolProbe[] = [
 
 async function probeOne(tool: ToolProbe): Promise<ToolStatus> {
   try {
-    const { stdout } = await execFileAsync(tool.command, tool.args, {
+    // Resolve command if it's a function
+    const command = typeof tool.command === 'function' ? await tool.command() : tool.command;
+
+    const { stdout } = await execFileAsync(command, tool.args, {
       timeout: 10_000,
       env: { ...process.env },
     });
@@ -57,7 +60,7 @@ async function probeOne(tool: ToolProbe): Promise<ToolStatus> {
       name: tool.name,
       available: true,
       version: tool.parseVersion(stdout),
-      path: tool.command,
+      path: command,
     };
   } catch {
     return { name: tool.name, available: false };

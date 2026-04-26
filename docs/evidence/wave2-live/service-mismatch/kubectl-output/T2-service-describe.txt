@@ -1,0 +1,16 @@
+Name:                     meter-service
+Namespace:                energy
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 app=meter-service-v2
+Type:                     ClusterIP
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       IP_REDACTED
+IPs:                      IP_REDACTED
+Port:                     <unset>  3000/TCP
+TargetPort:               3000/TCP
+Endpoints:
+Session Affinity:         None
+Internal Traffic Policy:  Cluster
+Events:                   <none>

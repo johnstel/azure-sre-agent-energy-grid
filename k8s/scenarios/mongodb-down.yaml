@@ -8,8 +8,9 @@
 # This is the most realistic scenario because it requires SRE Agent to trace
 # the dependency chain: dispatch-service → MongoDB → scaled to 0.
 #
-# SRE Agent can diagnose: Dependency failures, cascading impact, service
-# health correlation, and recommend scaling MongoDB back up.
+# Scenario is intended to test whether SRE Agent can diagnose: Dependency
+# failures, cascading impact, service health correlation, and recommend scaling
+# MongoDB back up.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/mongodb-down.yaml
@@ -27,6 +28,15 @@ metadata:
     app: mongodb
     scenario: mongodb-down
     sre-demo: breakable
+  annotations:
+    sre.scenario: mongodb-down
+    sre.service: mongodb
+    sre.namespace: energy
+    sre.component: mongodb
+    sre.runbook_id: RB-009-mongodb-down
+    sre.root_cause_category: dependency
+    sre.change_source: scale-event
+    sre.version: "2026-04-25"
 spec:
   # BREAKING CHANGE: Scale to 0 replicas - meter database goes offline
   replicas: 0
@@ -40,6 +50,15 @@ spec:
       labels:
         app: mongodb
         scenario: mongodb-down
+      annotations:
+        sre.scenario: mongodb-down
+        sre.service: mongodb
+        sre.namespace: energy
+        sre.component: mongodb
+        sre.runbook_id: RB-009-mongodb-down
+        sre.root_cause_category: dependency
+        sre.change_source: scale-event
+        sre.version: "2026-04-25"
     spec:
       nodeSelector:
         nodepool-type: user

@@ -1,0 +1,13 @@
+NAME                                READY   STATUS    RESTARTS   AGE    IP           NODE                               NOMINATED NODE   READINESS GATES
+asset-service-c744d6667-fgcsz       1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+asset-service-c744d6667-fzdfb       1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+dispatch-service-5589cf949c-mxbp6   1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+dispatch-service-5589cf949c-rqx6w   1/1     Running   0          7h4m   IP_REDACTED    NODE_REDACTED   <none>           <none>
+grid-dashboard-66cb797c94-jpm4n     1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+grid-dashboard-66cb797c94-wksmz     1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+load-simulator-57fc84dfdf-4962f     1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+meter-service-5b8f45f67f-85nk2      1/1     Running   0          7h5m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+meter-service-5b8f45f67f-h7rhc      1/1     Running   0          7h5m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+mongodb-d948b8585-wnvx7             1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+ops-console-558566cf95-2rmxq        1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>
+rabbitmq-79d58d7457-j4zdc           1/1     Running   0          7h4m   IP_REDACTED   NODE_REDACTED   <none>           <none>

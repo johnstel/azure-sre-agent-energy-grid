@@ -1,0 +1,2 @@
+meter-service-686c5dbfc7-gds69      0/1     CrashLoopBackOff   3 (35s ago)   81s
+meter-service-686c5dbfc7-mfvgw      0/1     CrashLoopBackOff   3 (31s ago)   81s

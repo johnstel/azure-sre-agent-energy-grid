@@ -1,0 +1,13 @@
+NAME                                READY   STATUS    RESTARTS        AGE     IP           NODE                               NOMINATED NODE   READINESS GATES
+asset-service-c744d6667-9qkj7       1/1     Running   0               3h7m    <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+asset-service-c744d6667-j8sjr       1/1     Running   0               7m19s   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+dispatch-service-5589cf949c-7f87d   1/1     Running   1 (6m30s ago)   7m19s   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+dispatch-service-5589cf949c-nm6l9   1/1     Running   0               7m18s   <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+grid-dashboard-66cb797c94-54qr6     1/1     Running   0               3h7m    <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+grid-dashboard-66cb797c94-kkksl     1/1     Running   0               3h7m    <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+load-simulator-57fc84dfdf-fv5td     1/1     Running   0               3h4m    <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+meter-service-5b8f45f67f-6z4l9      1/1     Running   0               17s     <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+meter-service-5b8f45f67f-ql4xk      1/1     Running   0               27s     <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+mongodb-d948b8585-8hh27             1/1     Running   0               3h4m    <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+ops-console-558566cf95-nsqsc        1/1     Running   0               3h7m    <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>
+rabbitmq-79d58d7457-jfjnj           1/1     Running   0               3h4m    <REDACTED_IP>   <REDACTED_NODE>   <none>           <none>

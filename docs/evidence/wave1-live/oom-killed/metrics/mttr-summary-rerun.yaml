@@ -1,0 +1,53 @@
+# Wave 1 OOMKilled Scenario - MTTR Summary (RERUN)
+# Container Insights Pre-flight: PASS
+# Execution Date: 2026-04-26
+
+scenario: oom-killed
+execution_type: rerun
+reason: Original run occurred during Container Insights ingestion gap
+
+timeline:
+  t0_baseline: "2026-04-26T03:41:03Z"
+  t1_inject: "2026-04-26T03:41:04Z"
+  t2_detect: "2026-04-26T03:42:27Z"
+  t3_diagnose: "2026-04-26T03:42:29Z"
+  t4_fix: "2026-04-26T03:42:45Z"
+  t5_verify: "2026-04-26T03:43:31Z"
+
+durations:
+  detection_seconds: 83    # T1 → T2
+  diagnosis_seconds: 18    # T2 → T4
+  recovery_seconds: 46     # T4 → T5
+  total_mttr_seconds: 147  # T1 → T5
+
+observations:
+  t0: "All 12 pods Running, meter-service healthy with 256Mi memory"
+  t1: "Applied oom-killed.yaml (16Mi memory limit)"
+  t2: "Both meter-service pods CrashLoopBackOff with 3 restarts"
+  t3: "kubectl describe confirmed OOMKilled reason, 16Mi limit, 3 restart count"
+  t4: "Restored baseline (256Mi memory)"
+  t5: "Both meter-service pods Running and Ready"
+
+evidence_files:
+  - kubectl-output-rerun/T0-baseline-pods.txt
+  - kubectl-output-rerun/T0-baseline-events.txt
+  - kubectl-output-rerun/T1-scenario-applied.txt
+  - kubectl-output-rerun/T2-meter-status.txt
+  - kubectl-output-rerun/T2-oomkilled-events.txt
+  - kubectl-output-rerun/T3-describe-pod.txt
+  - kubectl-output-rerun/T3-previous-logs.txt
+  - kubectl-output-rerun/T5-recovery-pods.txt
+  - kubectl-output-rerun/T5-post-recovery-events.txt
+
+verdict:
+  mttr_threshold_seconds: 900
+  mttr_result: PASS
+  mttr_actual: 147
+  mttr_margin: 753  # How much under threshold
+
+notes:
+  - "Pre-flight Container Insights check: PASS (72 Running pods at 03:39:46Z)"
+  - "Scenario applied after confirming active 'energy' namespace telemetry"
+  - "OOMKilled events visible in pod describe output"
+  - "Recovery clean - no residual CrashLoopBackOff"
+  - "Next: Wait 15 minutes for Container Insights ingestion of this run"

@@ -1,0 +1,148 @@
+// =============================================================================
+// SRE Agent Operational Telemetry (SCHEMA_TBD)
+// =============================================================================
+// Purpose: Query SRE Agent App Insights telemetry for conversations, actions, errors
+// Use case: Audit agent behavior, troubleshoot agent issues, measure diagnosis time (T2→T3)
+// Time range: Configurable via TimeRange parameter (default: last 24 hours)
+// Parameters:
+//   - TimeRange: Time window for analysis (default: 24h)
+//   - timeBin: Time bucket granularity for trending (default: 15m)
+//
+// ⚠️ SCHEMA_TBD — Azure SRE Agent Preview (2025-05-01-preview)
+//
+// WARNING: This query references SRE Agent App Insights telemetry fields that are
+// subject to change during Public Preview. Field names, dimensions, and schema may
+// change without notice before GA.
+//
+// PHYSICAL SEPARATION: This query lives under docs/evidence/kql/schema-tbd/ to
+// isolate Preview-dependent queries from stable Container Insights/Activity Log queries.
+// Per Security SR-2, stable queries must not reference SCHEMA_TBD fields.
+//
+// Known TBD fields (observed in 2025-05-01-preview, subject to change):
+//   - customDimensions["sre.agent.conversationId"]
+//   - customDimensions["sre.agent.action"]
+//   - customDimensions["sre.agent.recommendation"]
+//   - operation_Name (may contain agent-specific operation types)
+//   - dependency telemetry (how agent queries Log Analytics, ARM, etc.)
+//
+// Required projected columns: TimeBucket, ResourceId, CorrelationId (per Security MF-3)
+//
+// For contract details, see: docs/CAPABILITY-CONTRACTS.md §8 (SCHEMA_TBD Rule)
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARAMETERS — Modify before running
+// ─────────────────────────────────────────────────────────────────────────────
+let TimeRange = 24h;           // Parameter: Time window
+let timeBin = 15m;             // Parameter: Time bucket granularity for trending
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUERY LOGIC — SCHEMA_TBD
+// ─────────────────────────────────────────────────────────────────────────────
+
+// SCHEMA_TBD — Conversation traces (if agent emits custom dimensions)
+traces
+| where timestamp > ago(TimeRange)
+| where cloud_RoleName contains "sre-agent" or customDimensions has "sre.agent"
+| extend
+    // SCHEMA_TBD — Field names are subject to change
+    ConversationId = tostring(customDimensions["sre.agent.conversationId"]),
+    Action = tostring(customDimensions["sre.agent.action"]),
+    Recommendation = tostring(customDimensions["sre.agent.recommendation"]),
+    // Security MF-3 required columns
+    TimeBucket = bin(timestamp, timeBin),
+    ResourceId = column_ifexists("_ResourceId", ""),  // App Insights app resource ID
+    CorrelationId = column_ifexists("operation_Id", "")  // App Insights operation correlation
+| project
+    TimeBucket,
+    timestamp,
+    message,
+    severityLevel,
+    ConversationId,
+    Action,
+    Recommendation,
+    ResourceId,
+    CorrelationId,
+    customDimensions
+| order by timestamp desc
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ADDITIONAL QUERIES (Commented — Uncomment after schema verification)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// SCHEMA_TBD — Dependency calls from SRE Agent to Log Analytics, ARM, etc.
+// dependencies
+// | where timestamp > ago(TimeRange)
+// | where cloud_RoleName contains "sre-agent"
+// | extend
+//     TargetService = tostring(target),
+//     DependencyType = tostring(type),
+//     Duration = duration,
+//     TimeBucket = bin(timestamp, timeBin),
+//     ResourceId = column_ifexists("_ResourceId", ""),
+//     CorrelationId = column_ifexists("operation_Id", "")
+// | project
+//     TimeBucket,
+//     timestamp,
+//     name,
+//     TargetService,
+//     DependencyType,
+//     Duration,
+//     success,
+//     resultCode,
+//     ResourceId,
+//     CorrelationId
+// | order by timestamp desc
+
+// SCHEMA_TBD — Exceptions and errors
+// exceptions
+// | where timestamp > ago(TimeRange)
+// | where cloud_RoleName contains "sre-agent"
+// | extend
+//     TimeBucket = bin(timestamp, timeBin),
+//     ResourceId = column_ifexists("_ResourceId", ""),
+//     CorrelationId = column_ifexists("operation_Id", "")
+// | project
+//     TimeBucket,
+//     timestamp,
+//     type,
+//     outerMessage,
+//     problemId,
+//     ResourceId,
+//     CorrelationId,
+//     customDimensions
+// | order by timestamp desc
+
+// =============================================================================
+// Wave 1 UAT Verification Plan
+// =============================================================================
+//
+// BEFORE SRE Agent is deployed:
+// - This query will return no results (App Insights has no agent telemetry yet)
+// - UAT step: Verify query syntax is valid (no parsing errors)
+//
+// AFTER SRE Agent is deployed (with appInsightsConnectionString configured):
+// 1. Deploy infrastructure with deploySreAgent = true
+// 2. Open SRE Agent portal and submit a test prompt (e.g., "Show me pods in energy namespace")
+// 3. Wait 2-5 minutes for telemetry ingestion
+// 4. Run this query in Log Analytics workspace
+// 5. Expected results:
+//    - traces table has entries with cloud_RoleName or customDimensions related to SRE Agent
+//    - TimeBucket, ResourceId, CorrelationId columns are populated (per Security MF-3)
+//    - If no results, check App Insights connection in sre-agent.bicep deployment
+//    - If results appear but field names differ, update SCHEMA_TBD comments
+//
+// 6. Document observed field names in docs/evidence/kql/README.md with:
+//    - API version: 2025-05-01-preview
+//    - Date observed: YYYY-MM-DD
+//    - Field name: customDimensions["actual.field.name"]
+//    - Purpose: what the field represents
+//
+// 7. Tag any new queries using these fields with // SCHEMA_TBD comments
+//
+// KNOWN LIMITATIONS:
+// - SRE Agent conversation history retention: Unknown (Preview service)
+// - App Insights sampling: May impact telemetry volume at high scale
+// - Cross-region latency: telemetry may take 2-10 minutes to appear
+//
+// =============================================================================

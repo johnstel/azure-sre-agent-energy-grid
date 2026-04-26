@@ -1,0 +1,44 @@
+flowchart TB
+    subgraph profiles["Azure SRE Agent access profiles"]
+        readonly["review-readonly\nmode: Review\naccessLevel: Low"]
+        remediate["review-remediate\nmode: Review\naccessLevel: High\ncurrent demo default"]
+        auto["auto-remediate\nmode: Auto\nout of Wave 1 scope"]
+    end
+
+    subgraph permissions["Permission envelope"]
+        reader["Reader\nResource metadata"]
+        logs["Log Analytics Reader\nQuery evidence"]
+        contributor["Contributor\nResource-group writes"]
+        kubeDemo["AKS cluster admin roles\nDEMO ONLY script fallback"]
+    end
+
+    subgraph controls["Customer-facing control model"]
+        diagnose["Diagnose and hypothesize"]
+        recommend["Recommend remediation"]
+        human["Human approval / operator action"]
+        noAuto["No autonomous remediation claim in Wave 1"]
+    end
+
+    readonly --> reader
+    readonly --> logs
+    readonly --> diagnose
+
+    remediate --> reader
+    remediate --> logs
+    remediate --> contributor
+    remediate -. "demo convenience only" .-> kubeDemo
+    remediate --> diagnose
+    remediate --> recommend
+    recommend --> human
+
+    auto -. "requires separate security gate" .-> noAuto
+
+    classDef safe fill:#dcfce7,stroke:#166534,color:#111827
+    classDef caution fill:#fef3c7,stroke:#92400e,color:#111827
+    classDef blocked fill:#fee2e2,stroke:#991b1b,color:#111827
+    classDef control fill:#dbeafe,stroke:#1d4ed8,color:#111827
+
+    class readonly,reader,logs,diagnose safe
+    class remediate,contributor,kubeDemo,recommend,human caution
+    class auto,noAuto blocked
+    class controls control

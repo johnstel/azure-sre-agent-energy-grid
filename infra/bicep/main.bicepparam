@@ -11,8 +11,8 @@ using 'main.bicep'
 // Observability stack (Grafana + Prometheus)
 param deployObservability = true
 
-// Baseline alert rules
-param deployAlerts = false
+// Baseline alert rules (Wave 1: enabled for demo)
+param deployAlerts = true
 
 // Deploy Azure SRE Agent (programmatic deployment now supported)
 param deploySreAgent = true

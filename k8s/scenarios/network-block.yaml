@@ -4,8 +4,9 @@
 # A security policy update gone wrong isolates the meter-service from the
 # grid, blocking all ingress and egress traffic.
 #
-# SRE Agent can diagnose: Network connectivity issues, service unavailable,
-# recommend checking network policies and firewall rules.
+# Scenario is intended to test whether SRE Agent can diagnose: Network
+# connectivity issues and service unavailability, and recommend checking network
+# policies and firewall rules.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/network-block.yaml
@@ -22,6 +23,15 @@ metadata:
   labels:
     scenario: network-block
     sre-demo: breakable
+  annotations:
+    sre.scenario: network-block
+    sre.service: meter-service
+    sre.namespace: energy
+    sre.component: network-policy
+    sre.runbook_id: RB-007-network-block
+    sre.root_cause_category: networking
+    sre.change_source: manual-kubectl
+    sre.version: "2026-04-25"
 spec:
   podSelector:
     matchLabels:
