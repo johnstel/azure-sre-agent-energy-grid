@@ -28,6 +28,10 @@
 
 ## Learnings
 
+### 2026-04-26: Issue #4 maxPods maintenance runbook QA
+- Durable operator docs for maxPods drift should explicitly encode Dallas's defer-with-issue gate: no live remediation outside the maintenance window, capacity-positive migration, and temporary scale-out only if pod-density pressure returns first.
+- Do not promote temporary `plan/` artifacts into durable docs unless approved; the runbook should stand alone and reference the issue plus source files instead.
+
 ### 2026-04-26: Issue #3 AKS maxPods QA Review
 - Treat AKS `maxPods` as node-pool immutable like VM size: QA approval requires proof that `deploy.ps1` preserves existing pool values for both `-WhatIf` and deployment before raising new-cluster defaults.
 - Pending Defender, Retina, AMA, or similar `kube-system` pods are degraded security/observability coverage; live remediation pass requires no Pending pods plus full Defender/Retina readiness and healthy `energy` workloads.

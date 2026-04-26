@@ -700,3 +700,5 @@ Cluster `aks-gridmon-dev` was in **STOPPED** power state, preventing all Contain
 **Azure CNI default maxPods=30 is too tight for this demo stack:** With Defender, Retina, AMA, CSI, Azure Policy, Gatekeeper, Calico, and app workloads, 30 pods per node leaves little room for add-on churn. New clusters should set explicit higher maxPods, while existing pools must preserve immutable maxPods to avoid deployment failures.
 
 **Security posture must be preserved during headroom fixes:** Do not disable Defender, Retina, monitoring, admission/security policies, resource requests/limits, affinity, or tolerations to make scheduling green. Do not delete pods blindly; capture before/after Pending pods, describe events, node allocatable/requested capacity, node pool SKU/count/maxPods, kube-system DaemonSet readiness, and `energy` workload health.
+
+**Immutable maxPods drift requires maintenance, not redeploy:** AKS node pool `maxPods` cannot be changed in place. For existing demo-prod pools, use a maintenance-window blue/green node pool replacement with temporary capacity and subnet/IP preflight, then verify canonical pool names return with the desired maxPods.
