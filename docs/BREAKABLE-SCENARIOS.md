@@ -453,10 +453,11 @@ kubectl apply -f k8s/base/application.yaml
 
 ### Quick Demo (5 minutes)
 
-1. Apply OOMKilled scenario (meter service memory exhaustion)
-2. Show pods crashing in kubectl
-3. Ask SRE Agent to diagnose
-4. Apply fix and show recovery
+1. Apply MongoDBDown scenario — `kubectl apply -f k8s/scenarios/mongodb-down.yaml`
+2. Show the cascade: MongoDB at 0 replicas → dispatch-service fails → meter events queue in RabbitMQ
+3. Ask SRE Agent: "Smart meter data isn't being processed — what's wrong?"
+4. Highlight: SRE Agent traces the dependency chain to MongoDB as root cause
+5. Fix: `kubectl apply -f k8s/base/application.yaml`
 
 ### Comprehensive Demo (20 minutes)
 
