@@ -490,6 +490,30 @@ function toInventoryPodSummary(pod: Pod): InventoryPodSummary {
   };
 }
 
+function isDeploymentCurrentlyHealthy(
+  deployment: Deployment,
+  pods: InventoryPodSummary[],
+  endpointReadiness: ServiceEndpointSummary[],
+): boolean {
+  const desired = deployment.desiredReplicas;
+  const readyPods = pods.filter((pod) => pod.ready).length;
+  const runningPods = pods.filter((pod) => pod.phase === 'Running').length;
+  const restarts = pods.reduce((sum, pod) => sum + pod.restarts, 0);
+  const warningReason = pods.map((pod) => pod.reason).find((reason) => reason && isWarningReason(reason));
+  const notReadyService = endpointReadiness.find((endpoint) => endpoint.notReady > 0);
+
+  return (
+    desired > 0 &&
+    pods.length > 0 &&
+    readyPods === desired &&
+    runningPods === desired &&
+    deployment.availableReplicas === desired &&
+    restarts === 0 &&
+    !warningReason &&
+    !notReadyService
+  );
+}
+
 function classifyDeployment(
   deployment: Deployment,
   pods: InventoryPodSummary[],
@@ -535,7 +559,7 @@ function classifyDeployment(
     return { severity: 'warning', reason: `${restarts} container restart(s)` };
   }
 
-  if (warningEvent) {
+  if (warningEvent && !isDeploymentCurrentlyHealthy(deployment, pods, endpointReadiness)) {
     return { severity: 'warning', reason: warningEvent.reason || 'Recent Kubernetes warning event' };
   }
 

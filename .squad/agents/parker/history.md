@@ -908,3 +908,20 @@ Used `"alert.scenarios": "oom-killed,crash-loop"` comma-separated format for mul
 **Validation**: ✅ `npm run build` and `npm run lint` both passed.
 
 **Learning**: Vue's class binding syntax `[arrayClass, { conditional }]` cleanly handles multiple severity states + selection state without redundant DOM checks. Existing `selected` state reused for pod highlighting instead of introducing new `selectedPod` ref.
+
+### 2026-04-26: Mission Control Deployment Classification — Historical Events Should Not Mark Healthy Deployments as Degraded
+
+**Problem:** `classifyDeployment()` in `mission-control/backend/src/services/KubeClient.ts` was marking services as `warning` severity due to historical Kubernetes warning events (e.g., `FailedCreatePodSandBox`, `Unhealthy`, `FailedMount`) even when all pods were Running/Ready, desired replicas were met, restarts were zero, and endpoints were ready.
+
+**Root Cause:** Line 538-540 returned `warning` if any `warningEvent` existed, without checking whether the deployment was currently healthy. These were resolved startup events that no longer applied.
+
+**Fix:**
+- Added `isDeploymentCurrentlyHealthy()` helper that validates: desired > 0, all pods present, readyPods === desired, runningPods === desired, availableReplicas === desired, restarts === 0, no warning pod reasons, no not-ready service endpoints
+- Modified line 538 to only apply warning event severity when deployment is NOT currently healthy: `if (warningEvent && !isDeploymentCurrentlyHealthy(...))`
+- Preserved all real degraded signals: missing pods, insufficient replicas, critical/warning pod reasons, empty/not-ready service endpoints, container restarts
+
+**Result:** Historical warning events remain visible in `recentEvents[]` but no longer drive severity to `warning` when the deployment is fully operational.
+
+**Validation:** ✅ Build passed, ✅ Lint passed
+
+**Learning:** When classifying deployment health, only current operational state should drive severity. Historical events are valuable context but should not override "all pods ready, all endpoints ready, zero restarts" evidence.
