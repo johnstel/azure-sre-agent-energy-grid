@@ -1,5 +1,5 @@
 <template>
-  <section class="portal-validation">
+  <section id="portal-validation" class="portal-validation">
     <div class="portal-validation__heading">
       <div class="portal-validation__heading-content">
         <p class="wallboard-kicker wallboard-kicker--urgent">Required before customer demo</p>

@@ -21,7 +21,7 @@
         <button
           class="command-button command-button--neutral"
           type="button"
-          aria-controls="wallboard-control-dock"
+          aria-controls="wallboard-control-dock portal-validation"
           :aria-expanded="controlPanelOpen"
           @click="controlPanelOpen = !controlPanelOpen"
         >
@@ -136,7 +136,7 @@
       </div>
     </div>
 
-    <PortalValidation />
+    <PortalValidation v-if="controlPanelOpen" />
 
     <div class="wallboard__main">
       <section class="inventory-panel" aria-labelledby="inventory-heading">
