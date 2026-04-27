@@ -301,7 +301,13 @@
         </span>
       </div>
 
-      <div class="analyst-transcript" role="log" aria-live="polite" aria-label="Local Analyst conversation transcript">
+      <div
+        ref="analystTranscriptRef"
+        class="analyst-transcript"
+        role="log"
+        aria-label="Local Analyst conversation transcript"
+        tabindex="0"
+      >
         <div v-if="analystTranscript.length === 0" class="analyst-empty">
           Ask about pod health, active scenarios, preflight blockers, or which incident to inspect first.
         </div>
@@ -551,6 +557,7 @@ const analystError = ref('');
 const analystLoading = ref(false);
 const analystInputRef = ref<HTMLTextAreaElement | null>(null);
 const analystDrawerRef = ref<HTMLElement | null>(null);
+const analystTranscriptRef = ref<HTMLElement | null>(null);
 let analystMessageId = 0;
 let analystOpener: HTMLElement | null = null;
 
@@ -879,12 +886,14 @@ async function askAnalyst() {
   analystLoading.value = true;
   analystError.value = '';
   analystOpen.value = true;
+  const shouldFollowTranscript = isAnalystTranscriptNearBottom();
   analystTranscript.value.push({
     id: ++analystMessageId,
     role: 'user',
     content: question,
     createdAt: new Date().toISOString(),
   });
+  scrollAnalystTranscriptToLatest(shouldFollowTranscript);
   analystQuestion.value = '';
   try {
     const response = await askAssistant(question, history, buildAnalystClientContext());
@@ -895,6 +904,7 @@ async function askAnalyst() {
       createdAt: response.metadata.timestamp,
       metadata: response.metadata,
     });
+    scrollAnalystTranscriptToLatest(shouldFollowTranscript);
   } catch (error) {
     analystError.value = `Explain This State unavailable: ${error instanceof Error ? error.message : String(error)}`;
     analystTranscript.value.push({
@@ -903,9 +913,27 @@ async function askAnalyst() {
       content: analystError.value,
       createdAt: new Date().toISOString(),
     });
+    scrollAnalystTranscriptToLatest(shouldFollowTranscript);
   } finally {
     analystLoading.value = false;
+    // Re-check after the loading placeholder unmounts so the final scroll height is accurate.
+    scrollAnalystTranscriptToLatest(shouldFollowTranscript);
   }
+}
+
+function isAnalystTranscriptNearBottom() {
+  const transcript = analystTranscriptRef.value;
+  if (!transcript) return true;
+  const distanceFromBottom = transcript.scrollHeight - transcript.scrollTop - transcript.clientHeight;
+  return distanceFromBottom <= 96;
+}
+
+function scrollAnalystTranscriptToLatest(shouldScroll = isAnalystTranscriptNearBottom()) {
+  void nextTick(() => {
+    const transcript = analystTranscriptRef.value;
+    if (!transcript || !shouldScroll) return;
+    transcript.scrollTop = transcript.scrollHeight;
+  });
 }
 
 async function openAnalyst(event?: MouseEvent) {
@@ -1855,8 +1883,10 @@ defineExpose({
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 0.8rem;
+  min-height: 0;
   width: clamp(360px, 25vw, 520px);
   max-width: calc(100vw - 1rem);
+  overflow: hidden;
   border-left: 1px solid rgb(34 211 238 / 0.32);
   background:
     linear-gradient(180deg, rgb(15 23 42 / 0.98), rgb(2 6 23 / 0.98)),
@@ -1894,12 +1924,21 @@ defineExpose({
 }
 
 .analyst-transcript {
+  min-width: 0;
+  min-height: 0;
   border: 1px solid rgb(51 65 85 / 0.76);
   border-radius: var(--radius-sm);
   background: rgb(2 6 23 / 0.5);
   padding: 0.75rem;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+
+.analyst-transcript:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .analyst-empty {
@@ -1913,11 +1952,13 @@ defineExpose({
 .analyst-message {
   display: grid;
   gap: 0.38rem;
+  min-width: 0;
   margin-bottom: 0.75rem;
   border: 1px solid rgb(148 163 184 / 0.16);
   border-radius: var(--radius-sm);
   padding: 0.75rem;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .analyst-message--user {
@@ -1935,6 +1976,7 @@ defineExpose({
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  min-width: 0;
   color: var(--muted);
   font-size: 0.82rem;
 }
@@ -1944,16 +1986,23 @@ defineExpose({
 }
 
 .analyst-message p {
+  min-width: 0;
+  margin: 0;
   color: var(--text);
   font-size: 0.98rem;
   line-height: 1.48;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .analyst-message__sources {
+  min-width: 0;
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .analyst-composer {
