@@ -68,6 +68,7 @@ Write-Host @"
 
 $totalChecks = 0
 $passedChecks = 0
+$maxPodsDriftWarnings = 0
 
 # =============================================================================
 # AZURE RESOURCE CHECKS
@@ -173,6 +174,52 @@ $healthyNodes = ($nodes.items | Where-Object {
 $totalNodes = $nodes.items.Count
 if (Write-Check "All nodes are Ready" ($healthyNodes -eq $totalNodes) "$healthyNodes/$totalNodes nodes ready") {
     $passedChecks++
+}
+
+# =============================================================================
+# NODE POOL MAXPODS CHECK
+# =============================================================================
+Write-Section "Node Pool maxPods Configuration"
+
+if ($aksName) {
+    $nodePools = az aks nodepool list --resource-group $ResourceGroupName --cluster-name $aksName --output json 2>$null | ConvertFrom-Json
+    if ($nodePools -and $nodePools.Count -gt 0) {
+        Write-Host "`n  Node Pool maxPods (target: 50 after maintenance window):" -ForegroundColor White
+        $allAtTarget = $true
+        foreach ($pool in $nodePools) {
+            $poolName = $pool.name
+            $poolMode = $pool.mode
+            $poolMaxPods = $pool.maxPods
+            $atTarget = $poolMaxPods -ge 50
+            $icon = if ($atTarget) { "✅" } else { "⚠️ " }
+            $color = if ($atTarget) { "Green" } else { "Yellow" }
+            Write-Host "    $icon $poolName  mode=$poolMode  maxPods=$poolMaxPods" -ForegroundColor $color
+            if (-not $atTarget) {
+                $allAtTarget = $false
+                $maxPodsDriftWarnings++
+            }
+        }
+
+        $totalChecks++
+        if ($allAtTarget) {
+            if (Write-Check "All node pools maxPods >= 50" $true) {
+                $passedChecks++
+            }
+        }
+        else {
+            # Warning-only: drift is expected on clusters not yet through maintenance window
+            Write-Host "  ⚠️  One or more node pools still have maxPods < 50." -ForegroundColor Yellow
+            Write-Host "     Run the maintenance-window procedure in docs/AKS-MAXPODS-MAINTENANCE-RUNBOOK.md" -ForegroundColor Gray
+            # Count as passed so this does not block overall validation
+            $passedChecks++
+        }
+    }
+    else {
+        Write-Host "  ℹ️  Could not retrieve node pool list" -ForegroundColor Gray
+    }
+}
+else {
+    Write-Host "  ℹ️  Skipped (AKS cluster not found)" -ForegroundColor Gray
 }
 
 # =============================================================================
@@ -301,11 +348,78 @@ else {
 }
 
 # =============================================================================
+# SECURITY AND OBSERVABILITY ADD-ONS (kube-system)
+# =============================================================================
+Write-Section "Security and Observability Add-ons (kube-system)"
+Write-Host "  Note: All add-ons must be Ready before any node pool maintenance begins." -ForegroundColor Gray
+
+# Microsoft Defender
+$defenderDs = kubectl get daemonset -n kube-system -l "app=microsoft-defender-collector-ds" -o json 2>$null | ConvertFrom-Json
+if (-not $defenderDs -or $defenderDs.items.Count -eq 0) {
+    $defenderDs = kubectl get daemonset -n kube-system -l "app=microsoft-defender-publisher-ds" -o json 2>$null | ConvertFrom-Json
+}
+if ($defenderDs -and $defenderDs.items.Count -gt 0) {
+    foreach ($ds in $defenderDs.items) {
+        $desired = $ds.status.desiredNumberScheduled
+        $ready = $ds.status.numberReady
+        $totalChecks++
+        if (Write-Check "Defender DaemonSet '$($ds.metadata.name)' Ready" ($ready -eq $desired) "$ready/$desired pods") {
+            $passedChecks++
+        }
+    }
+}
+else {
+    Write-Host "  ℹ️  Microsoft Defender not detected (may not be installed)" -ForegroundColor Gray
+}
+
+# Retina
+$retinaDs = kubectl get daemonset -n kube-system -l "k8s-app=retina" -o json 2>$null | ConvertFrom-Json
+if (-not $retinaDs -or $retinaDs.items.Count -eq 0) {
+    $retinaDs = kubectl get daemonset -n kube-system -l "app=retina" -o json 2>$null | ConvertFrom-Json
+}
+if ($retinaDs -and $retinaDs.items.Count -gt 0) {
+    foreach ($ds in $retinaDs.items) {
+        $desired = $ds.status.desiredNumberScheduled
+        $ready = $ds.status.numberReady
+        $totalChecks++
+        if (Write-Check "Retina DaemonSet '$($ds.metadata.name)' Ready" ($ready -eq $desired) "$ready/$desired pods") {
+            $passedChecks++
+        }
+    }
+}
+else {
+    Write-Host "  ℹ️  Retina not detected (may not be installed)" -ForegroundColor Gray
+}
+
+# Azure Monitor Agent (DaemonSet)
+$amaDs = kubectl get daemonset -n kube-system -l "app=ama-logs" -o json 2>$null | ConvertFrom-Json
+if (-not $amaDs -or $amaDs.items.Count -eq 0) {
+    $amaDs = kubectl get daemonset -n kube-system -l "component=oms-agent" -o json 2>$null | ConvertFrom-Json
+}
+if ($amaDs -and $amaDs.items.Count -gt 0) {
+    foreach ($ds in $amaDs.items) {
+        $desired = $ds.status.desiredNumberScheduled
+        $ready = $ds.status.numberReady
+        $totalChecks++
+        if (Write-Check "Azure Monitor Agent DaemonSet '$($ds.metadata.name)' Ready" ($ready -eq $desired) "$ready/$desired pods") {
+            $passedChecks++
+        }
+    }
+}
+else {
+    Write-Host "  ℹ️  Azure Monitor Agent DaemonSet not detected (may not be installed)" -ForegroundColor Gray
+}
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 Write-Host "`n"
 Write-Host "══════════════════════════════════════════════════════════════" -ForegroundColor $(if ($passedChecks -eq $totalChecks) { "Green" } else { "Yellow" })
 Write-Host "  VALIDATION SUMMARY: $passedChecks/$totalChecks checks passed" -ForegroundColor $(if ($passedChecks -eq $totalChecks) { "Green" } else { "Yellow" })
+if ($maxPodsDriftWarnings -gt 0) {
+    Write-Host "  ⚠️  maxPods drift warnings: $maxPodsDriftWarnings pool(s) still at maxPods < 50" -ForegroundColor Yellow
+    Write-Host "     See docs/AKS-MAXPODS-MAINTENANCE-RUNBOOK.md to schedule remediation." -ForegroundColor Gray
+}
 Write-Host "══════════════════════════════════════════════════════════════" -ForegroundColor $(if ($passedChecks -eq $totalChecks) { "Green" } else { "Yellow" })
 
 if ($passedChecks -eq $totalChecks) {
