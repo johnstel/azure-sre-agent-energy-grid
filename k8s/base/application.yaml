@@ -896,6 +896,21 @@ data:
       .drawer-prompt-preview { margin-top: .4rem; }
       .drawer-prompt-preview summary { cursor: pointer; color: var(--muted); font-size: .78rem; }
       .drawer-prompt-preview pre { margin: .3rem 0 0; padding: .45rem .6rem; background: rgba(15,23,42,.85); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 9rem; overflow-y: auto; }
+      /* === #24 Event strip === */
+      .map-event-strip { margin-top: .85rem; border: 1px solid rgba(148,163,184,.35); border-radius: 10px; background: rgba(15,23,42,.78); padding: .75rem .85rem; }
+      .map-event-strip-header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+      .map-event-strip-title { color: var(--text); font-size: .8rem; letter-spacing: .07em; text-transform: uppercase; margin: 0; }
+      .map-event-strip-status { color: var(--muted); font-size: .76rem; border: 1px solid #475569; border-radius: 999px; padding: .18rem .55rem; }
+      .map-event-empty { color: var(--muted); font-size: .82rem; line-height: 1.45; margin-top: .55rem; }
+      .map-event-list { list-style: none; display: flex; gap: .65rem; overflow-x: auto; margin-top: .65rem; padding-bottom: .2rem; }
+      .map-event-list[hidden] { display: none; }
+      .map-event-item { flex: 0 0 min(320px, 82vw); }
+      .map-event-button, .map-event-static { width: 100%; min-height: 4.8rem; text-align: left; border: 1px solid #334155; border-radius: 8px; background: rgba(30,41,59,.82); color: var(--text); padding: .55rem .65rem; font: inherit; }
+      .map-event-button { cursor: pointer; }
+      .map-event-button:hover, .map-event-button:focus-visible { border-color: var(--cyan); outline: 2px solid rgba(34,211,238,.75); outline-offset: 2px; }
+      .map-event-meta { display: flex; gap: .45rem; align-items: center; color: var(--muted); font-size: .75rem; margin-bottom: .25rem; }
+      .map-event-object { color: var(--text); font-weight: 700; }
+      .map-event-message { color: #cbd5e1; font-size: .8rem; line-height: 1.35; display: block; margin-top: .25rem; }
       @keyframes skeleton-pulse { 0%,100% { opacity: .55; } 50% { opacity: .22; } }
       .skeleton { background: #334155; border-radius: 4px; animation: skeleton-pulse 1.4s ease-in-out infinite; height: .85em; margin-bottom: .3rem; display: block; }
       .skeleton.short { width: 52%; }
@@ -1035,10 +1050,20 @@ data:
                 </div>
                 <div id="drawer-body"></div>
                 <div class="drawer-citation" id="drawer-citation"></div>
-              </aside>
-           </div>
-         </div>
-       </section>
+               </aside>
+            </div>
+            <section class="map-event-strip" aria-labelledby="map-event-strip-title">
+              <div class="map-event-strip-header">
+                <h3 id="map-event-strip-title" class="map-event-strip-title">Recent demo events</h3>
+                <span id="map-event-strip-status" class="map-event-strip-status">V1 unavailable</span>
+              </div>
+              <div id="map-event-empty" class="map-event-empty" role="status" aria-live="polite">
+                Event data is not exposed by the V1 cloud demo data contract. This strip does not read Kubernetes events, SCADA, or real grid telemetry.
+              </div>
+              <ul id="map-event-list" class="map-event-list" aria-label="Most recent cloud demo events" hidden></ul>
+            </section>
+          </div>
+        </section>
      </main>
     <div class="footer">Contoso Energy &mdash; Grid Operations Console &mdash; Azure SRE Agent Demo Lab</div>
 
@@ -1086,8 +1111,10 @@ data:
       const LIVE_HEALTH_TIMEOUT_MS = 3000;
       const MAP_HEALTH_POLL_MS = 30000;
       const STALE_AFTER_MS = 60000;
+      const MAX_EVENT_STRIP_ITEMS = 5;
+      const EVENT_MESSAGE_LIMIT = 120;
       const SEVERITY_RANK = { healthy: 0, warning: 1, critical: 2 };
-       const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0, dragMoved: false, healthById: {}, lastSuccessfulHealthPoll: null, healthPollInFlight: false, selectedNodeId: null, selectedEdgeKey: null, activeFilter: 'all' };
+       const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0, dragMoved: false, healthById: {}, lastSuccessfulHealthPoll: null, healthPollInFlight: false, selectedNodeId: null, selectedEdgeKey: null, activeFilter: 'all', events: [], eventDataAvailable: false };
      var _drawerLastFocus = null;
      var _drawerLastFocusNodeId = null;
 
@@ -1308,11 +1335,12 @@ data:
           })
          .finally(() => {
            mapState.healthPollInFlight = false;
-           renderHealthGrid();
-           updateMapHealthBanner();
-           refreshGridMapAfterHealthChange();
-           updateFilterBadges();
-         });
+            renderHealthGrid();
+            updateMapHealthBanner();
+            refreshGridMapAfterHealthChange();
+            renderEventStrip();
+            updateFilterBadges();
+          });
        }
 
      function createSvgElement(name, attrs) {
@@ -1357,11 +1385,62 @@ data:
        if (!ts) return 'unknown time';
        return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
      }
-     function citationTimestamp() {
-       var ts = mapState.lastSuccessfulHealthPoll;
-       return ts ? fmtTime(ts) : 'session start';
-     }
-     function buildNodeBody(node) {
+      function citationTimestamp() {
+        var ts = mapState.lastSuccessfulHealthPoll;
+        return ts ? fmtTime(ts) : 'session start';
+      }
+      function truncateEventMessage(message) {
+        var text = message ? String(message) : '';
+        return text.length > EVENT_MESSAGE_LIMIT ? text.slice(0, EVENT_MESSAGE_LIMIT - 1) + '\u2026' : text;
+      }
+      function nodeIdForEvent(event) {
+        if (!event) return null;
+        if (event.nodeId && GRID_TOPOLOGY.nodes.some(function(node) { return node.id === event.nodeId; })) return event.nodeId;
+        var name = event.objectName || event.involvedObjectName || '';
+        var match = GRID_TOPOLOGY.nodes.find(function(node) { return node.id === name || node.resourceName === name || node.label === name; });
+        return match ? match.id : null;
+      }
+      function renderEventStrip() {
+        var statusEl = document.getElementById('map-event-strip-status');
+        var emptyEl = document.getElementById('map-event-empty');
+        var listEl = document.getElementById('map-event-list');
+        if (!statusEl || !emptyEl || !listEl) return;
+        var events = Array.isArray(mapState.events) ? mapState.events.slice(0, MAX_EVENT_STRIP_ITEMS) : [];
+        listEl.innerHTML = '';
+        if (!mapState.eventDataAvailable || events.length === 0) {
+          statusEl.textContent = 'V1 unavailable';
+          emptyEl.hidden = false;
+          emptyEl.textContent = 'Event data is not exposed by the V1 cloud demo data contract. This strip does not read Kubernetes events, SCADA, or real grid telemetry.';
+          listEl.hidden = true;
+          return;
+        }
+        statusEl.textContent = events.length + ' recent';
+        emptyEl.hidden = true;
+        listEl.hidden = false;
+        events.forEach(function(event) {
+          var nodeId = nodeIdForEvent(event);
+          var fullMessage = event.message ? String(event.message) : '';
+          var shortMessage = truncateEventMessage(fullMessage);
+          var severity = event.severity || 'unknown';
+          var icon = severity === 'critical' ? '\u2715' : severity === 'warning' ? '!' : '\u2022';
+          var objectName = event.objectName || event.involvedObjectName || nodeId || 'unknown object';
+          var reason = event.reason || 'event';
+          var content = '<span class="map-event-meta"><span>' + escHtml(fmtTime(event.timestamp)) + '</span><span aria-hidden="true">' + escHtml(icon) + '</span><span>' + escHtml(severity) + '</span></span>';
+          content += '<span class="map-event-object">' + escHtml(objectName) + ': ' + escHtml(reason) + '</span>';
+          content += '<span class="map-event-message" title="' + escHtml(fullMessage) + '">' + escHtml(shortMessage) + '</span>';
+          var li = document.createElement('li');
+          li.className = 'map-event-item';
+          if (nodeId) {
+            var a11yLabel = severity + ' event - ' + objectName + ': ' + reason + '. ' + (fullMessage || shortMessage) + '. Activate to select this node on the grid map.';
+            li.innerHTML = '<button type="button" class="map-event-button" data-node-id="' + escHtml(nodeId) + '" aria-label="' + escHtml(a11yLabel) + '">' + content + '</button>';
+          } else {
+            if (fullMessage.length > EVENT_MESSAGE_LIMIT) content += '<span class="sr-only"> Full message: ' + escHtml(fullMessage) + '</span>';
+            li.innerHTML = '<div class="map-event-static">' + content + '</div>';
+          }
+          listEl.appendChild(li);
+        });
+      }
+      function buildNodeBody(node) {
        var status = getMapStatus(node);
        var result = node.healthSource === 'live' ? (mapState.healthById[node.id] || null) : null;
        var html = '';
@@ -1492,7 +1571,7 @@ data:
        if (subtitleEl) subtitleEl.textContent = subtitleText || '';
        if (bodyEl) bodyEl.innerHTML = bodyHtml;
        if (citEl) citEl.textContent = citationText;
-       if (drawer.hidden) { _drawerLastFocus = document.activeElement; _drawerLastFocusNodeId = (document.activeElement && document.activeElement.dataset && document.activeElement.dataset.nodeId) ? document.activeElement.dataset.nodeId : null; }
+       if (drawer.hidden) { _drawerLastFocus = document.activeElement; _drawerLastFocusNodeId = (document.activeElement && document.activeElement.classList && document.activeElement.classList.contains('map-node') && document.activeElement.dataset && document.activeElement.dataset.nodeId) ? document.activeElement.dataset.nodeId : null; }
        drawer.hidden = false;
        var closeBtn = document.getElementById('drawer-close');
        if (closeBtn) closeBtn.focus();
@@ -1957,10 +2036,11 @@ data:
          url.hash = '';
          history.replaceState({ view: selected }, '', url);
        }
-       if (selected === 'map') {
-         renderGridMap();
-         window.setTimeout(fitGridMap, 0);
-         resetMapIdleTimer();
+        if (selected === 'map') {
+          renderGridMap();
+          renderEventStrip();
+          window.setTimeout(fitGridMap, 0);
+          resetMapIdleTimer();
        } else {
          if (_mapIdleTimer) { clearTimeout(_mapIdleTimer); _mapIdleTimer = null; }
        }
@@ -1997,9 +2077,16 @@ data:
        if (mapControls) { mapControls.addEventListener('click', resetMapIdleTimer); }
      }
 
-     function initViewToggle() {
-       initSeverityFilter();
-       document.querySelectorAll('[data-view-target]').forEach(button => {
+      function initViewToggle() {
+        initSeverityFilter();
+        var eventList = document.getElementById('map-event-list');
+        if (eventList) eventList.addEventListener('click', function(event) {
+          var target = event.target.closest ? event.target.closest('[data-node-id]') : null;
+          if (!target || !target.dataset.nodeId) return;
+          selectNode(target.dataset.nodeId);
+          resetMapIdleTimer();
+        });
+        document.querySelectorAll('[data-view-target]').forEach(button => {
          button.addEventListener('click', () => setConsoleView(button.dataset.viewTarget, true));
        });
        window.addEventListener('popstate', () => setConsoleView(initialViewFromLocation(), false));
@@ -2026,7 +2113,6 @@ data:
     </script>
     </body>
     </html>
-
 ---
 apiVersion: v1
 kind: ConfigMap

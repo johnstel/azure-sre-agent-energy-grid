@@ -37,6 +37,10 @@ The V1 cloud-demo data contract exposes **three live health endpoints** and **se
 nodes**. All health polling is done by `ops-console` nginx proxies — no browser JavaScript reads
 Kubernetes directly.
 
+The bottom event strip is present in V1 but shows a safe unavailable empty state because the V1
+contract does not expose Kubernetes event data. It must not show synthetic events or imply SCADA,
+utility telemetry, or real grid event visibility.
+
 ### Live health endpoints (can reflect scenario state changes)
 
 | Node | Endpoint | Healthy when | Failure signal |
@@ -599,6 +603,7 @@ Run the automated script:
 - [ ] The health banner has `role="status"` and `aria-live="polite"`
 - [ ] The map disclaimer has `role="note"`
 - [ ] The selection status region (for screen readers) has `role="status"` and `aria-live="polite"`
+- [ ] The event strip empty-state message has `role="status"` and `aria-live="polite"`
 - [ ] Filter buttons have `aria-pressed` set correctly (true when active, false otherwise)
 - [ ] When a node is selected, its `aria-label` includes ", selected"
 - [ ] The detail drawer close button has `aria-label="Close detail panel"` or equivalent
@@ -642,6 +647,7 @@ exists.
 Additionally, the following node states are not fully observable in V1 by design:
 - **MongoDB failure** (`mongodb-down.yaml`): The `mongodb` node renders as `unknown`/static in V1. Downstream service degradation is indirect and app-dependent.
 - **Pod logs, Kubernetes events, restart counts**: Not available in V1 (no browser-safe endpoint).
+- **Event strip dynamic rows**: The strip remains in a safe unavailable empty state until a governed V2 event endpoint exists.
 - **Grid-worker disabled state**: Rendered as `disabled` but no dynamic health signal exists.
 - **Forecast-service absent state**: Rendered as `unknown`/optional-absent but no health endpoint exists.
 
