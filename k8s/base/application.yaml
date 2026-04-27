@@ -948,11 +948,11 @@ data:
           <div class="map-health-banner warning" id="map-health-banner" role="status" aria-live="polite">
             Live service health has not been received yet. Static and optional nodes are shown in a safe unknown/static state.
           </div>
-          <p class="sr-only">Interactive topology map. Tab between nodes, Enter to select, Escape to deselect. Use arrow keys to pan, + / &#8722; to zoom, 0 to fit.</p>
+          <p class="sr-only" id="map-instructions">Interactive topology map. Tab between nodes, Enter to select, Escape to deselect. Use arrow keys to pan, + / &#8722; to zoom, 0 to fit.</p>
           <div id="map-selection-status" role="status" aria-live="polite" class="sr-only"></div>
           <div class="card">
            <div class="grid-map-shell" id="grid-map-shell">
-             <svg id="grid-map-svg" class="grid-map-svg" role="application" aria-roledescription="interactive topology map" aria-label="Interactive cloud demo topology map" tabindex="0">
+             <svg id="grid-map-svg" class="grid-map-svg" role="application" aria-roledescription="interactive topology map" aria-label="Interactive cloud demo topology map" aria-describedby="map-instructions" tabindex="0">
                <g id="grid-map-stage"></g>
              </svg>
              <div class="map-fallback" id="map-fallback" hidden>
