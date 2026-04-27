@@ -677,7 +677,7 @@ function addLogEntry() {
    if (subtitleEl) subtitleEl.textContent = subtitleText || '';
    if (bodyEl) bodyEl.innerHTML = bodyHtml;
    if (citEl) citEl.textContent = citationText;
-   _drawerLastFocus = document.activeElement;
+   if (drawer.hidden) { _drawerLastFocus = document.activeElement; }
    drawer.hidden = false;
    var closeBtn = document.getElementById('drawer-close');
    if (closeBtn) closeBtn.focus();
