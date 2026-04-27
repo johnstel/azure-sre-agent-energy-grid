@@ -177,6 +177,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - [Cost Estimation](docs/COSTS.md)
 - [Interactive Grid Map Spec](docs/INTERACTIVE-GRID-MAP-SPEC.md) — approved cloud-demo topology map specification
 - [Cloud Grid Map Data Contract](docs/CLOUD-GRID-MAP-DATA-CONTRACT.md) — selected cloud host, V1 health sources, and reusable topology config for the grid map
+- [Grid Map Smoke Tests](docs/GRID-MAP-SMOKE-TESTS.md) — scenario smoke test checklist and V1 visibility matrix for all 10 breakable scenarios
 
 ## 🤝 Contributing
 
