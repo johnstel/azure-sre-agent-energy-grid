@@ -1474,7 +1474,7 @@ data:
        html += '<h3 class="drawer-section-title">Analyst handoff</h3>';
        html += '<div class="drawer-handoff-actions">';
        html += '<button type="button" class="drawer-handoff-btn" id="handoff-copy-btn" data-copy-text="' + safePrompt + '" aria-label="Copy prompt for Local Analyst">\u{1F4CB} Copy prompt</button>';
-       html += '<a href="https://portal.azure.com/" target="_blank" rel="noopener noreferrer" class="drawer-handoff-btn portal" aria-label="Open Azure Portal in new tab">\u{1F517} Azure Portal</a>';
+       html += '<a href="https://portal.azure.com/" id="handoff-portal-link" target="_blank" rel="noopener noreferrer" class="drawer-handoff-btn portal" aria-label="Open Azure Portal in new tab">\u{1F517} Azure Portal</a>';
        html += '</div>';
        html += '<p class="drawer-copy-status" id="handoff-copy-status" role="status" aria-live="polite" aria-atomic="true"></p>';
        html += '<details class="drawer-prompt-preview" id="handoff-prompt-preview"><summary id="handoff-prompt-summary">View prompt text</summary><pre id="handoff-prompt-pre" tabindex="0">' + safePrompt + '</pre></details>';
@@ -1520,6 +1520,8 @@ data:
        if (!drawer || drawer.hidden) return;
        var _bodyEl0 = document.getElementById('drawer-body');
        var _activeId = (_bodyEl0 && _bodyEl0.contains(document.activeElement) && document.activeElement.id) ? document.activeElement.id : null;
+       var _previewEl0 = document.getElementById('handoff-prompt-preview');
+       var _previewOpen = !!(_previewEl0 && _previewEl0.open);
        if (mapState.selectedNodeId) {
          var node = GRID_TOPOLOGY.nodes.find(function(n) { return n.id === mapState.selectedNodeId; });
          if (node) {
@@ -1544,7 +1546,8 @@ data:
            }
          }
        }
-       if (_activeId) { var _toFocus = document.getElementById(_activeId); if (_toFocus && typeof _toFocus.focus === 'function') { try { _toFocus.focus(); } catch (e) {} } }
+       if (_previewOpen) { var _pe = document.getElementById('handoff-prompt-preview'); if (_pe) _pe.open = true; }
+       if (_activeId) { var _toFocus = document.getElementById(_activeId); if (_toFocus && typeof _toFocus.focus === 'function') _toFocus.focus(); }
      }
      function initDetailDrawer() {
        var closeBtn = document.getElementById('drawer-close');
