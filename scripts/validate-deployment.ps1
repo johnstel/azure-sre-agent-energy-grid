@@ -55,14 +55,22 @@ function Write-Section {
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 }
 
-# Returns the first non-empty DaemonSet list found for the given label selectors (kube-system).
+# Returns all unique DaemonSets found for the given label selectors (kube-system).
 function Get-KubeSystemDaemonSet {
     param([string[]]$LabelSelectors)
+    $itemsByName = [ordered]@{}
     foreach ($selector in $LabelSelectors) {
         $result = kubectl get daemonset -n kube-system -l $selector -o json 2>$null | ConvertFrom-Json
-        if ($result -and $result.items.Count -gt 0) {
-            return $result
+        if ($result -and $result.items) {
+            foreach ($item in $result.items) {
+                if ($item.metadata.name -and -not $itemsByName.Contains($item.metadata.name)) {
+                    $itemsByName[$item.metadata.name] = $item
+                }
+            }
         }
+    }
+    if ($itemsByName.Count -gt 0) {
+        return [pscustomobject]@{ items = @($itemsByName.Values) }
     }
     return $null
 }
@@ -81,6 +89,7 @@ Write-Host @"
 $totalChecks = 0
 $passedChecks = 0
 $maxPodsDriftWarnings = 0
+$securityAddonWarnings = 0
 
 # =============================================================================
 # AZURE RESOURCE CHECKS
@@ -371,14 +380,17 @@ if ($defenderDs) {
     foreach ($ds in $defenderDs.items) {
         $desired = $ds.status.desiredNumberScheduled
         $ready = $ds.status.numberReady
+        $statusAvailable = $null -ne $desired -and $null -ne $ready
+        $message = if ($statusAvailable) { "$ready/$desired pods" } else { "Status unavailable" }
         $totalChecks++
-        if (Write-Check "Defender DaemonSet '$($ds.metadata.name)' Ready" ($ready -eq $desired) "$ready/$desired pods") {
+        if (Write-Check "Defender DaemonSet '$($ds.metadata.name)' Ready" ($statusAvailable -and $ready -eq $desired) $message) {
             $passedChecks++
         }
     }
 }
 else {
-    Write-Host "  ℹ️  Microsoft Defender not detected (may not be installed)" -ForegroundColor Gray
+    Write-Host "  ⚠️  Microsoft Defender DaemonSet not detected; reconcile against approved cluster posture before maintenance" -ForegroundColor Yellow
+    $securityAddonWarnings++
 }
 
 # Retina
@@ -387,14 +399,17 @@ if ($retinaDs) {
     foreach ($ds in $retinaDs.items) {
         $desired = $ds.status.desiredNumberScheduled
         $ready = $ds.status.numberReady
+        $statusAvailable = $null -ne $desired -and $null -ne $ready
+        $message = if ($statusAvailable) { "$ready/$desired pods" } else { "Status unavailable" }
         $totalChecks++
-        if (Write-Check "Retina DaemonSet '$($ds.metadata.name)' Ready" ($ready -eq $desired) "$ready/$desired pods") {
+        if (Write-Check "Retina DaemonSet '$($ds.metadata.name)' Ready" ($statusAvailable -and $ready -eq $desired) $message) {
             $passedChecks++
         }
     }
 }
 else {
-    Write-Host "  ℹ️  Retina not detected (may not be installed)" -ForegroundColor Gray
+    Write-Host "  ⚠️  Retina DaemonSet not detected; reconcile against approved cluster posture before maintenance" -ForegroundColor Yellow
+    $securityAddonWarnings++
 }
 
 # Azure Monitor Agent (DaemonSet)
@@ -403,14 +418,17 @@ if ($amaDs) {
     foreach ($ds in $amaDs.items) {
         $desired = $ds.status.desiredNumberScheduled
         $ready = $ds.status.numberReady
+        $statusAvailable = $null -ne $desired -and $null -ne $ready
+        $message = if ($statusAvailable) { "$ready/$desired pods" } else { "Status unavailable" }
         $totalChecks++
-        if (Write-Check "Azure Monitor Agent DaemonSet '$($ds.metadata.name)' Ready" ($ready -eq $desired) "$ready/$desired pods") {
+        if (Write-Check "Azure Monitor Agent DaemonSet '$($ds.metadata.name)' Ready" ($statusAvailable -and $ready -eq $desired) $message) {
             $passedChecks++
         }
     }
 }
 else {
-    Write-Host "  ℹ️  Azure Monitor Agent DaemonSet not detected (may not be installed)" -ForegroundColor Gray
+    Write-Host "  ⚠️  Azure Monitor Agent DaemonSet not detected; reconcile against approved cluster posture before maintenance" -ForegroundColor Yellow
+    $securityAddonWarnings++
 }
 
 # =============================================================================
@@ -422,6 +440,10 @@ Write-Host "  VALIDATION SUMMARY: $passedChecks/$totalChecks checks passed" -For
 if ($maxPodsDriftWarnings -gt 0) {
     Write-Host "  ⚠️  maxPods drift warnings: $maxPodsDriftWarnings pool(s) still at maxPods < 50" -ForegroundColor Yellow
     Write-Host "     See docs/AKS-MAXPODS-MAINTENANCE-RUNBOOK.md to schedule remediation." -ForegroundColor Gray
+}
+if ($securityAddonWarnings -gt 0) {
+    Write-Host "  ⚠️  security/observability add-on warnings: $securityAddonWarnings expected component(s) not detected" -ForegroundColor Yellow
+    Write-Host "     Reconcile missing components against the approved cluster posture before maintenance." -ForegroundColor Gray
 }
 Write-Host "══════════════════════════════════════════════════════════════" -ForegroundColor $(if ($passedChecks -eq $totalChecks) { "Green" } else { "Yellow" })
 

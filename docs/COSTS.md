@@ -49,7 +49,7 @@ This document provides estimated costs for running the Azure SRE Agent Energy Gr
 
 #### Maintenance-Window Node Pool Recreation Cost
 
-When executing the blue/green `maxPods=30` drift fix (see [AKS-MAXPODS-MAINTENANCE-RUNBOOK.md](./AKS-MAXPODS-MAINTENANCE-RUNBOOK.md)), temporary `sys50` and `work50` pools run alongside the old pools before the originals are deleted.
+When executing the blue/green `maxPods=30` drift fix (see [AKS-MAXPODS-MAINTENANCE-RUNBOOK.md](./AKS-MAXPODS-MAINTENANCE-RUNBOOK.md)), temporary `sys50` and `work50` pools run alongside the old pools before the originals are deleted. The estimate below assumes the current issue #4 maintenance shape: one temporary system node and four temporary workload nodes on `Standard_D2s_v5`. Recalculate if live node counts, VM sizes, or temporary autoscaling differ.
 
 | Temporary Pool | VM Size | Extra Nodes | Cost/hour |
 |----------------|---------|-------------|-----------|
