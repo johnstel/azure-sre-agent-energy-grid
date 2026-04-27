@@ -141,6 +141,32 @@
   .skeleton.long { width: 82%; }
   @media (max-width: 799px) { .detail-drawer { position: static; width: 100%; height: auto; border-left: none; border-radius: 10px; border: 1px solid #334155; margin-top: .75rem; } }
   @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; opacity: .45; } }
+  /* === #21 Responsive drawer breakpoints === */
+  /* 800-1279px: bottom sheet */
+  @media (min-width: 800px) and (max-width: 1279px) {
+    .detail-drawer { position: absolute; top: auto; bottom: 0; right: 0; left: 0; width: 100%; max-height: 260px; height: 40%; border-top: 1px solid #334155; border-left: none; border-radius: 12px 12px 0 0; }
+  }
+  /* >=1920px: docked side panel */
+  @media (min-width: 1920px) {
+    .grid-map-shell { overflow: visible; min-height: 640px; display: grid; grid-template-columns: 1fr; grid-template-rows: minmax(640px, 1fr); }
+    .grid-map-shell:has(.detail-drawer:not([hidden])) { grid-template-columns: 1fr 340px; }
+    .grid-map-svg { grid-column: 1; grid-row: 1; height: 640px; }
+    .map-fallback { grid-column: 1; grid-row: 1; }
+    .detail-drawer { position: static !important; grid-column: 2; grid-row: 1; width: 100%; height: 640px; max-height: 640px; border-left: 1px solid #334155; border-radius: 0 12px 12px 0; }
+    .map-node-title { font-size: 16px; }
+    .map-node-symbol { font-size: 15px; }
+    .map-node-subtitle { font-size: 13px; }
+    .map-node-status { font-size: 11px; }
+  }
+  /* === #21 Drawer enter animations === */
+  @keyframes drawer-slide-right-in { from { transform: translateX(12%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes drawer-slide-up-in { from { transform: translateY(10%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @media (min-width: 1280px) and (max-width: 1919px) { .detail-drawer:not([hidden]) { animation: drawer-slide-right-in 0.22s ease; } }
+  @media (min-width: 800px) and (max-width: 1279px) { .detail-drawer:not([hidden]) { animation: drawer-slide-up-in 0.22s ease; } }
+  /* === #21 Reduced-motion: disable all nonessential animation === */
+  @media (prefers-reduced-motion: reduce) { .detail-drawer:not([hidden]) { animation: none !important; } .loading { animation: none; } }
+  /* === #21 Disclaimer always visible above map shell === */
+  .map-disclaimer { position: relative; z-index: 2; }
 </style>
 </head>
  <body>
@@ -234,8 +260,8 @@
          </svg>
          <div class="map-fallback" id="map-fallback" hidden>
            <div>
-             <strong>Grid map needs at least 800 × 500 pixels.</strong><br>
-             Increase the browser window or use a larger display to view the topology safely.
+             <strong>Grid map requires a larger screen.</strong><br>
+              Use the wallboard view on a wider display for the interactive topology.
            </div>
          </div>
           <aside id="detail-drawer" class="detail-drawer" hidden aria-labelledby="drawer-title">
@@ -686,15 +712,18 @@ function addLogEntry() {
  function closeDetailDrawer() {
    var drawer = document.getElementById('detail-drawer');
    if (!drawer) return;
+   var focusWasInDrawer = drawer.contains(document.activeElement);
    drawer.hidden = true;
-   var focusTarget = null;
-   if (_drawerLastFocusNodeId) {
-     focusTarget = document.querySelector('.map-node[data-node-id="' + _drawerLastFocusNodeId + '"]');
+   if (focusWasInDrawer) {
+     var focusTarget = null;
+     if (_drawerLastFocusNodeId) {
+       focusTarget = document.querySelector('.map-node[data-node-id="' + _drawerLastFocusNodeId + '"]');
+     }
+     if (!focusTarget && _drawerLastFocus && _drawerLastFocus.isConnected && typeof _drawerLastFocus.focus === 'function') {
+       focusTarget = _drawerLastFocus;
+     }
+     if (focusTarget) { try { focusTarget.focus(); } catch (e) {} }
    }
-   if (!focusTarget && _drawerLastFocus && _drawerLastFocus.isConnected && typeof _drawerLastFocus.focus === 'function') {
-     focusTarget = _drawerLastFocus;
-   }
-   if (focusTarget) { try { focusTarget.focus(); } catch (e) {} }
    _drawerLastFocus = null;
    _drawerLastFocusNodeId = null;
  }
@@ -991,11 +1020,13 @@ function addLogEntry() {
    const shell = document.getElementById('grid-map-shell');
    const fallback = document.getElementById('map-fallback');
    if (!svg || !shell || !fallback) return;
-   const width = shell.clientWidth;
+   const shellWidth = shell.clientWidth;
    const shellHeight = shell.clientHeight;
-   const height = Math.max(560, shellHeight);
-   svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
-   if (width < 800 || shellHeight < 500 || window.innerHeight < 500) {
+   const svgWidth = svg.clientWidth > 0 ? svg.clientWidth : shellWidth;
+   const svgHeight = svg.clientHeight > 0 ? svg.clientHeight : shellHeight;
+   const height = Math.max(560, svgHeight);
+   svg.setAttribute('viewBox', '0 0 ' + svgWidth + ' ' + height);
+   if (shellWidth < 800 || shellHeight < 500 || window.innerHeight < 500) {
      fallback.hidden = false;
      svg.setAttribute('aria-hidden', 'true');
      return;
@@ -1004,8 +1035,8 @@ function addLogEntry() {
    svg.removeAttribute('aria-hidden');
    const bounds = getMapBounds();
    const padding = 48;
-   mapState.k = Math.min((width - padding * 2) / bounds.width, (height - padding * 2) / bounds.height);
-   mapState.x = (width - bounds.width * mapState.k) / 2 - bounds.minX * mapState.k;
+   mapState.k = Math.min((svgWidth - padding * 2) / bounds.width, (height - padding * 2) / bounds.height);
+   mapState.x = (svgWidth - bounds.width * mapState.k) / 2 - bounds.minX * mapState.k;
    mapState.y = (height - bounds.height * mapState.k) / 2 - bounds.minY * mapState.k;
    applyMapTransform();
  }
@@ -1114,7 +1145,41 @@ function addLogEntry() {
    if (selected === 'map') {
      renderGridMap();
      window.setTimeout(fitGridMap, 0);
+     resetMapIdleTimer();
+   } else {
+     if (_mapIdleTimer) { clearTimeout(_mapIdleTimer); _mapIdleTimer = null; }
    }
+ }
+
+ const IDLE_TIMEOUT_MS = 30000;
+ var _mapIdleTimer = null;
+ function resetMapIdleTimer() {
+   if (_mapIdleTimer) { clearTimeout(_mapIdleTimer); _mapIdleTimer = null; }
+   var mapView = document.getElementById('map-view');
+   if (!mapView || mapView.hidden) return;
+   _mapIdleTimer = window.setTimeout(function() {
+     _mapIdleTimer = null;
+     var mv = document.getElementById('map-view');
+     if (!mv || mv.hidden) return;
+     if (mapState && mapState.dragging) { resetMapIdleTimer(); return; }
+     clearSelection();
+     fitGridMap();
+   }, IDLE_TIMEOUT_MS);
+ }
+ function initIdleTracking() {
+   var shell = document.getElementById('grid-map-shell');
+   if (shell) {
+     ['pointerdown', 'keydown', 'wheel'].forEach(function(evtType) {
+       shell.addEventListener(evtType, resetMapIdleTimer, { passive: true });
+     });
+   }
+   var filterBar = document.querySelector('.filter-bar');
+   if (filterBar) {
+     filterBar.addEventListener('click', resetMapIdleTimer);
+     filterBar.addEventListener('keydown', resetMapIdleTimer);
+   }
+   var mapControls = document.querySelector('.map-controls');
+   if (mapControls) { mapControls.addEventListener('click', resetMapIdleTimer); }
  }
 
  function initViewToggle() {
@@ -1133,7 +1198,7 @@ function addLogEntry() {
    setConsoleView(initialViewFromLocation(), false);
  }
 
- initViewToggle(); initDetailDrawer();
+ initViewToggle(); initDetailDrawer(); initIdleTracking();
  updateClock(); updateMetrics(); loadDispatches(); loadAssets(); loadHealth();
 for (let i = 0; i < 10; i++) addLogEntry();
 setInterval(updateClock, 1000);
