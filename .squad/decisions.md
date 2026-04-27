@@ -757,3 +757,114 @@ Week 3:  [A1 spike concludes] ────┤
 
 **Why:** Structured backlog removes overclaiming. 3 start immediately (spike + docs). 3 features unblock after docs approved. 2 SRE Agent features conditional on spike findings. All implementation issues carry mandatory safety acceptance criteria. Estimated effort: 3–4 weeks.
 
+
+---
+
+### 2026-04-26: Squad Agent Prompt Exceeds GitHub 30,000 Character Limit
+
+**By:** Dallas (Lead)
+**Status:** Recommendation — awaiting John's approval before implementation
+
+**Problem**
+
+`.github/agents/squad.agent.md` is **79,903 characters** — **2.66× the GitHub custom agent prompt limit of 30,000 characters**. It must lose ~50,000 characters (~62%) to function as a GitHub Custom Agent.
+
+**Root Cause**
+
+The file is a monolithic coordinator playbook containing:
+- Core orchestration logic (routing, spawning, constraints)
+- Init/setup flows (one-time use, ~4,849 chars)
+- Model selection lookup tables (~7,042 chars — largest single section)
+- Worktree management (~7,707 chars combined)
+- Client compatibility & VS Code adaptations (~3,619 chars)
+- Casting/naming system (~3,051 chars)
+- Ralph work monitor spec (~6,747 chars)
+- MCP integration details (~2,083 chars)
+- Ceremonies, plugins, PRD mode, human members (~4,660 chars)
+
+Much of this is reference material that the coordinator reads once, not behavioral instructions it needs on every prompt.
+
+**Triage: What MUST Stay Inline (Core Behavior ~18K chars)**
+
+These sections define the coordinator's identity and per-turn behavior:
+
+| Section | Chars | Reason |
+|---------|-------|--------|
+| Coordinator Identity | 1,112 | Who I am |
+| Team Mode | 1,960 | Core operating loop |
+| Acknowledge / Feels Heard | 767 | UX behavior |
+| Routing | 2,000 | Every-turn decision |
+| How to Spawn an Agent | 3,997 | Core mechanic |
+| After Agent Work | 2,723 | Core mechanic |
+| Anti-Patterns | 1,093 | Guardrails |
+| Constraints | 1,352 | Hard rules |
+| Source of Truth Hierarchy | 3,000 | Decision framework |
+| Eager Execution | 1,068 | Behavioral |
+| Mode Selection (bg default) | 1,198 | Behavioral |
+| **Subtotal** | **~20,270** | |
+
+With frontmatter + section connectors, the slim core is ~22-24K — fits within 30K with room for essential additions.
+
+**What Should Move to `.squad/` Reference Docs (~50K chars)**
+
+These sections are either one-time setup, lookup tables, or subsystem specs:
+
+| Content | Chars | Target Location |
+|---------|-------|-----------------|
+| Init Mode Phase 1 & 2 | 4,849 | `.squad/templates/init-flow.md` |
+| Per-Agent Model Selection | 7,042 | `.squad/config.json` or `.squad/templates/model-selection.md` |
+| Response Mode Selection | 3,687 | `.squad/templates/response-modes.md` |
+| Worktree Awareness + Lifecycle + Pre-Spawn | 7,707 | `.squad/templates/worktree-guide.md` |
+| Client Compatibility (all sub-sections) | 3,619 | `.squad/templates/machine-capabilities.md` (exists) |
+| Ralph — full spec | 6,747 | `.squad/templates/ralph-circuit-breaker.md` (exists) |
+| Casting & Persistent Naming (all) | 3,051 | `.squad/templates/casting-reference.md` (exists) |
+| MCP Integration (all) | 2,083 | `.squad/templates/mcp-config.md` (exists) |
+| Ceremonies | 996 | `.squad/ceremonies.md` (exists) |
+| Plugin Marketplace | 504 | `.squad/templates/plugin-marketplace.md` (exists) |
+| GitHub Issues Mode | 1,188 | `.squad/templates/issue-lifecycle.md` (exists) |
+| PRD Mode | 835 | `.squad/templates/prd-mode.md` (new) |
+| Human/Copilot Members | 1,639 | `.squad/templates/roster.md` (exists) |
+| Reviewer Rejection (detailed) | 1,886 | `.squad/templates/reviewer-protocol.md` (new) |
+| Parallel Fan-Out | 1,860 | Inline summary (3 lines) + reference doc |
+| Shared File / Drop-Box | 930 | `.squad/templates/drop-box.md` (new) |
+| Directive Capture | 1,294 | `.squad/templates/directives.md` (new) |
+| Issue Awareness | 1,359 | Merge into issue-lifecycle.md |
+| Role Emoji table | 1,706 | `.squad/templates/role-emoji.md` (new) |
+| Skill Confidence | 608 | Inline 2-line summary |
+| Consult Mode | 305 | Inline 1-line summary |
+| Orchestration Logging | 595 | `.squad/templates/orchestration-log.md` (exists) |
+| **Total movable** | **~53,490** | |
+
+**Key Insight: Many Templates Already Exist**
+
+The `.squad/templates/` directory already has 30+ reference files covering casting, ceremonies, machine capabilities, MCP config, plugin marketplace, and more. The squad.agent.md is duplicating content that templates were designed to hold. The slim agent just needs one-line pointers like:
+
+```
+For model selection rules, see `.squad/config.json` and `.squad/templates/model-selection.md`.
+```
+
+**Risks**
+
+1. **Behavioral drift**: If the coordinator can't "see" the full rules, spawned agents may get weaker prompts. **Mitigation**: Keep all per-turn behavioral rules inline; externalize only lookup tables and one-time flows.
+
+2. **Init Mode breakage**: New repos need Init Mode, which is large. **Mitigation**: Keep a 3-line Init Mode stub inline that says "read `.squad/templates/init-flow.md` and follow it."
+
+3. **Upstream conflicts**: Squad is versioned (v0.9.1). If the upstream template changes, our slim version diverges. **Mitigation**: Keep a copy of the original as `.squad/templates/squad.agent.md` (already exists) and document the slimming rationale.
+
+4. **Token budget**: Even at 30K chars, the agent prompt + copilot-instructions.md (6,407 chars) may hit model context limits. The slim version should target ~25K to leave headroom.
+
+**Recommended Path**
+
+1. **Do NOT edit the file yet** — this is an analysis-only decision.
+2. Route to **Ripley or Parker** (whoever has bandwidth) to create the slim version:
+   - Copy current file to `.squad/templates/squad-agent-full-v0.9.1.md` as backup
+   - Create new `.github/agents/squad.agent.md` at ≤25K chars
+   - Keep all "Core Behavior" sections inline
+   - Replace externalized sections with 1-2 line summaries + file references
+   - Validate the new file works as a GitHub Custom Agent
+3. **Test**: Create a test conversation with the slimmed agent to verify routing, spawning, and ceremony behavior still work.
+
+**Verdict**
+
+**Actionable, low-risk.** Most of the bloat is reference material already duplicated in `.squad/templates/`. The slim version is a straightforward extraction — not a rewrite.
+
