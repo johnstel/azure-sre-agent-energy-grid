@@ -844,6 +844,25 @@ data:
         .grid-map-svg { display: none; }
         .map-fallback { display: grid; }
       }
+      @media (prefers-reduced-motion: reduce) {
+        .loading { animation: none; }
+        .map-status-dot.healthy, .map-status-dot.warning, .map-status-dot.critical { filter: none; }
+      }
+      .node-ring, .node-focus-ring { fill: none; stroke: none; pointer-events: none; }
+      .map-node.selected .node-ring { stroke: var(--cyan); stroke-width: 3; filter: drop-shadow(0 0 8px rgba(34,211,238,.75)); }
+      .map-node:focus-visible { outline: none; }
+      .map-node:focus-visible .node-focus-ring { stroke: rgba(255,255,255,.88); stroke-width: 2; stroke-dasharray: 6 4; filter: drop-shadow(0 0 6px rgba(255,255,255,.45)); }
+      .map-node.dimmed { opacity: 0.22; }
+      .map-edge.dimmed { opacity: 0.12; }
+      .map-edge.selected { stroke: var(--cyan) !important; stroke-width: 5 !important; opacity: 1 !important; filter: drop-shadow(0 0 8px rgba(34,211,238,.65)); }
+      .map-edge-hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
+      .filter-bar { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: .75rem; }
+      .filter-btn { background: rgba(15,23,42,.8); border: 1px solid #475569; border-radius: 8px; color: var(--muted); padding: .35rem .7rem; cursor: pointer; font: inherit; font-size: .82rem; display: inline-flex; align-items: center; gap: .4rem; }
+      .filter-btn:hover, .filter-btn:focus-visible { border-color: var(--cyan); color: var(--text); outline: 2px solid rgba(34,211,238,.35); outline-offset: 2px; }
+      .filter-btn[aria-pressed="true"] { background: rgba(34,211,238,.15); border-color: var(--cyan); color: var(--cyan); font-weight: 600; }
+      .filter-btn[data-filter="critical"][aria-pressed="true"] { background: rgba(248,113,113,.15); border-color: var(--red); color: var(--red); }
+      .filter-btn[data-filter="warning"][aria-pressed="true"] { background: rgba(251,191,36,.15); border-color: var(--amber); color: var(--amber); }
+      .filter-badge { display: inline-block; min-width: 1.3em; padding: .1em .35em; background: rgba(255,255,255,.1); border-radius: 999px; font-size: .75em; font-weight: 700; text-align: center; line-height: 1.4; }
     </style>
     </head>
      <body>
@@ -916,6 +935,12 @@ data:
              <button class="map-button" type="button" id="map-reset">Fit / Reset</button>
            </div>
          </div>
+          <div class="filter-bar" role="group" aria-label="Severity filter">
+            <span style="color:var(--muted);font-size:.82rem">Filter:</span>
+            <button class="filter-btn" type="button" data-filter="all" aria-pressed="true">All <span class="filter-badge" id="badge-all">—</span></button>
+            <button class="filter-btn" type="button" data-filter="critical" aria-pressed="false">Critical <span class="filter-badge" id="badge-critical">—</span></button>
+            <button class="filter-btn" type="button" data-filter="warning" aria-pressed="false">Warning <span class="filter-badge" id="badge-warning">—</span></button>
+          </div>
           <div class="map-disclaimer" role="note">
             Demo topology only. This map visualizes Kubernetes service/application health for the Azure SRE Agent demo and is not connected to real grid telemetry, SCADA, GIS, or utility infrastructure.
           </div>
@@ -984,7 +1009,7 @@ data:
       const MAP_HEALTH_POLL_MS = 30000;
       const STALE_AFTER_MS = 60000;
       const SEVERITY_RANK = { healthy: 0, warning: 1, critical: 2 };
-      const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0, healthById: {}, lastSuccessfulHealthPoll: null, healthPollInFlight: false };
+       const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0, dragMoved: false, healthById: {}, lastSuccessfulHealthPoll: null, healthPollInFlight: false, selectedNodeId: null, selectedEdgeKey: null, activeFilter: 'all' };
 
     function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
@@ -1200,13 +1225,14 @@ data:
               }
             });
           })
-          .finally(() => {
-            mapState.healthPollInFlight = false;
-            renderHealthGrid();
-            updateMapHealthBanner();
-            refreshGridMapAfterHealthChange();
-          });
-      }
+         .finally(() => {
+           mapState.healthPollInFlight = false;
+           renderHealthGrid();
+           updateMapHealthBanner();
+           refreshGridMapAfterHealthChange();
+           updateFilterBadges();
+         });
+       }
 
      function createSvgElement(name, attrs) {
        const el = document.createElementNS(SVG_NS, name);
@@ -1237,6 +1263,85 @@ data:
         return { className: 'unknown', label: 'unknown/static endpoint state' };
       }
 
+     function selectNode(nodeId) {
+       mapState.selectedNodeId = nodeId;
+       mapState.selectedEdgeKey = null;
+       applyNodeSelection();
+       applyEdgeSelection();
+     }
+     function selectEdge(key) {
+       mapState.selectedEdgeKey = key;
+       mapState.selectedNodeId = null;
+       applyNodeSelection();
+       applyEdgeSelection();
+     }
+     function clearSelection() {
+       mapState.selectedNodeId = null;
+       mapState.selectedEdgeKey = null;
+       applyNodeSelection();
+       applyEdgeSelection();
+     }
+     function applyNodeSelection() {
+       document.querySelectorAll('.map-node').forEach(function(group) {
+         var isSelected = group.dataset.nodeId === mapState.selectedNodeId && !!mapState.selectedNodeId;
+         group.classList.toggle('selected', isSelected);
+         group.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+       });
+     }
+     function applyEdgeSelection() {
+       document.querySelectorAll('.map-edge').forEach(function(line) {
+         line.classList.toggle('selected', !!mapState.selectedEdgeKey && line.dataset.edgeKey === mapState.selectedEdgeKey);
+       });
+     }
+     function updateFilterBadges() {
+       var total = GRID_TOPOLOGY.nodes.length;
+       var critical = 0, warning = 0;
+       GRID_TOPOLOGY.nodes.forEach(function(node) {
+         var sev = getMapStatus(node).severity;
+         if (sev === 'critical') critical++;
+         else if (sev === 'warning') warning++;
+       });
+       var badgeAll = document.getElementById('badge-all');
+       var badgeCritical = document.getElementById('badge-critical');
+       var badgeWarning = document.getElementById('badge-warning');
+       if (badgeAll) badgeAll.textContent = total;
+       if (badgeCritical) badgeCritical.textContent = critical;
+       if (badgeWarning) badgeWarning.textContent = warning;
+     }
+     function applySeverityFilter() {
+       var filter = mapState.activeFilter;
+       document.querySelectorAll('[data-filter]').forEach(function(btn) {
+         btn.setAttribute('aria-pressed', btn.dataset.filter === filter ? 'true' : 'false');
+       });
+       document.querySelectorAll('.map-node').forEach(function(group) {
+         var nodeId = group.dataset.nodeId;
+         if (!nodeId || filter === 'all') { group.classList.remove('dimmed'); return; }
+         var node = GRID_TOPOLOGY.nodes.find(function(n) { return n.id === nodeId; });
+         var severity = node ? getMapStatus(node).severity : 'unknown';
+         group.classList.toggle('dimmed', severity !== filter);
+       });
+       document.querySelectorAll('.map-edge').forEach(function(line) {
+         if (filter === 'all') { line.classList.remove('dimmed'); return; }
+         var key = line.dataset.edgeKey;
+         if (!key) return;
+         var parts = key.split(':');
+         var srcNode = document.querySelector('.map-node[data-node-id="' + parts[0] + '"]');
+         var tgtNode = document.querySelector('.map-node[data-node-id="' + parts[1] + '"]');
+         var srcDimmed = srcNode && srcNode.classList.contains('dimmed');
+         var tgtDimmed = tgtNode && tgtNode.classList.contains('dimmed');
+         line.classList.toggle('dimmed', srcDimmed && tgtDimmed);
+       });
+       updateFilterBadges();
+     }
+     function initSeverityFilter() {
+       document.querySelectorAll('[data-filter]').forEach(function(btn) {
+         btn.addEventListener('click', function() {
+           mapState.activeFilter = btn.dataset.filter;
+           applySeverityFilter();
+         });
+       });
+       updateFilterBadges();
+     }
      function nodeCenter(node) {
        return { x: node.position.x + MAP_NODE.width / 2, y: node.position.y + MAP_NODE.height / 2 };
      }
@@ -1256,7 +1361,9 @@ data:
          class: 'map-node service ' + status.className,
          tabindex: '0',
          role: 'img',
-         'aria-label': node.label + ', ' + node.metaphor + ', ' + status.text
+         'aria-label': node.label + ', ' + node.metaphor + ', ' + status.text,
+         'data-node-id': node.id,
+         'aria-selected': mapState.selectedNodeId === node.id ? 'true' : 'false'
        });
         const x = node.position.x;
         const y = node.position.y;
@@ -1274,6 +1381,9 @@ data:
        const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 64 });
        state.textContent = status.text;
        group.appendChild(state);
+       group.appendChild(createSvgElement('rect', { class: 'node-ring', x: x - 4, y: y - 4, width: MAP_NODE.width + 8, height: MAP_NODE.height + 8, rx: 18, ry: 18 }));
+       group.appendChild(createSvgElement('rect', { class: 'node-focus-ring', x: x - 7, y: y - 7, width: MAP_NODE.width + 14, height: MAP_NODE.height + 14, rx: 21, ry: 21 }));
+       if (mapState.selectedNodeId === node.id) group.classList.add('selected');
        stage.appendChild(group);
      }
 
@@ -1283,7 +1393,9 @@ data:
          class: 'map-node datastore ' + status.className,
          tabindex: '0',
          role: 'img',
-         'aria-label': node.label + ', data store, ' + node.metaphor + ', ' + status.text
+         'aria-label': node.label + ', data store, ' + node.metaphor + ', ' + status.text,
+         'data-node-id': node.id,
+         'aria-selected': mapState.selectedNodeId === node.id ? 'true' : 'false'
        });
        const x = node.position.x;
        const y = node.position.y;
@@ -1303,6 +1415,9 @@ data:
        const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 67 });
        state.textContent = status.text;
        group.appendChild(state);
+       group.appendChild(createSvgElement('rect', { class: 'node-ring', x: x - 4, y: y - 4, width: MAP_NODE.width + 8, height: MAP_NODE.height + 8, rx: 14, ry: 14 }));
+       group.appendChild(createSvgElement('rect', { class: 'node-focus-ring', x: x - 7, y: y - 7, width: MAP_NODE.width + 14, height: MAP_NODE.height + 14, rx: 17, ry: 17 }));
+       if (mapState.selectedNodeId === node.id) group.classList.add('selected');
        stage.appendChild(group);
      }
 
@@ -1326,22 +1441,32 @@ data:
          const source = nodesById[edge.source];
           const target = nodesById[edge.target];
           if (!source || !target) return;
-          const start = edgeAnchor(source, target);
-          const end = edgeAnchor(target, source);
-          const edgeStatus = getEdgeStatus(edge, source, target);
-          const edgeLine = createSvgElement('line', {
-            class: 'map-edge ' + edgeStatus.className,
-            x1: start.x,
-            y1: start.y,
-            x2: end.x,
-            y2: end.y,
-            'marker-end': 'url(#map-arrowhead)',
-            'aria-label': edge.label + ', ' + edgeStatus.label
-          });
-          stage.appendChild(edgeLine);
-          const label = createSvgElement('text', { class: 'map-edge-label', x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 8, 'text-anchor': 'middle' });
-          label.textContent = edge.label + (edgeStatus.className === 'unknown' ? ' · unknown' : edgeStatus.className === 'critical' ? ' · critical' : edgeStatus.className === 'warning' ? ' · warning' : '');
-          stage.appendChild(label);
+           const start = edgeAnchor(source, target);
+           const end = edgeAnchor(target, source);
+           const edgeStatus = getEdgeStatus(edge, source, target);
+           const edgeKey = edge.source + ':' + edge.target;
+           const edgeLine = createSvgElement('line', {
+             class: 'map-edge ' + edgeStatus.className + (mapState.selectedEdgeKey === edgeKey ? ' selected' : ''),
+             x1: start.x,
+             y1: start.y,
+             x2: end.x,
+             y2: end.y,
+             'marker-end': 'url(#map-arrowhead)',
+             role: 'img',
+             'aria-label': edge.label + ', ' + edgeStatus.label,
+             'data-edge-key': edgeKey
+           });
+           stage.appendChild(edgeLine);
+           const edgeHit = createSvgElement('line', {
+             class: 'map-edge-hit',
+             x1: start.x, y1: start.y, x2: end.x, y2: end.y,
+             'data-edge-key': edgeKey,
+             'aria-hidden': 'true'
+           });
+           stage.appendChild(edgeHit);
+           const label = createSvgElement('text', { class: 'map-edge-label', x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 8, 'text-anchor': 'middle' });
+           label.textContent = edge.label + (edgeStatus.className === 'unknown' ? ' · unknown' : edgeStatus.className === 'critical' ? ' · critical' : edgeStatus.className === 'warning' ? ' · warning' : '');
+           stage.appendChild(label);
         });
 
        GRID_TOPOLOGY.nodes.forEach(node => {
@@ -1351,6 +1476,9 @@ data:
 
        mapState.rendered = true;
        bindGridMapInteractions();
+       applyNodeSelection();
+       applyEdgeSelection();
+       applySeverityFilter();
        fitGridMap();
      }
 
@@ -1420,14 +1548,18 @@ data:
        svg.addEventListener('pointerdown', event => {
          if (event.button !== 0) return;
          mapState.dragging = true;
+         mapState.dragMoved = false;
          mapState.dragX = event.clientX;
          mapState.dragY = event.clientY;
          svg.setPointerCapture(event.pointerId);
        });
        svg.addEventListener('pointermove', event => {
          if (!mapState.dragging) return;
-         mapState.x += event.clientX - mapState.dragX;
-         mapState.y += event.clientY - mapState.dragY;
+         const dx = event.clientX - mapState.dragX;
+         const dy = event.clientY - mapState.dragY;
+         if (Math.abs(dx) + Math.abs(dy) > 4) mapState.dragMoved = true;
+         mapState.x += dx;
+         mapState.y += dy;
          mapState.dragX = event.clientX;
          mapState.dragY = event.clientY;
          applyMapTransform();
@@ -1436,14 +1568,35 @@ data:
          mapState.dragging = false;
          if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
        });
+       svg.addEventListener('click', event => {
+         if (mapState.dragMoved) { mapState.dragMoved = false; return; }
+         const nodeGroup = event.target.closest ? event.target.closest('.map-node') : null;
+         if (nodeGroup && nodeGroup.dataset.nodeId) {
+           const id = nodeGroup.dataset.nodeId;
+           if (mapState.selectedNodeId === id) clearSelection(); else selectNode(id);
+           return;
+         }
+         const hitLine = event.target.closest ? event.target.closest('.map-edge-hit') : null;
+         if (hitLine && hitLine.dataset.edgeKey) {
+           const key = hitLine.dataset.edgeKey;
+           if (mapState.selectedEdgeKey === key) clearSelection(); else selectEdge(key);
+           return;
+         }
+         clearSelection();
+       });
        svg.addEventListener('keydown', event => {
          const step = 26;
-         if (event.key === '+' || event.key === '=') { zoomGridMap(1.12); event.preventDefault(); }
-         if (event.key === '-' || event.key === '_') { zoomGridMap(0.88); event.preventDefault(); }
-         if (event.key === '0') { fitGridMap(); event.preventDefault(); }
-         if (event.key === 'ArrowLeft') { mapState.x += step; applyMapTransform(); event.preventDefault(); }
-         if (event.key === 'ArrowRight') { mapState.x -= step; applyMapTransform(); event.preventDefault(); }
-         if (event.key === 'ArrowUp') { mapState.y += step; applyMapTransform(); event.preventDefault(); }
+         if (event.key === 'Escape') { clearSelection(); return; }
+         if (event.key === 'Enter') {
+           const nodeGroup = event.target.closest ? event.target.closest('.map-node') : null;
+           if (nodeGroup && nodeGroup.dataset.nodeId) { selectNode(nodeGroup.dataset.nodeId); event.preventDefault(); return; }
+         }
+         if (event.key === '+' || event.key === '=') { zoomGridMap(1.12); event.preventDefault(); return; }
+         if (event.key === '-' || event.key === '_') { zoomGridMap(0.88); event.preventDefault(); return; }
+         if (event.key === '0') { fitGridMap(); event.preventDefault(); return; }
+         if (event.key === 'ArrowLeft') { mapState.x += step; applyMapTransform(); event.preventDefault(); return; }
+         if (event.key === 'ArrowRight') { mapState.x -= step; applyMapTransform(); event.preventDefault(); return; }
+         if (event.key === 'ArrowUp') { mapState.y += step; applyMapTransform(); event.preventDefault(); return; }
          if (event.key === 'ArrowDown') { mapState.y -= step; applyMapTransform(); event.preventDefault(); }
        });
      }
@@ -1474,6 +1627,7 @@ data:
      }
 
      function initViewToggle() {
+       initSeverityFilter();
        document.querySelectorAll('[data-view-target]').forEach(button => {
          button.addEventListener('click', () => setConsoleView(button.dataset.viewTarget, true));
        });
