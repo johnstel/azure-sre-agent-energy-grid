@@ -893,6 +893,9 @@ data:
       .drawer-handoff-btn.portal { border-color: rgba(167,139,250,.5); color: var(--accent); }
       .drawer-handoff-btn.portal:hover, .drawer-handoff-btn.portal:focus-visible { border-color: var(--accent); }
       .drawer-copy-status { font-size: .78rem; min-height: 1.3em; color: var(--green); line-height: 1.4; }
+      .drawer-prompt-preview { margin-top: .4rem; }
+      .drawer-prompt-preview summary { cursor: pointer; color: var(--muted); font-size: .78rem; }
+      .drawer-prompt-preview pre { margin: .3rem 0 0; padding: .45rem .6rem; background: rgba(15,23,42,.85); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 9rem; overflow-y: auto; }
       @keyframes skeleton-pulse { 0%,100% { opacity: .55; } 50% { opacity: .22; } }
       .skeleton { background: #334155; border-radius: 4px; animation: skeleton-pulse 1.4s ease-in-out infinite; height: .85em; margin-bottom: .3rem; display: block; }
       .skeleton.short { width: 52%; }
@@ -1474,6 +1477,7 @@ data:
        html += '<a href="https://portal.azure.com/" target="_blank" rel="noopener noreferrer" class="drawer-handoff-btn portal" aria-label="Open Azure Portal in new tab">\u{1F517} Azure Portal</a>';
        html += '</div>';
        html += '<p class="drawer-copy-status" id="handoff-copy-status" role="status" aria-live="polite" aria-atomic="true"></p>';
+       html += '<details class="drawer-prompt-preview" id="handoff-prompt-preview"><summary>View prompt text</summary><pre tabindex="0">' + safePrompt + '</pre></details>';
        html += '</div>';
        return html;
      }
@@ -1556,9 +1560,13 @@ data:
              if (statusEl) { statusEl.textContent = 'Prompt copied to clipboard.'; setTimeout(function() { if (statusEl) statusEl.textContent = ''; }, 3000); }
            }, function() {
              if (statusEl) statusEl.textContent = 'Copy failed \u2014 prompt shown below.';
+             var previewEl = document.getElementById('handoff-prompt-preview');
+             if (previewEl) previewEl.open = true;
            });
          } else {
            if (statusEl) statusEl.textContent = 'Clipboard unavailable \u2014 see prompt below.';
+           var previewEl = document.getElementById('handoff-prompt-preview');
+           if (previewEl) previewEl.open = true;
          }
        });
      }
