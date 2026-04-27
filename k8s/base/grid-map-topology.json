@@ -1,0 +1,170 @@
+{
+  "schemaVersion": "1.0",
+  "host": "ops-console",
+  "namespace": "energy",
+  "disclaimer": "Demo topology only. This map visualizes Kubernetes service/application health for the Azure SRE Agent demo and is not connected to real grid telemetry, SCADA, GIS, or utility infrastructure.",
+  "dataContract": {
+    "version": "cloud-demo-v1",
+    "source": "ops-console nginx proxy and static topology config",
+    "refreshSeconds": 30,
+    "severityOrder": ["healthy", "warning", "critical"],
+    "unknownHandling": "Unknown is a separate non-propagating state. Do not treat unknown as worse than critical.",
+    "liveHealth": {
+      "asset-service": {
+        "method": "GET",
+        "path": "/api/assets/health",
+        "healthyWhen": "HTTP 2xx response"
+      },
+      "meter-service": {
+        "method": "GET",
+        "path": "/api/meter/health",
+        "healthyWhen": "HTTP 2xx response"
+      },
+      "dispatch-service": {
+        "method": "GET",
+        "path": "/api/dispatch/health",
+        "healthyWhen": "HTTP 2xx response"
+      }
+    },
+    "staticHealth": {
+      "mongodb": "in-cluster",
+      "rabbitmq": "in-cluster",
+      "grid-dashboard": "in-cluster",
+      "ops-console": "in-cluster",
+      "load-simulator": "in-cluster",
+      "grid-worker": "disabled-replicas-0",
+      "forecast-service": "optional-absent"
+    },
+    "unsupportedInV1": [
+      "direct local Mission Control API reads",
+      "Kubernetes pod listing from browser JavaScript",
+      "Kubernetes events in the browser",
+      "pod logs in the browser",
+      "write, exec, shell, secret, scale, patch, restart, or remediation actions"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "grid-dashboard",
+      "label": "Consumer Portal",
+      "resourceName": "grid-dashboard",
+      "metaphor": "Customer Energy Portal",
+      "kind": "service",
+      "icon": "dashboard",
+      "position": { "x": 120, "y": 120 },
+      "healthSource": "static"
+    },
+    {
+      "id": "ops-console",
+      "label": "Grid Operations Console",
+      "resourceName": "ops-console",
+      "metaphor": "Control Room",
+      "kind": "service",
+      "icon": "console",
+      "position": { "x": 120, "y": 320 },
+      "healthSource": "static"
+    },
+    {
+      "id": "meter-service",
+      "label": "Meter Service",
+      "resourceName": "meter-service",
+      "metaphor": "Smart Meter Ingestion",
+      "kind": "service",
+      "icon": "meter",
+      "position": { "x": 360, "y": 120 },
+      "healthSource": "live",
+      "healthPath": "/api/meter/health"
+    },
+    {
+      "id": "asset-service",
+      "label": "Asset Service",
+      "resourceName": "asset-service",
+      "metaphor": "Asset Catalog",
+      "kind": "service",
+      "icon": "assets",
+      "position": { "x": 360, "y": 320 },
+      "healthSource": "live",
+      "healthPath": "/api/assets/health"
+    },
+    {
+      "id": "dispatch-service",
+      "label": "Dispatch Service",
+      "resourceName": "dispatch-service",
+      "metaphor": "Energy Dispatch",
+      "kind": "service",
+      "icon": "dispatch",
+      "position": { "x": 600, "y": 220 },
+      "healthSource": "live",
+      "healthPath": "/api/dispatch/health"
+    },
+    {
+      "id": "rabbitmq",
+      "label": "RabbitMQ",
+      "resourceName": "rabbitmq",
+      "metaphor": "Event Bus",
+      "kind": "datastore",
+      "icon": "queue",
+      "position": { "x": 600, "y": 60 },
+      "healthSource": "static"
+    },
+    {
+      "id": "mongodb",
+      "label": "MongoDB",
+      "resourceName": "mongodb",
+      "metaphor": "Meter Data Store",
+      "kind": "datastore",
+      "icon": "database",
+      "position": { "x": 840, "y": 220 },
+      "healthSource": "static"
+    },
+    {
+      "id": "load-simulator",
+      "label": "Load Simulator",
+      "resourceName": "load-simulator",
+      "metaphor": "Consumer Demand Simulator",
+      "kind": "service",
+      "icon": "simulator",
+      "position": { "x": 360, "y": 520 },
+      "healthSource": "static"
+    },
+    {
+      "id": "grid-worker",
+      "label": "Grid Worker",
+      "resourceName": "grid-worker",
+      "metaphor": "Dispatch Worker",
+      "kind": "service",
+      "icon": "worker",
+      "position": { "x": 600, "y": 520 },
+      "healthSource": "static",
+      "replicas": 0,
+      "stateNote": "Disabled in application.yaml with replicas: 0 due to AMQP protocol mismatch"
+    },
+    {
+      "id": "forecast-service",
+      "label": "Forecast Service",
+      "resourceName": "forecast-service",
+      "metaphor": "Demand Forecast",
+      "kind": "service",
+      "icon": "forecast",
+      "position": { "x": 840, "y": 420 },
+      "healthSource": "optional",
+      "optional": true,
+      "absentBehavior": "Render as unknown with label Optional service absent in current deployment"
+    }
+  ],
+  "edges": [
+    { "source": "grid-dashboard", "target": "meter-service", "label": "Usage and billing data", "type": "sync" },
+    { "source": "grid-dashboard", "target": "asset-service", "label": "Asset catalog reads", "type": "sync" },
+    { "source": "ops-console", "target": "dispatch-service", "label": "Operations data", "type": "sync" },
+    { "source": "ops-console", "target": "asset-service", "label": "Asset inventory", "type": "sync" },
+    { "source": "meter-service", "target": "rabbitmq", "label": "Meter events", "type": "async" },
+    { "source": "meter-service", "target": "mongodb", "label": "Meter readings", "type": "sync" },
+    { "source": "rabbitmq", "target": "dispatch-service", "label": "Dispatch commands", "type": "async" },
+    { "source": "dispatch-service", "target": "mongodb", "label": "Grid state writes", "type": "sync" },
+    { "source": "asset-service", "target": "mongodb", "label": "Asset catalog data", "type": "sync" },
+    { "source": "dispatch-service", "target": "asset-service", "label": "Asset lookups", "type": "sync" },
+    { "source": "asset-service", "target": "forecast-service", "label": "Demand forecast", "type": "sync", "optional": true },
+    { "source": "load-simulator", "target": "meter-service", "label": "Simulated meter usage", "type": "sync" },
+    { "source": "grid-worker", "target": "dispatch-service", "label": "Disabled dispatch processing path", "type": "sync", "disabled": true }
+  ]
+}

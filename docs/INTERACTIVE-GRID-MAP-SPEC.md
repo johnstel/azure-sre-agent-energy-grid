@@ -443,7 +443,7 @@ The grid map must not consume local Mission Control APIs. Issue A must select an
 2. Add a small read-only in-cluster status endpoint or sidecar specifically for demo topology health, with no secret, exec, shell, or remediation access.
 3. Split V1 into a static/topology-only cloud demo map plus explicit follow-up work for richer Kubernetes-derived state.
 
-Do not wire the cloud map to local Mission Control APIs as an implementation shortcut.
+Do not wire the cloud map to local Mission Control APIs as an implementation shortcut. The Issue A decision is captured in [Cloud Grid Map data contract](CLOUD-GRID-MAP-DATA-CONTRACT.md), with reusable topology in `k8s/base/grid-map-topology.json`.
 
 ### 5.4 Source and Citation Fields
 

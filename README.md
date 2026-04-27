@@ -175,7 +175,8 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - [Kubernetes Service Troubleshooting](docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md)
 - [Azure Networking Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Cost Estimation](docs/COSTS.md)
-- [Interactive Grid Map Spec](docs/INTERACTIVE-GRID-MAP-SPEC.md) — design spec for the topology map screen (pending expert review)
+- [Interactive Grid Map Spec](docs/INTERACTIVE-GRID-MAP-SPEC.md) — approved cloud-demo topology map specification
+- [Cloud Grid Map Data Contract](docs/CLOUD-GRID-MAP-DATA-CONTRACT.md) — selected cloud host, V1 health sources, and reusable topology config for the grid map
 
 ## 🤝 Contributing
 
