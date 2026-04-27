@@ -702,3 +702,48 @@ Cluster `aks-gridmon-dev` was in **STOPPED** power state, preventing all Contain
 **Security posture must be preserved during headroom fixes:** Do not disable Defender, Retina, monitoring, admission/security policies, resource requests/limits, affinity, or tolerations to make scheduling green. Do not delete pods blindly; capture before/after Pending pods, describe events, node allocatable/requested capacity, node pool SKU/count/maxPods, kube-system DaemonSet readiness, and `energy` workload health.
 
 **Immutable maxPods drift requires maintenance, not redeploy:** AKS node pool `maxPods` cannot be changed in place. For existing demo-prod pools, use a maintenance-window blue/green node pool replacement with temporary capacity and subnet/IP preflight, then verify canonical pool names return with the desired maxPods.
+
+---
+
+## 2026-04-27: Local Analyst Expansion — Infrastructure Query Feature Backlog
+
+**Task**: Participate in analyst feature expansion research + issue backlog creation.
+
+**Role in Wave**:
+- **B1 (Feature):** Implement AKS read-only query tools in Analyst backend (owner)
+- **B2 (Feature):** Implement Log Analytics KQL query tool for Analyst (owner)
+
+**Ownership Assignment**:
+- Reassigned to Ripley from Parker (corrected by Dallas architecture review)
+- Rationale: Ripley owns infrastructure integration per charter; AKS + Log Analytics backend integration are infra-level concerns
+
+**Key Constraints**:
+- All 10 existing Analyst safety controls must be preserved (permission handler, system prompt lock, tool isolation, concurrency gate, timeout, input validation, error masking, snapshot stripping, untrusted context marking, size limits)
+- New tools added to explicit allowlist; default policy `reject` for unknown queries
+- No write operations to any Azure resource or K8s object
+- No secrets/tokens/connection strings exposed in responses
+- Graceful degradation: if Azure query fails, Analyst says "couldn't query — check manually" (not hallucinated)
+- Response latency <10s for infrastructure queries
+- Works in dev container with `az login --use-device-code`
+
+**Feature Acceptance Criteria**:
+- Data source cited (tool name, query, timestamp)
+- Limitations disclosed when data incomplete
+- Unit + integration tests for tool handlers
+- Negative tests: Analyst refuses out-of-scope queries (writes, unauthorized namespaces)
+- Demo fitness: adds value to "deploy → break → diagnose" flow
+
+**Blocked On**: 
+- A2 approval (governance model docs) — John must approve before B1/B2 begin
+
+**Data Access Hierarchy** (Priority 1 → 3):
+1. Azure CLI passthrough (AKS queries — already tested in Mission Control)
+2. Azure SDK (Log Analytics + Application Insights structured queries)
+3. Portal deep-links (complex dashboards)
+
+**Issues Created**: #8 (AKS queries), #9 (Log Analytics KQL)
+
+**Next**: John approves governance docs (#6–#7); Ripley begins B1/B2 implementation.
+
+**Status**: ✅ Issues #8–#9 created; awaiting governance doc approval gate
+

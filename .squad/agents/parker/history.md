@@ -945,3 +945,33 @@ Used `"alert.scenarios": "oom-killed,crash-loop"` comma-separated format for mul
 **Validation:** ✅ Build passed, ✅ Lint passed
 
 **Learning:** When classifying deployment health, only current operational state should drive severity. Historical events are valuable context but should not override "all pods ready, all endpoints ready, zero restarts" evidence.
+
+---
+
+## 2026-04-27: Local Analyst Expansion — Issue Backlog Created
+
+**Task**: Participate in analyst feature expansion research + issue creation.
+
+**Role in Wave**:
+- **A1 (Spike):** Research SRE Agent REST API v2 preview surface (owner)
+- **B3 (Feature):** Build Analyst response UI: source badges, tool citations, limitations (owner)
+- **C1 (Feature):** Integrate SRE Agent portal deep-linking with context pre-fill (owner)
+- **C2 (Feature):** Direct SRE Agent REST API integration — conditional on A1 spike findings (owner)
+
+**Key Decisions**:
+- A1 spike gates all SRE Agent API work (conversation endpoints undocumented in preview)
+- C1 (portal deep-links) ships first with proven fallback; C2 only if spike succeeds
+- Portal deep-linking uses `https://aka.ms/sreagent/portal` with context pre-fill from Analyst
+- All new tools require explicit allowlist + fail-closed policy on unknown queries
+- Mandatory acceptance criteria: 10 safety controls preserved, data boundaries cited, <10s latency, demo fitness
+
+**Ownership Correction**:
+- Originally assigned AKS + Log Analytics backend features; corrected to Ripley (infra integration owner)
+- UI components remain with Parker (K8s/SRE surface owner per charter)
+
+**Issues Created**: #5 (spike), #10 (UI), #11 (portal deep-links), #12 (REST API — conditional)
+
+**Next**: John reviews docs issues #6–#7 (governance gate) before feature work begins.
+
+**Status**: ✅ Issues #5, #10–#12 created; awaiting John approval for docs gates
+

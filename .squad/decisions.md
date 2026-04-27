@@ -623,3 +623,137 @@ Issue-driven work keeps production findings visible, reviewable, prioritized, an
 **Next Owner:** Senior Developer (assigned)
 
 **Rationale:** Keeps John in Mission Control wallboard; enables single-deck demo flow; maintains safe language (portal outputs are pending, not automated).
+
+---
+
+### 2026-04-27T00:53:23Z: Local Analyst Issue Backlog — Lambert Proposal
+
+**By:** Lambert (QA/Docs specialist)  
+**Input:** Contractor research from PM, UX, Code Discovery, Security, SRE  
+**Status:** ✅ Approved by Dallas (with corrections); ready for John review  
+**Related:** `dallas-analyst-issue-scope.md` (Dallas corrections)  
+
+**What:** Local Analyst expansion to interact with Mission Control, Azure infrastructure, and Azure SRE Agent. Proposed 7-issue backlog split across:
+- **1 spike:** SRE Agent REST API v2 preview research
+- **2 docs-only:** Governance model + safe language guardrails
+- **4 features:** AKS queries, Log Analytics integration, UI components, portal deep-linking
+
+**Key Findings:**
+- SRE Agent exposes REST API v2 (preview) but conversation submission/approval endpoints **undocumented in public preview**
+- Mission Control already validates Azure CLI availability; prioritize CLI passthrough → SDK → portal fallback
+- Security review requires explicit read-only guardrails: tool allowlist + fail-closed policy
+- UX research recommends 5 phases; only phases 1–3 (transparency → read-only queries → SRE Agent consultation relay) in scope. Phases 4–5 (remediation + execution) deferred.
+
+**Data Access Hierarchy:**
+1. Azure CLI passthrough (AKS queries — already tested)
+2. Azure SDK (Log Analytics + Application Insights structured queries)
+3. Portal deep-links (complex dashboards/views)
+
+**Governance Model:** Every tool/query requires explicit approval policy:
+```
+'get_aks_state': 'approved'
+'query_log_analytics': 'approved'
+'*': 'rejected'  // Everything else fails closed
+```
+
+**Why This Backlog Works:**
+- Unblocks phase 1 quickly (docs + AKS/KQL features shippable in 2 weeks; don't wait for SRE Agent API maturity)
+- Governance-first approach (docs approval gates prevent safety regression before code ships)
+- Parallel research (spike runs independently; feeds phase 2 planning)
+- Risk-managed SRE Agent integration (fallback portal deep-links proven; REST API optional enhancement)
+
+**Next Steps:** John reviews + approves docs issues (#6–#7) as governance gate for implementation features
+
+---
+
+### 2026-04-27T00:53:23Z: Local Analyst Issue Scope — Dallas Architecture Review & Corrections
+
+**By:** Dallas (Lead / Architecture Gate Owner)  
+**Input:** Lambert's 7-issue backlog proposal + contractor research constraints  
+**Status:** ✅ Approved; corrected backlog structured into 3 priority groups  
+**Related:** `lambert-analyst-issue-backlog.md` (Lambert's original proposal)  
+
+**Verdict:** YES — Create issues, with corrections
+
+**Critical Constraints (From Research):**
+1. **No confirmed stable public API** for programmatic SRE Agent conversation submission. REST API v2 exists in preview; conversation/approval endpoints undocumented. Any direct SRE Agent integration must be spike or docs-only.
+2. **Current analyst has 10 production-grade safety controls.** Any expansion must preserve all 10: permission handler, system prompt lock, tool isolation, concurrency gate, timeout, input validation, error masking, snapshot stripping, untrusted context marking, size limits.
+3. **Read-only first, remediation later.** UX phases 1–3 only; phases 4–5 (remediation proposals, gated execution) explicitly out of scope.
+4. **Demo apps do NOT emit custom App Insights telemetry.** Only infrastructure-level Container Insights data is queryable. Don't promise app-level telemetry.
+
+**Corrected Backlog (8 Issues Total):**
+
+**Priority Group A — No Dependencies, Start Immediately:**
+- **A1 (Spike):** Research Azure SRE Agent REST API v2 preview surface — Parker
+- **A2 (Docs):** Local Analyst governance model and tool policy — Lambert
+- **A3 (Docs):** Safe language guardrails for expanded Analyst — Lambert
+
+**Priority Group B — Blocked on A2 Approval:**
+- **B1 (Feature):** Implement AKS read-only query tools in Analyst backend — Ripley (corrected from Parker)
+- **B2 (Feature):** Implement Log Analytics KQL query tool for Analyst — Ripley (corrected from Parker)
+- **B3 (Feature):** Build Analyst response UI: source badges, tool citations, limitations — Parker
+
+**Priority Group C — Blocked on A1 Spike Outcome:**
+- **C1 (Feature):** Integrate SRE Agent portal deep-linking with context pre-fill — Parker (shippable, proven)
+- **C2 (Feature):** Direct SRE Agent REST API integration (if feasible) — Parker (speculative, conditional on spike)
+
+**Ownership Corrections:**
+| Lambert Proposed | Dallas Corrected | Reason |
+|-----------------|-----------------|--------|
+| Parker owns AKS query extension | **Ripley** owns B1, B2 | Ripley owns infra integration; these are backend service changes to add Azure SDK/CLI tools |
+| Dallas owns UI components | **Parker** owns B3 | Parker owns K8s/SRE surface; Dallas reviews, does not implement |
+| Single SRE Agent issue | **Split into C1 + C2** | Deep-linking (C1) shippable; REST API (C2) speculative; gated on spike |
+
+**Mandatory Acceptance Criteria (Every Feature):**
+
+*Safety & Governance:*
+- [ ] All 10 existing safety controls preserved
+- [ ] New tools added to explicit allowlist; default policy `reject`
+- [ ] System prompt updated; declares capabilities AND limitations
+- [ ] No write operations; no secrets/tokens/connection strings exposed
+
+*Data Boundaries:*
+- [ ] Responses cite data source (tool name, query, timestamp)
+- [ ] Limitations disclosed when data incomplete
+- [ ] Graceful degradation: if Azure query fails, analyst says "I couldn't query this — check manually"
+
+*Testing:*
+- [ ] Unit tests for new tool handlers
+- [ ] Integration test: analyst correctly uses new tool when asked
+- [ ] Negative test: analyst refuses out-of-scope queries (writes, unauthorized namespaces)
+
+*Demo Fitness:*
+- [ ] Works in dev container with `az login --use-device-code`
+- [ ] Adds value to "deploy → break → diagnose" demo flow
+- [ ] Response latency <10s for infrastructure queries
+
+**Issues That Must Be Spikes/Docs-Only:**
+- **A1 (SRE Agent API spike):** Endpoints undocumented; building against unstable preview = rework when it changes
+- **C2 (Direct SRE Agent REST API):** Depends entirely on A1 findings; may not be feasible
+- **A2, A3 (Docs):** Must be reviewed + approved BEFORE code changes analyst's behavior
+
+**Sequencing:**
+```
+Week 1:  A1 (spike) ──────────────┐
+         A2 (governance docs) ─┐  │
+         A3 (safe language) ────┤  │
+                               │  │
+Week 2:  [John reviews A2, A3] ┤  │
+         B1 (AKS) ──────────────┤  │
+         B2 (KQL) ──────────────┤  │
+         B3 (UI) ───────────────┘  │
+                                  │
+Week 3:  [A1 spike concludes] ────┤
+         C1 (deep-links) ─────────┘
+         C2 (REST API) – only if A1 succeeds
+```
+
+**Out of Scope:**
+- Remediation proposals (UX phase 4)
+- Gated execution (UX phase 5)
+- Multi-cluster aggregation (phase 3 future work)
+- App Insights custom telemetry (demo apps don't emit it)
+- SRE Agent approval workflow (approval API undocumented)
+
+**Why:** Structured backlog removes overclaiming. 3 start immediately (spike + docs). 3 features unblock after docs approved. 2 SRE Agent features conditional on spike findings. All implementation issues carry mandatory safety acceptance criteria. Estimated effort: 3–4 weeks.
+
