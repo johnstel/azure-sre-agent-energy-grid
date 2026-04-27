@@ -507,7 +507,7 @@ data:
           <div class="metric cyan" id="response-time">--<sub> ms</sub></div>
         </div>
       </div>
-    
+
       <h2 class="section-title">&#127981; Energy Assets</h2>
       <div class="card" style="overflow-x:auto;">
         <table id="assets-table">
@@ -515,7 +515,7 @@ data:
           <tbody id="assets-body"><tr><td colspan="5" class="loading">Loading energy assets...</td></tr></tbody>
         </table>
       </div>
-    
+
       <h2 class="section-title">&#128200; Recent Meter Readings</h2>
       <div class="card" style="overflow-x:auto;">
         <table>
@@ -523,12 +523,12 @@ data:
           <tbody id="readings-body"></tbody>
         </table>
       </div>
-    
+
       <h2 class="section-title">&#128506; Service Health</h2>
       <div class="grid" id="health-cards"></div>
     </main>
     <div class="footer">Contoso Energy &mdash; Grid Operations Platform &mdash; Azure SRE Agent Demo Lab</div>
-    
+
     <script>
     const SERVICES = [
       { name: 'Asset Service', url: '/api/assets/health', port: 3002 },
@@ -537,18 +537,18 @@ data:
       { name: 'MongoDB', url: null },
       { name: 'RabbitMQ', url: null },
     ];
-    
+
     const ZONES = ['Zone-A North', 'Zone-B Central', 'Zone-C South', 'Zone-D East', 'Zone-E West'];
     const ASSET_TYPES = ['Solar Farm', 'Wind Turbine', 'Gas Turbine', 'Hydroelectric', 'Battery Storage', 'Substation'];
     const ASSET_NAMES = ['Ridgeline Solar Alpha', 'Cedar Wind Farm', 'Riverside Gas Unit 3', 'Lakeview Hydro Station', 'Eastport Battery Grid', 'Northgate Substation 7', 'Summit Solar Bravo', 'Pinecrest Wind Array', 'Valley Gas Peaker 1', 'Harbor Hydro Complex'];
-    
+
     function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
     function fmt(n) { return n.toLocaleString(); }
-    
+
     function updateClock() {
       document.getElementById('clock').textContent = new Date().toLocaleTimeString();
     }
-    
+
     function updateMetrics() {
       document.getElementById('grid-load').innerHTML = fmt(rand(2800, 4200)) + '<sub> MW</sub>';
       document.getElementById('gen-capacity').innerHTML = fmt(rand(5000, 6500)) + '<sub> MW</sub>';
@@ -557,7 +557,7 @@ data:
       document.getElementById('dispatch-queue').innerHTML = rand(12, 85) + '<sub> events</sub>';
       document.getElementById('response-time').innerHTML = rand(18, 120) + '<sub> ms</sub>';
     }
-    
+
     function loadAssets() {
       fetch('/api/assets/')
         .then(r => r.json())
@@ -584,7 +584,7 @@ data:
             '<tr><td colspan="5" style="color:var(--red)">&#9888; Unable to reach Asset Service</td></tr>';
         });
     }
-    
+
     function loadReadings() {
       const tbody = document.getElementById('readings-body');
       tbody.innerHTML = '';
@@ -599,7 +599,7 @@ data:
         tbody.appendChild(tr);
       }
     }
-    
+
     function loadHealth() {
       const container = document.getElementById('health-cards');
       container.innerHTML = '';
@@ -617,7 +617,7 @@ data:
         container.appendChild(card);
       });
     }
-    
+
     updateClock(); updateMetrics(); loadAssets(); loadReadings(); loadHealth();
     setInterval(updateClock, 1000);
     setInterval(updateMetrics, 5000);
@@ -627,7 +627,7 @@ data:
     </script>
     </body>
     </html>
-    
+
 
 ---
 apiVersion: v1
@@ -758,8 +758,13 @@ data:
       :root { --bg: #0f172a; --card: #1e293b; --accent: #a78bfa; --green: #34d399; --amber: #fbbf24; --red: #f87171; --cyan: #22d3ee; --text: #e2e8f0; --muted: #94a3b8; }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-      header { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); border-bottom: 2px solid var(--accent); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; }
+      header { background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); border-bottom: 2px solid var(--accent); padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
       header h1 { font-size: 1.4rem; font-weight: 600; display: flex; align-items: center; gap: .6rem; }
+      .header-left { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+      .view-toggle { display: inline-flex; gap: .25rem; padding: .25rem; border: 1px solid rgba(167,139,250,.45); border-radius: 999px; background: rgba(15,23,42,.55); }
+      .view-toggle button { border: 0; border-radius: 999px; padding: .45rem .8rem; color: var(--muted); background: transparent; font: inherit; font-size: .85rem; cursor: pointer; }
+      .view-toggle button:hover, .view-toggle button:focus-visible { color: var(--text); outline: 2px solid rgba(34,211,238,.55); outline-offset: 2px; }
+      .view-toggle button[aria-selected="true"] { color: #0f172a; background: var(--green); box-shadow: 0 0 12px rgba(52,211,153,.35); font-weight: 700; }
       .status-bar { display: flex; gap: 1.5rem; font-size: .85rem; }
       .status-bar .item { display: flex; align-items: center; gap: .4rem; }
       .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
@@ -789,78 +794,184 @@ data:
       .log-box .err { color: var(--red); }
       @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
       .loading { animation: pulse 1.5s infinite; color: var(--muted); }
+      .app-view[hidden] { display: none; }
+      .map-toolbar { display: flex; gap: .6rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: .8rem; }
+      .map-controls { display: flex; gap: .5rem; flex-wrap: wrap; }
+      .map-button { background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: var(--text); padding: .45rem .65rem; cursor: pointer; font: inherit; font-size: .85rem; }
+      .map-button:hover, .map-button:focus-visible { border-color: var(--cyan); outline: 2px solid rgba(34,211,238,.35); outline-offset: 2px; }
+      .map-meta { color: var(--muted); font-size: .8rem; }
+      .map-disclaimer { border: 1px solid rgba(251,191,36,.35); background: rgba(120,53,15,.18); color: #fde68a; border-radius: 10px; padding: .8rem 1rem; margin-bottom: 1rem; font-size: .86rem; line-height: 1.45; }
+      .grid-map-shell { position: relative; min-height: 560px; border: 1px solid #334155; border-radius: 12px; overflow: hidden; background: radial-gradient(circle at 50% 0%, rgba(34,211,238,.12), transparent 36%), linear-gradient(180deg, rgba(15,23,42,.96), rgba(2,6,23,.98)); }
+      .grid-map-svg { width: 100%; height: 560px; display: block; touch-action: none; cursor: grab; }
+      .grid-map-svg:active { cursor: grabbing; }
+      .grid-map-svg:focus-visible { outline: 3px solid rgba(34,211,238,.6); outline-offset: -3px; }
+      .map-fallback { position: absolute; inset: 0; display: grid; place-items: center; padding: 2rem; text-align: center; background: rgba(15,23,42,.96); color: var(--muted); line-height: 1.5; }
+      .map-fallback[hidden] { display: none; }
+      .map-edge { stroke: #64748b; stroke-width: 2.4; fill: none; opacity: .82; }
+      .map-edge.disabled { stroke-dasharray: 8 7; opacity: .58; }
+      .map-edge-label { fill: #cbd5e1; font-size: 11px; paint-order: stroke; stroke: #020617; stroke-width: 4px; stroke-linejoin: round; }
+      .map-node .node-box { fill: #182338; stroke: #475569; stroke-width: 1.5; filter: drop-shadow(0 10px 18px rgba(2,6,23,.45)); }
+      .map-node.service .node-box { stroke: rgba(34,211,238,.65); }
+      .map-node.datastore .node-box, .map-node.datastore .node-cap { fill: #14213a; stroke: rgba(167,139,250,.75); stroke-width: 1.5; }
+      .map-node.disabled .node-box { stroke-dasharray: 7 5; opacity: .72; }
+      .map-node text { pointer-events: none; }
+      .map-node-title { fill: var(--text); font-size: 14px; font-weight: 700; }
+      .map-node-subtitle { fill: var(--muted); font-size: 11px; }
+      .map-node-status { fill: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+      .map-status-dot { fill: #94a3b8; }
+      .map-status-dot.healthy { fill: var(--green); filter: drop-shadow(0 0 5px rgba(52,211,153,.85)); }
+      .map-status-dot.disabled { fill: var(--amber); }
+      @media (max-width: 799px), (max-height: 499px) {
+        .grid-map-shell { min-height: 260px; }
+        .grid-map-svg { display: none; }
+        .map-fallback { display: grid; }
+      }
     </style>
     </head>
-    <body>
-    <header>
-      <h1>&#9881; Grid Operations Console</h1>
-      <div class="status-bar">
-        <div class="item"><span class="dot green"></span> Operator Mode</div>
-        <div class="item" id="clock"></div>
-      </div>
-    </header>
-    <main>
-      <div class="grid">
-        <div class="card">
-          <h3>Dispatch Queue Depth</h3>
-          <div class="metric" style="color:var(--accent)" id="queue-depth">--</div>
-        </div>
-        <div class="card">
-          <h3>Active Dispatches</h3>
-          <div class="metric" style="color:var(--cyan)" id="active-dispatches">--</div>
-        </div>
-        <div class="card">
-          <h3>Grid Efficiency</h3>
-          <div class="metric" style="color:var(--green)" id="efficiency">--<sub> %</sub></div>
-        </div>
-        <div class="card">
-          <h3>Alert Count (24h)</h3>
-          <div class="metric" style="color:var(--amber)" id="alert-count">--</div>
-        </div>
-      </div>
-    
-      <h2 class="section-title">&#128640; Active Dispatch Orders</h2>
-      <div class="card" style="overflow-x:auto">
-        <table>
-          <thead><tr><th>Dispatch ID</th><th>Type</th><th>Zone</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
-          <tbody id="dispatch-body"></tbody>
-        </table>
-      </div>
-    
-      <h2 class="section-title">&#127981; Energy Asset Inventory</h2>
-      <div class="card" style="overflow-x:auto">
-        <table>
-          <thead><tr><th>Asset ID</th><th>Name</th><th>Type</th><th>Output</th><th>Efficiency</th><th>Status</th></tr></thead>
-          <tbody id="assets-body"><tr><td colspan="6" class="loading">Loading assets...</td></tr></tbody>
-        </table>
-      </div>
-    
-      <h2 class="section-title">&#128195; Operations Log</h2>
-      <div class="log-box" id="ops-log"></div>
-    
-      <h2 class="section-title">&#128506; Platform Health</h2>
-      <div class="grid" id="health-grid"></div>
-    </main>
+     <body>
+     <header>
+       <div class="header-left">
+         <h1>&#9881; Grid Operations Console</h1>
+         <nav class="view-toggle" aria-label="Console views">
+           <button type="button" id="operations-tab" data-view-target="operations" aria-selected="true">Operations</button>
+           <button type="button" id="map-tab" data-view-target="map" aria-selected="false">Grid Map</button>
+         </nav>
+       </div>
+       <div class="status-bar">
+         <div class="item"><span class="dot green"></span> Operator Mode</div>
+         <div class="item" id="clock"></div>
+       </div>
+     </header>
+     <main>
+       <section id="operations-view" class="app-view" data-view="operations">
+         <div class="grid">
+           <div class="card">
+             <h3>Dispatch Queue Depth</h3>
+             <div class="metric" style="color:var(--accent)" id="queue-depth">--</div>
+           </div>
+           <div class="card">
+             <h3>Active Dispatches</h3>
+             <div class="metric" style="color:var(--cyan)" id="active-dispatches">--</div>
+           </div>
+           <div class="card">
+             <h3>Grid Efficiency</h3>
+             <div class="metric" style="color:var(--green)" id="efficiency">--<sub> %</sub></div>
+           </div>
+           <div class="card">
+             <h3>Alert Count (24h)</h3>
+             <div class="metric" style="color:var(--amber)" id="alert-count">--</div>
+           </div>
+         </div>
+
+         <h2 class="section-title">&#128640; Active Dispatch Orders</h2>
+         <div class="card" style="overflow-x:auto">
+           <table>
+             <thead><tr><th>Dispatch ID</th><th>Type</th><th>Zone</th><th>Priority</th><th>Status</th><th>Assigned</th></tr></thead>
+             <tbody id="dispatch-body"></tbody>
+           </table>
+         </div>
+
+         <h2 class="section-title">&#127981; Energy Asset Inventory</h2>
+         <div class="card" style="overflow-x:auto">
+           <table>
+             <thead><tr><th>Asset ID</th><th>Name</th><th>Type</th><th>Output</th><th>Efficiency</th><th>Status</th></tr></thead>
+             <tbody id="assets-body"><tr><td colspan="6" class="loading">Loading assets...</td></tr></tbody>
+           </table>
+         </div>
+
+         <h2 class="section-title">&#128195; Operations Log</h2>
+         <div class="log-box" id="ops-log"></div>
+
+         <h2 class="section-title">&#128506; Platform Health</h2>
+         <div class="grid" id="health-grid"></div>
+       </section>
+
+       <section id="map-view" class="app-view" data-view="map" hidden>
+         <div class="map-toolbar">
+           <div>
+             <h2 class="section-title" style="margin-top:0">&#128506; Cloud Demo Grid Map</h2>
+             <div class="map-meta">Static topology from the approved cloud grid-map data contract. Live severity binding is intentionally deferred.</div>
+           </div>
+           <div class="map-controls" aria-label="Grid map controls">
+             <button class="map-button" type="button" id="map-zoom-in">Zoom in</button>
+             <button class="map-button" type="button" id="map-zoom-out">Zoom out</button>
+             <button class="map-button" type="button" id="map-reset">Fit / Reset</button>
+           </div>
+         </div>
+         <div class="map-disclaimer" role="note">
+           Demo topology only. This map visualizes Kubernetes service/application health for the Azure SRE Agent demo and is not connected to real grid telemetry, SCADA, GIS, or utility infrastructure.
+         </div>
+         <div class="card">
+           <div class="grid-map-shell" id="grid-map-shell">
+             <svg id="grid-map-svg" class="grid-map-svg" role="img" aria-label="Static cloud demo topology graph with service and data-store nodes" tabindex="0">
+               <g id="grid-map-stage"></g>
+             </svg>
+             <div class="map-fallback" id="map-fallback" hidden>
+               <div>
+                 <strong>Grid map needs at least 800 × 500 pixels.</strong><br>
+                 Increase the browser window or use a larger display to view the topology safely.
+               </div>
+             </div>
+           </div>
+         </div>
+       </section>
+     </main>
     <div class="footer">Contoso Energy &mdash; Grid Operations Console &mdash; Azure SRE Agent Demo Lab</div>
-    
+
     <script>
     const ZONES = ['Zone-A North', 'Zone-B Central', 'Zone-C South', 'Zone-D East', 'Zone-E West'];
     const DISPATCH_TYPES = ['Load Balance', 'Frequency Adj', 'Capacity Shift', 'Emergency Shed', 'Reserve Activate', 'Ramp Up', 'Ramp Down'];
-    const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
-    const ASSET_TYPES = ['Solar Farm', 'Wind Array', 'Gas Turbine', 'Hydroelectric', 'Battery Bank', 'Substation'];
-    const ASSET_NAMES = ['Ridgeline Solar Alpha', 'Cedar Wind Farm', 'Riverside Gas Unit 3', 'Lakeview Hydro Station', 'Eastport Battery Grid', 'Northgate Substation 7', 'Summit Solar Bravo', 'Pinecrest Wind Array', 'Valley Gas Peaker 1', 'Harbor Hydro Complex'];
-    
+     const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
+     const ASSET_TYPES = ['Solar Farm', 'Wind Array', 'Gas Turbine', 'Hydroelectric', 'Battery Bank', 'Substation'];
+     const ASSET_NAMES = ['Ridgeline Solar Alpha', 'Cedar Wind Farm', 'Riverside Gas Unit 3', 'Lakeview Hydro Station', 'Eastport Battery Grid', 'Northgate Substation 7', 'Summit Solar Bravo', 'Pinecrest Wind Array', 'Valley Gas Peaker 1', 'Harbor Hydro Complex'];
+     const GRID_TOPOLOGY = {
+       schemaVersion: '1.0',
+       host: 'ops-console',
+       namespace: 'energy',
+       disclaimer: 'Demo topology only. This map visualizes Kubernetes service/application health for the Azure SRE Agent demo and is not connected to real grid telemetry, SCADA, GIS, or utility infrastructure.',
+       nodes: [
+         { id: 'grid-dashboard', label: 'Consumer Portal', resourceName: 'grid-dashboard', metaphor: 'Customer Energy Portal', kind: 'service', position: { x: 120, y: 120 }, healthSource: 'static' },
+         { id: 'ops-console', label: 'Grid Operations Console', resourceName: 'ops-console', metaphor: 'Control Room', kind: 'service', position: { x: 120, y: 320 }, healthSource: 'static' },
+         { id: 'meter-service', label: 'Meter Service', resourceName: 'meter-service', metaphor: 'Smart Meter Ingestion', kind: 'service', position: { x: 360, y: 120 }, healthSource: 'live', healthPath: '/api/meter/health' },
+         { id: 'asset-service', label: 'Asset Service', resourceName: 'asset-service', metaphor: 'Asset Catalog', kind: 'service', position: { x: 360, y: 320 }, healthSource: 'live', healthPath: '/api/assets/health' },
+         { id: 'dispatch-service', label: 'Dispatch Service', resourceName: 'dispatch-service', metaphor: 'Energy Dispatch', kind: 'service', position: { x: 600, y: 220 }, healthSource: 'live', healthPath: '/api/dispatch/health' },
+         { id: 'rabbitmq', label: 'RabbitMQ', resourceName: 'rabbitmq', metaphor: 'Event Bus', kind: 'datastore', position: { x: 600, y: 60 }, healthSource: 'static' },
+         { id: 'mongodb', label: 'MongoDB', resourceName: 'mongodb', metaphor: 'Meter Data Store', kind: 'datastore', position: { x: 840, y: 220 }, healthSource: 'static' },
+         { id: 'load-simulator', label: 'Load Simulator', resourceName: 'load-simulator', metaphor: 'Consumer Demand Simulator', kind: 'service', position: { x: 360, y: 520 }, healthSource: 'static' },
+         { id: 'grid-worker', label: 'Grid Worker', resourceName: 'grid-worker', metaphor: 'Dispatch Worker', kind: 'service', position: { x: 600, y: 520 }, healthSource: 'static', replicas: 0, stateNote: 'Disabled in application.yaml with replicas: 0 due to AMQP protocol mismatch' },
+         { id: 'forecast-service', label: 'Forecast Service', resourceName: 'forecast-service', metaphor: 'Demand Forecast', kind: 'service', position: { x: 840, y: 420 }, healthSource: 'optional', optional: true, absentBehavior: 'Render as unknown with label Optional service absent in current deployment' }
+       ],
+       edges: [
+         { source: 'grid-dashboard', target: 'meter-service', label: 'Usage and billing data', type: 'sync' },
+         { source: 'grid-dashboard', target: 'asset-service', label: 'Asset catalog reads', type: 'sync' },
+         { source: 'ops-console', target: 'dispatch-service', label: 'Operations data', type: 'sync' },
+         { source: 'ops-console', target: 'asset-service', label: 'Asset inventory', type: 'sync' },
+         { source: 'meter-service', target: 'rabbitmq', label: 'Meter events', type: 'async' },
+         { source: 'meter-service', target: 'mongodb', label: 'Meter readings', type: 'sync' },
+         { source: 'rabbitmq', target: 'dispatch-service', label: 'Dispatch commands', type: 'async' },
+         { source: 'dispatch-service', target: 'mongodb', label: 'Grid state writes', type: 'sync' },
+         { source: 'asset-service', target: 'mongodb', label: 'Asset catalog data', type: 'sync' },
+         { source: 'dispatch-service', target: 'asset-service', label: 'Asset lookups', type: 'sync' },
+         { source: 'asset-service', target: 'forecast-service', label: 'Demand forecast', type: 'sync', optional: true },
+         { source: 'load-simulator', target: 'meter-service', label: 'Simulated meter usage', type: 'sync' },
+         { source: 'grid-worker', target: 'dispatch-service', label: 'Disabled dispatch processing path', type: 'sync', disabled: true }
+       ]
+     };
+     const MAP_NODE = { width: 176, height: 76 };
+     const SVG_NS = 'http://www.w3.org/2000/svg';
+     const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0 };
+
     function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-    
+
     function updateClock() { document.getElementById('clock').textContent = new Date().toLocaleTimeString(); }
-    
+
     function updateMetrics() {
       document.getElementById('queue-depth').textContent = rand(5, 42);
       document.getElementById('active-dispatches').textContent = rand(3, 18);
       document.getElementById('efficiency').innerHTML = (92 + Math.random() * 7).toFixed(1) + '<sub> %</sub>';
       document.getElementById('alert-count').textContent = rand(2, 15);
     }
-    
+
     function loadDispatches() {
       const tbody = document.getElementById('dispatch-body');
       tbody.innerHTML = '';
@@ -881,7 +992,7 @@ data:
         tbody.appendChild(tr);
       }
     }
-    
+
     function loadAssets() {
       fetch('/api/assets/')
         .then(r => r.json())
@@ -909,7 +1020,7 @@ data:
             '<tr><td colspan="6" style="color:var(--red)">&#9888; Asset Service unavailable</td></tr>';
         });
     }
-    
+
     const LOG_MESSAGES = [
       { level: 'info', msg: 'Dispatch DSP-{id} completed for {zone}' },
       { level: 'info', msg: 'Meter batch processed: {n} readings ingested' },
@@ -922,7 +1033,7 @@ data:
       { level: 'warn', msg: 'Dispatch backlog growing in {zone}' },
       { level: 'info', msg: 'RabbitMQ consumer reconnected successfully' },
     ];
-    
+
     function addLogEntry() {
       const box = document.getElementById('ops-log');
       const tmpl = LOG_MESSAGES[rand(0, LOG_MESSAGES.length - 1)];
@@ -933,10 +1044,10 @@ data:
       box.prepend(line);
       if (box.children.length > 50) box.removeChild(box.lastChild);
     }
-    
-    function loadHealth() {
-      const grid = document.getElementById('health-grid');
-      grid.innerHTML = '';
+
+     function loadHealth() {
+       const grid = document.getElementById('health-grid');
+       grid.innerHTML = '';
       const svcs = [
         { name: 'Asset Service', url: '/api/assets/health' },
         { name: 'Meter Service', url: '/api/meter/health' },
@@ -955,11 +1066,268 @@ data:
         } else {
           card.innerHTML = '<h3>' + svc.name + '</h3><div style="color:var(--muted)"><span class="dot green"></span> In-Cluster</div>';
         }
-        grid.appendChild(card);
-      });
-    }
-    
-    updateClock(); updateMetrics(); loadDispatches(); loadAssets(); loadHealth();
+         grid.appendChild(card);
+       });
+     }
+
+     function createSvgElement(name, attrs) {
+       const el = document.createElementNS(SVG_NS, name);
+       Object.keys(attrs || {}).forEach(key => el.setAttribute(key, attrs[key]));
+       return el;
+     }
+
+     function getMapStatus(node) {
+       if (node.replicas === 0) return { text: 'disabled', className: 'disabled' };
+       if (node.optional) return { text: 'optional absent', className: 'unknown' };
+       if (node.healthSource === 'live') return { text: 'unknown', className: 'unknown' };
+       return { text: 'static in-cluster', className: 'unknown' };
+     }
+
+     function nodeCenter(node) {
+       return { x: node.position.x + MAP_NODE.width / 2, y: node.position.y + MAP_NODE.height / 2 };
+     }
+
+     function edgeAnchor(from, to) {
+       const a = nodeCenter(from);
+       const b = nodeCenter(to);
+       const dx = b.x - a.x;
+       const dy = b.y - a.y;
+       const scale = Math.max(Math.abs(dx) / (MAP_NODE.width / 2), Math.abs(dy) / (MAP_NODE.height / 2), 1);
+       return { x: a.x + dx / scale, y: a.y + dy / scale };
+     }
+
+     function renderServiceNode(stage, node) {
+       const status = getMapStatus(node);
+       const group = createSvgElement('g', {
+         class: 'map-node service ' + status.className,
+         tabindex: '0',
+         role: 'img',
+         'aria-label': node.label + ', ' + node.metaphor + ', ' + status.text
+       });
+       const x = node.position.x;
+       const y = node.position.y;
+       group.appendChild(createSvgElement('rect', { class: 'node-box', x, y, width: MAP_NODE.width, height: MAP_NODE.height, rx: 14, ry: 14 }));
+       group.appendChild(createSvgElement('circle', { class: 'map-status-dot ' + status.className, cx: x + 16, cy: y + 18, r: 5 }));
+       const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 23 });
+       title.textContent = node.label;
+       group.appendChild(title);
+       const subtitle = createSvgElement('text', { class: 'map-node-subtitle', x: x + 16, y: y + 46 });
+       subtitle.textContent = node.metaphor;
+       group.appendChild(subtitle);
+       const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 64 });
+       state.textContent = status.text;
+       group.appendChild(state);
+       stage.appendChild(group);
+     }
+
+     function renderDataStoreNode(stage, node) {
+       const status = getMapStatus(node);
+       const group = createSvgElement('g', {
+         class: 'map-node datastore ' + status.className,
+         tabindex: '0',
+         role: 'img',
+         'aria-label': node.label + ', data store, ' + node.metaphor + ', ' + status.text
+       });
+       const x = node.position.x;
+       const y = node.position.y;
+       group.appendChild(createSvgElement('rect', { class: 'node-box', x, y: y + 12, width: MAP_NODE.width, height: MAP_NODE.height - 24, rx: 6, ry: 6 }));
+       group.appendChild(createSvgElement('ellipse', { class: 'node-cap', cx: x + MAP_NODE.width / 2, cy: y + 13, rx: MAP_NODE.width / 2, ry: 14 }));
+       group.appendChild(createSvgElement('ellipse', { class: 'node-cap', cx: x + MAP_NODE.width / 2, cy: y + MAP_NODE.height - 12, rx: MAP_NODE.width / 2, ry: 14 }));
+       group.appendChild(createSvgElement('circle', { class: 'map-status-dot ' + status.className, cx: x + 16, cy: y + 22, r: 5 }));
+       const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 27 });
+       title.textContent = node.label;
+       group.appendChild(title);
+       const subtitle = createSvgElement('text', { class: 'map-node-subtitle', x: x + 16, y: y + 50 });
+       subtitle.textContent = node.metaphor;
+       group.appendChild(subtitle);
+       const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 67 });
+       state.textContent = status.text;
+       group.appendChild(state);
+       stage.appendChild(group);
+     }
+
+     function renderGridMap() {
+       const svg = document.getElementById('grid-map-svg');
+       const stage = document.getElementById('grid-map-stage');
+       if (!svg || !stage || mapState.rendered) return;
+       stage.innerHTML = '';
+       const defs = createSvgElement('defs');
+       const marker = createSvgElement('marker', { id: 'map-arrowhead', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' });
+       marker.appendChild(createSvgElement('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#94a3b8' }));
+       defs.appendChild(marker);
+       stage.appendChild(defs);
+
+       const nodesById = GRID_TOPOLOGY.nodes.reduce((acc, node) => {
+         acc[node.id] = node;
+         return acc;
+       }, {});
+
+       GRID_TOPOLOGY.edges.forEach(edge => {
+         const source = nodesById[edge.source];
+         const target = nodesById[edge.target];
+         if (!source || !target) return;
+         const start = edgeAnchor(source, target);
+         const end = edgeAnchor(target, source);
+         const edgeLine = createSvgElement('line', {
+           class: 'map-edge' + (edge.disabled || edge.optional ? ' disabled' : ''),
+           x1: start.x,
+           y1: start.y,
+           x2: end.x,
+           y2: end.y,
+           'marker-end': 'url(#map-arrowhead)'
+         });
+         stage.appendChild(edgeLine);
+         const label = createSvgElement('text', { class: 'map-edge-label', x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 8, 'text-anchor': 'middle' });
+         label.textContent = edge.label;
+         stage.appendChild(label);
+       });
+
+       GRID_TOPOLOGY.nodes.forEach(node => {
+         if (node.kind === 'datastore') renderDataStoreNode(stage, node);
+         else renderServiceNode(stage, node);
+       });
+
+       mapState.rendered = true;
+       bindGridMapInteractions();
+       fitGridMap();
+     }
+
+     function getMapBounds() {
+       const xs = GRID_TOPOLOGY.nodes.map(n => n.position.x);
+       const ys = GRID_TOPOLOGY.nodes.map(n => n.position.y);
+       const minX = Math.min.apply(null, xs);
+       const minY = Math.min.apply(null, ys);
+       const maxX = Math.max.apply(null, xs) + MAP_NODE.width;
+       const maxY = Math.max.apply(null, ys) + MAP_NODE.height;
+       return { minX, minY, width: maxX - minX, height: maxY - minY };
+     }
+
+     function applyMapTransform() {
+       const stage = document.getElementById('grid-map-stage');
+       if (stage) stage.setAttribute('transform', 'translate(' + mapState.x + ' ' + mapState.y + ') scale(' + mapState.k + ')');
+     }
+
+     function fitGridMap() {
+       const svg = document.getElementById('grid-map-svg');
+       const shell = document.getElementById('grid-map-shell');
+       const fallback = document.getElementById('map-fallback');
+       if (!svg || !shell || !fallback) return;
+       const width = shell.clientWidth;
+       const shellHeight = shell.clientHeight;
+       const height = Math.max(560, shellHeight);
+       svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+       if (width < 800 || shellHeight < 500 || window.innerHeight < 500) {
+         fallback.hidden = false;
+         svg.setAttribute('aria-hidden', 'true');
+         return;
+       }
+       fallback.hidden = true;
+       svg.removeAttribute('aria-hidden');
+       const bounds = getMapBounds();
+       const padding = 48;
+       mapState.k = Math.min((width - padding * 2) / bounds.width, (height - padding * 2) / bounds.height);
+       mapState.x = (width - bounds.width * mapState.k) / 2 - bounds.minX * mapState.k;
+       mapState.y = (height - bounds.height * mapState.k) / 2 - bounds.minY * mapState.k;
+       applyMapTransform();
+     }
+
+     function zoomGridMap(factor, clientPoint) {
+       const svg = document.getElementById('grid-map-svg');
+       if (!svg) return;
+       const rect = svg.getBoundingClientRect();
+       const originX = clientPoint ? clientPoint.x - rect.left : rect.width / 2;
+       const originY = clientPoint ? clientPoint.y - rect.top : rect.height / 2;
+       const oldK = mapState.k;
+       const newK = Math.max(0.45, Math.min(2.6, oldK * factor));
+       const worldX = (originX - mapState.x) / oldK;
+       const worldY = (originY - mapState.y) / oldK;
+       mapState.k = newK;
+       mapState.x = originX - worldX * newK;
+       mapState.y = originY - worldY * newK;
+       applyMapTransform();
+     }
+
+     function bindGridMapInteractions() {
+       const svg = document.getElementById('grid-map-svg');
+       if (!svg || svg.dataset.bound === 'true') return;
+       svg.dataset.bound = 'true';
+       svg.addEventListener('wheel', event => {
+         event.preventDefault();
+         zoomGridMap(event.deltaY < 0 ? 1.12 : 0.88, { x: event.clientX, y: event.clientY });
+       }, { passive: false });
+       svg.addEventListener('pointerdown', event => {
+         if (event.button !== 0) return;
+         mapState.dragging = true;
+         mapState.dragX = event.clientX;
+         mapState.dragY = event.clientY;
+         svg.setPointerCapture(event.pointerId);
+       });
+       svg.addEventListener('pointermove', event => {
+         if (!mapState.dragging) return;
+         mapState.x += event.clientX - mapState.dragX;
+         mapState.y += event.clientY - mapState.dragY;
+         mapState.dragX = event.clientX;
+         mapState.dragY = event.clientY;
+         applyMapTransform();
+       });
+       svg.addEventListener('pointerup', event => {
+         mapState.dragging = false;
+         if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+       });
+       svg.addEventListener('keydown', event => {
+         const step = 26;
+         if (event.key === '+' || event.key === '=') { zoomGridMap(1.12); event.preventDefault(); }
+         if (event.key === '-' || event.key === '_') { zoomGridMap(0.88); event.preventDefault(); }
+         if (event.key === '0') { fitGridMap(); event.preventDefault(); }
+         if (event.key === 'ArrowLeft') { mapState.x += step; applyMapTransform(); event.preventDefault(); }
+         if (event.key === 'ArrowRight') { mapState.x -= step; applyMapTransform(); event.preventDefault(); }
+         if (event.key === 'ArrowUp') { mapState.y += step; applyMapTransform(); event.preventDefault(); }
+         if (event.key === 'ArrowDown') { mapState.y -= step; applyMapTransform(); event.preventDefault(); }
+       });
+     }
+
+     function initialViewFromLocation() {
+       const params = new URLSearchParams(window.location.search);
+       const hashView = window.location.hash.replace('#', '').toLowerCase();
+       return params.get('view') === 'map' || hashView === 'map' || hashView === 'grid-map' ? 'map' : 'operations';
+     }
+
+     function setConsoleView(view, updateUrl) {
+       const selected = view === 'map' ? 'map' : 'operations';
+       document.querySelectorAll('.app-view').forEach(section => { section.hidden = section.dataset.view !== selected; });
+       document.querySelectorAll('[data-view-target]').forEach(button => {
+         button.setAttribute('aria-selected', button.dataset.viewTarget === selected ? 'true' : 'false');
+       });
+       if (updateUrl) {
+         const url = new URL(window.location.href);
+         if (selected === 'map') url.searchParams.set('view', 'map');
+         else url.searchParams.delete('view');
+         url.hash = '';
+         history.replaceState({ view: selected }, '', url);
+       }
+       if (selected === 'map') {
+         renderGridMap();
+         window.setTimeout(fitGridMap, 0);
+       }
+     }
+
+     function initViewToggle() {
+       document.querySelectorAll('[data-view-target]').forEach(button => {
+         button.addEventListener('click', () => setConsoleView(button.dataset.viewTarget, true));
+       });
+       window.addEventListener('popstate', () => setConsoleView(initialViewFromLocation(), false));
+       window.addEventListener('hashchange', () => setConsoleView(initialViewFromLocation(), false));
+       document.getElementById('map-reset').addEventListener('click', fitGridMap);
+       document.getElementById('map-zoom-in').addEventListener('click', () => zoomGridMap(1.12));
+       document.getElementById('map-zoom-out').addEventListener('click', () => zoomGridMap(0.88));
+       window.addEventListener('resize', () => {
+         if (!document.getElementById('map-view').hidden) fitGridMap();
+       });
+       setConsoleView(initialViewFromLocation(), false);
+     }
+
+     initViewToggle();
+     updateClock(); updateMetrics(); loadDispatches(); loadAssets(); loadHealth();
     for (let i = 0; i < 10; i++) addLogEntry();
     setInterval(updateClock, 1000);
     setInterval(updateMetrics, 5000);
@@ -970,7 +1338,7 @@ data:
     </script>
     </body>
     </html>
-    
+
 
 ---
 apiVersion: v1
