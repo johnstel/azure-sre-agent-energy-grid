@@ -148,7 +148,7 @@ kubectl apply -f k8s/scenarios/oom-killed.yaml -n energy
 kubectl apply -f k8s/base/application.yaml -n energy
 ```
 - [ ] `meter-service` returns to **green / healthy** within 30 s of teardown
-- [ ] All edges return to healthy state
+- [ ] All edges return to their baseline/prior state (`meter-service → rabbitmq` and `meter-service → mongodb` return to unknown/gray; live-to-live edges return to healthy)
 
 ---
 
@@ -619,7 +619,7 @@ Run the automated script:
 - [ ] Warning nodes use both **amber/yellow color** and a distinct icon/badge
 - [ ] Healthy nodes use **green color** and a distinct icon/badge
 - [ ] Unknown/static nodes use **gray color** and a distinct indicator (dashed border or neutral badge)
-- [ ] Edge severity uses both color **and** dash pattern: solid = healthy/unknown, animated/dashed = warning/critical
+- [ ] Edge severity uses both color **and** dash pattern: solid = healthy; dashed/gray = unknown/static; animated/dashed = warning/critical
 - [ ] Test passes if a user simulating monochromatic vision can still distinguish severity states by shape, icon, and pattern alone
 
 ---
