@@ -154,7 +154,7 @@ For a 10-minute demo, use only scenarios 1 and 2. For a 5-minute demo, use scena
 | 7 | "Does it replace my SRE team?" | "No. It replaces the first 15 minutes of manual triage. Your SREs still make the decisions — they just get the diagnosis faster." |
 | 8 | "How does it know about my infrastructure?" | "It reads your Azure resource graph, Container Insights logs, and App Insights telemetry. It has the same view as an SRE with Reader access." |
 | 9 | "What about data privacy?" | "SRE Agent operates within your Azure tenant. Conversation data handling follows Azure's standard data processing terms. See Microsoft's Preview terms for specifics." |
-| 10 | "What does it cost?" | "The demo lab costs ~$32-38/day including SRE Agent. Production pricing follows Azure's standard consumption model — see our COSTS.md for the full breakdown." |
+| 10 | "What does it cost?" | "The demo lab costs ~$34-40/day including SRE Agent. Production pricing follows Azure's standard consumption model — see our COSTS.md for the full breakdown." |
 
 ---
 

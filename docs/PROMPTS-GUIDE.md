@@ -132,7 +132,7 @@ Use these to demo SRE Agent's ability to investigate and report without a specif
 
 ## Remediation Prompts
 
-Show that SRE Agent can take action, not just report:
+Ask SRE Agent to recommend or perform remediation actions in Review mode — the agent proposes, you approve:
 
 | Prompt | Action |
 |--------|--------|
@@ -142,7 +142,7 @@ Show that SRE Agent can take action, not just report:
 | "Remove the deny-meter-service network policy" | Policy management |
 | "Scale MongoDB back to 1 replica" | Dependency restoration |
 
-> **Note**: Remediation requires the SRE Agent to have write permissions (Contributor + AKS Cluster Admin). See [SRE-AGENT-SETUP.md](SRE-AGENT-SETUP.md) for RBAC configuration.
+> **Note**: Remediation requires the SRE Agent to have write permissions (Contributor + AKS Cluster Admin). In Review mode, the agent recommends actions and the operator decides whether to execute. See [SRE-AGENT-SETUP.md](SRE-AGENT-SETUP.md) for RBAC configuration.
 
 ---
 
