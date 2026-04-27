@@ -14,7 +14,7 @@ This is the single sequential checklist for running the Energy Grid SRE Agent de
 - [ ] Dev container is running (or PowerShell Core + kubectl available locally)
 - [ ] Firewall allows `*.azuresre.ai`
 - [ ] Confirm SRE Agent Preview is available: visit [aka.ms/sreagent/portal](https://aka.ms/sreagent/portal)
-- [ ] Review [docs/COSTS.md](COSTS.md) — budget ~$32-38/day with SRE Agent
+- [ ] Review [docs/COSTS.md](COSTS.md) — budget ~$34-40/day with SRE Agent
 - [ ] Identify which scenarios you will demo (recommended: OOMKilled → MongoDBDown → ServiceMismatch)
 - [ ] Review [docs/SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for claims to avoid
 

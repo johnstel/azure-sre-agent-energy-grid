@@ -1,6 +1,6 @@
 # Azure SRE Agent Energy Grid Demo Lab ⚡
 
-A fully automated Azure environment for demonstrating **Azure SRE Agent** capabilities using an **Energy Grid Operations Platform**. Deploy a breakable multi-service energy grid application on AKS and let SRE Agent diagnose and fix the issues!
+A fully automated Azure environment for demonstrating **Azure SRE Agent** capabilities using an **Energy Grid Operations Platform**. Deploy a breakable multi-service energy grid application on AKS and let SRE Agent diagnose issues and recommend fixes!
 
 ## 🎯 What This Lab Provides
 
@@ -21,7 +21,7 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 | **Recommend & Execute** | `accessLevel: 'High'`, `mode: 'Review'` | Diagnose + recommend remediation | ✅ Operator executes unless a real Preview approval UI/API is captured |
 | **Autonomous** | `accessLevel: 'High'`, `mode: 'Auto'` | Diagnose + execute autonomously | ❌ **Not demonstrated** |
 
-This lab deploys the **Propose & Approve** tier. For the full RBAC matrix (demo vs. production), security guardrails, and safe language guidance, see:
+This lab deploys the **Recommend & Execute** tier. For the full RBAC matrix (demo vs. production), security guardrails, and safe language guidance, see:
 
 - [Capability Contracts](docs/CAPABILITY-CONTRACTS.md) — shared contracts, RBAC matrix, data retention
 - [Demo Narrative](docs/DEMO-NARRATIVE.md) — 20-minute customer story arc and Q&A prep
@@ -111,8 +111,8 @@ See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions
 
 | Configuration | Daily Cost | Monthly Cost |
 |--------------|------------|--------------|
-| Default deployment | ~$22-28 | ~$650-850 |
-| + SRE Agent | ~$32-38 | ~$950-1,150 |
+| Default deployment | ~$24-30 | ~$660-870 |
+| + SRE Agent | ~$34-40 | ~$970-1,170 |
 
 See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 
@@ -148,6 +148,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - `-Location`: Azure region (`eastus2`, `swedencentral`, `australiaeast`) - Default: `eastus2`
 - `-WorkloadName`: Resource prefix - Default: `srelab`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
+- `-SkipSreAgent`: Skip Azure SRE Agent deployment (useful for regions/subscriptions without Preview access)
 - `-WhatIf`: Preview deployment without making changes
 - `-Yes`: Skip confirmation prompts (non-interactive mode)
 
@@ -174,6 +175,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - [Kubernetes Service Troubleshooting](docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md)
 - [Azure Networking Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Cost Estimation](docs/COSTS.md)
+- [Interactive Grid Map Spec](docs/INTERACTIVE-GRID-MAP-SPEC.md) — design spec for the topology map screen (pending expert review)
 
 ## 🤝 Contributing
 

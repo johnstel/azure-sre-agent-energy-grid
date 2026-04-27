@@ -38,14 +38,14 @@ Open http://localhost:5173 (dev) or http://localhost:3333 (production).
 mission-control/
 ├── frontend/          # Vue 3 + Vite + TailwindCSS v4
 │   └── src/
-│       ├── components/    # Vue components (Header, Preflight, Ask Copilot, etc.)
+│       ├── components/    # Vue components (Header, Preflight, Deploy, Destroy, PodGrid, etc.)
 │       ├── composables/   # useApi, usePolling, useWebSocket
 │       ├── styles/        # Energy grid theme (CSS custom properties)
 │       └── types/         # TypeScript API contracts
 ├── backend/           # Fastify 5 + WebSocket + TypeScript
 │   └── src/
-│       ├── routes/        # REST API (health, deploy, destroy, pods, scenarios)
-│       ├── services/      # CommandExecutor, JobManager, KubeClient, ToolDetector
+│       ├── routes/        # REST API (health, deploy, destroy, pods, scenarios, assistant, portal-validations)
+│       ├── services/      # AssistantService, CommandExecutor, JobManager, KubeClient, MissionStateService, PortalValidationService, PreflightService, ScenarioService, ToolDetector
 │       └── utils/         # Cross-platform paths, pino logger
 └── package.json       # npm workspaces root
 ```
@@ -59,9 +59,12 @@ mission-control/
 | POST | `/api/deploy` | Start deployment job |
 | POST | `/api/destroy` | Start destruction job (requires DELETE confirmation) |
 | GET | `/api/pods` | List pods in energy namespace |
+| GET | `/api/pods/:name/logs` | Get pod logs (query: `?lines=N`) |
 | GET | `/api/services` | List services |
+| GET | `/api/services/:name/endpoints` | Get endpoints for a service |
 | GET | `/api/deployments` | List deployments |
 | GET | `/api/events` | List K8s events |
+| GET | `/api/inventory` | Full namespace inventory (pods, services, deployments, events) |
 | POST | `/api/assistant/ask` | Ask Copilot about current Mission Control state |
 | GET | `/api/scenarios` | List all 10 scenarios |
 | POST | `/api/scenarios/:name/enable` | Apply a breakable scenario |
