@@ -1898,6 +1898,8 @@ defineExpose({
   border-radius: var(--radius-sm);
   background: rgb(2 6 23 / 0.5);
   padding: 0.75rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .analyst-empty {

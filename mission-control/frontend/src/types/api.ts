@@ -345,15 +345,35 @@ export interface AssistantAskRequest {
   screenContext?: AssistantClientContext;
 }
 
+export type AssistantResponseStatus = 'ok' | 'partial' | 'error' | 'timeout' | 'escalation';
+export type AssistantConfidence = 'high' | 'medium' | 'low' | 'none';
+
+export interface AssistantCitation {
+  label: string;
+  detail?: string;
+  timestamp?: string;
+}
+
+export interface AssistantEscalationLink {
+  label: string;
+  href: string;
+  kind: 'sre-agent' | 'azure-portal' | 'log-analytics' | 'app-insights' | 'grafana';
+  description: string;
+}
+
 export interface AssistantAskResponse {
   answer: string;
   metadata: {
     model: string;
-    status: 'ok';
+    status: AssistantResponseStatus;
+    uiState?: AssistantResponseStatus;
+    confidence?: AssistantConfidence;
     toolsUsed: string[];
     stateSnapshotTimestamp: string;
     sources: string[];
+    citations?: AssistantCitation[];
     limitations: string[];
+    escalationLinks?: AssistantEscalationLink[];
     timestamp: string;
   };
 }

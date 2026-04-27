@@ -65,6 +65,23 @@ Every future governed-read tool must be:
 
 The governed-read layer still must not expose arbitrary shell, unrestricted `az`, unrestricted `kubectl`, filesystem reads, secret access, arbitrary KQL, write/remediation operations, or direct Azure SRE Agent Preview API automation.
 
+### Implemented governed-read endpoints
+
+Mission Control backend exposes the following Local Analyst read endpoints. They are designed as evidence-producing data APIs for Analyst summaries, not remediation APIs.
+
+| Endpoint | Allowlist | Scope | Failure behavior |
+|----------|-----------|-------|------------------|
+| `GET /api/analyst/aks/:queryName` | `pod-resources`, `node-capacity`, `deployment-replicas`, `namespace-events`, `service-endpoints-health` | `energy` namespace; `node-capacity` also reads cluster nodes to summarize capacity for `energy` pod allocation | Unknown query names fail closed with `400`; kubectl errors return unavailable metadata and no inferred state |
+| `GET /api/analyst/logs/:templateName` | `pod-restarts-lifecycle`, `service-log-excerpts`, `application-exceptions-errors` | Configured Log Analytics workspace; `energy` namespace where Kubernetes tables include namespace fields | Unknown/freeform KQL and unknown parameters fail closed with `400`; timeout returns unavailable rather than partial guesses |
+
+The Log Analytics layer only builds canned KQL from validated parameters:
+
+- `pod-restarts-lifecycle`: recent restart and non-running lifecycle signals from `KubePodInventory`.
+- `service-log-excerpts`: bounded, redacted `ContainerLogV2` excerpts for a validated service or pod over a bounded time window.
+- `application-exceptions-errors`: bounded exception/error signals from workspace-backed Application Insights tables where present; requires a validated service filter to avoid broad workspace reads.
+
+Each successful response includes source, collection timestamp, limitations, confidence, workspace or namespace citation, time range where applicable, row count where applicable, and explicit partial-result behavior.
+
 ### Denied tool categories
 
 | Category | Examples | Required behavior |
