@@ -104,7 +104,7 @@ data contract. This is the primary traceability record for acceptance criterion 
 | 4 | HighCPU | `high-cpu.yaml` | `frequency-calc-overload` (new deploy) | **None — unsupported in V1** | N/A | — | None. See [Section 9](#9-v1-unsupported-dynamic-states) |
 | 5 | PendingPods | `pending-pods.yaml` | `substation-monitor` (new deploy) | **None — unsupported in V1** | N/A | — | None. See [Section 9](#9-v1-unsupported-dynamic-states) |
 | 6 | ProbeFailure | `probe-failure.yaml` | `grid-health-monitor` (new deploy) | **None — unsupported in V1** | N/A | — | None. See [Section 9](#9-v1-unsupported-dynamic-states) |
-| 7 | NetworkBlock | `network-block.yaml` | `meter-service` | **Full** — NetworkPolicy blocks proxy path | `critical` | `rabbitmq` (if unreachable from meter-service path) | `meter-service → rabbitmq` edge goes critical/dashed |
+| 7 | NetworkBlock | `network-block.yaml` | `meter-service` | **Full** — NetworkPolicy blocks proxy path | `critical` | `rabbitmq` (if unreachable from meter-service path) | `meter-service → rabbitmq` edge goes critical |
 | 8 | MissingConfig | `missing-config.yaml` | `grid-zone-config` (new deploy) | **None — unsupported in V1** | N/A | — | None. See [Section 9](#9-v1-unsupported-dynamic-states) |
 | 9 | MongoDBDown | `mongodb-down.yaml` | `mongodb` (static node) | **Partial** — mongodb is static/in-cluster; downstream services may degrade if app health checks DB | `unknown` on mongodb (no live endpoint); downstream `meter-service`/`dispatch-service`/`asset-service` may show `critical` if app health reflects DB loss (app-dependent) | `meter-service`, `dispatch-service`, `asset-service` (indirect, app-dependent) | All `→ mongodb` edges stay unknown/gray (static); downstream service edges may go critical if health endpoints degrade |
 | 10 | ServiceMismatch | `service-mismatch.yaml` | `meter-service` | **Full** — Service selector mismatch makes health endpoint unreachable | `critical` (health endpoint timeout via misconfigured Service) | — | `grid-dashboard → meter-service` edge goes critical; `meter-service → rabbitmq` and `meter-service → mongodb` edges go critical |
@@ -292,7 +292,8 @@ kubectl apply -f k8s/scenarios/network-block.yaml -n energy
 
 **Checklist**:
 - [ ] Within 30 s: `meter-service` node turns **red / critical** (NetworkPolicy blocks the nginx proxy path to `/api/meter/health`)
-- [ ] Edge `meter-service → rabbitmq` turns critical or dashed/blocked indicator
+- [ ] Edge `meter-service → rabbitmq` turns **critical** (red)
+  > **Note**: A dashed or blocked visual treatment on this edge is optional renderer behavior only; it does not satisfy this check on its own. The required pass condition is `critical` severity (red).
 - [ ] Edge `meter-service → mongodb` turns critical
 - [ ] `asset-service` and `dispatch-service` retain their own severities
 - [ ] Health banner may show "Data may be stale" if the proxy is entirely blocked; verify it does not claim network outage
