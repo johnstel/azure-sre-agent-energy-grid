@@ -885,6 +885,17 @@ data:
       .drawer-assessment { font-size: .8rem; color: #cbd5e1; line-height: 1.5; background: rgba(51,65,85,.4); border-radius: 6px; padding: .5rem .65rem; margin-top: .2rem; }
       .drawer-unavailable { font-size: .79rem; color: var(--muted); font-style: italic; line-height: 1.45; }
       .drawer-citation { font-size: .73rem; color: var(--muted); border-top: 1px solid #334155; margin-top: auto; line-height: 1.4; padding-top: .55rem; }
+      /* === #20 Handoff controls === */
+      .drawer-handoff { border-top: 1px solid #334155; padding-top: .6rem; }
+      .drawer-handoff-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: .4rem; }
+      .drawer-handoff-btn { background: rgba(15,23,42,.8); border: 1px solid #475569; border-radius: 8px; color: var(--text); padding: .4rem .75rem; cursor: pointer; font: inherit; font-size: .82rem; text-decoration: none; display: inline-block; }
+      .drawer-handoff-btn:hover, .drawer-handoff-btn:focus-visible { border-color: var(--cyan); outline: 2px solid rgba(34,211,238,.75); outline-offset: 2px; }
+      .drawer-handoff-btn.portal { border-color: rgba(167,139,250,.5); color: var(--accent); }
+      .drawer-handoff-btn.portal:hover, .drawer-handoff-btn.portal:focus-visible { border-color: var(--accent); }
+      .drawer-copy-status { font-size: .78rem; min-height: 1.3em; color: var(--green); line-height: 1.4; }
+      .drawer-prompt-preview { margin-top: .4rem; }
+      .drawer-prompt-preview summary { cursor: pointer; color: var(--muted); font-size: .78rem; }
+      .drawer-prompt-preview pre { margin: .3rem 0 0; padding: .45rem .6rem; background: rgba(15,23,42,.85); border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 9rem; overflow-y: auto; }
       @keyframes skeleton-pulse { 0%,100% { opacity: .55; } 50% { opacity: .22; } }
       .skeleton { background: #334155; border-radius: 4px; animation: skeleton-pulse 1.4s ease-in-out infinite; height: .85em; margin-bottom: .3rem; display: block; }
       .skeleton.short { width: 52%; }
@@ -1396,6 +1407,7 @@ data:
        html += '<h3 class="drawer-section-title">Optional details</h3>';
        html += '<div class="drawer-unavailable">Pod-level metrics, recent events, and application logs are not available from the V1 cloud demo health contract. This panel shows only the health snapshot from the approved cloud demo data source.</div>';
        html += '</div>';
+       html += buildHandoffSection(buildNodePrompt(node));
        return html;
      }
      function buildEdgeBody(edge, src, tgt) {
@@ -1441,6 +1453,32 @@ data:
        html += '<h3 class="drawer-section-title">Optional details</h3>';
        html += '<div class="drawer-unavailable">Endpoint-level telemetry, request rates, and error counts are not available from the V1 cloud demo health contract. This panel shows only connection state inferred from the approved cloud demo health snapshot.</div>';
        html += '</div>';
+       html += buildHandoffSection(buildEdgePrompt(edge, src, tgt));
+       return html;
+     }
+     function buildNodePrompt(node) {
+       var status = getMapStatus(node);
+       var ts = citationTimestamp();
+       return 'Explain the current reported state of "' + node.label + '" (' + node.metaphor + ') based on the cloud demo snapshot from ' + ts + '. Reported status: ' + status.text + '. Use only the cloud demo health and status information shown here; do not assume real grid telemetry, SCADA data, direct Azure SRE Agent invocation, or autonomous remediation certainty.';
+     }
+     function buildEdgePrompt(edge, src, tgt) {
+       var srcStatus = getMapStatus(src);
+       var tgtStatus = getMapStatus(tgt);
+       var ts = citationTimestamp();
+       return 'Explain the current reported connection state between "' + src.label + '" and "' + tgt.label + '" (' + (edge.label || 'connection') + ') based on the cloud demo snapshot from ' + ts + '. Source reported status: ' + srcStatus.text + '. Target reported status: ' + tgtStatus.text + '. Use only the cloud demo health and status information shown here; do not assume real grid telemetry, SCADA data, direct Azure SRE Agent invocation, or autonomous remediation certainty.';
+     }
+     function buildHandoffSection(promptText) {
+       var safePrompt = escHtml(promptText);
+       var html = '';
+       html += '<div class="drawer-handoff">';
+       html += '<h3 class="drawer-section-title">Analyst handoff</h3>';
+       html += '<div class="drawer-handoff-actions">';
+       html += '<button type="button" class="drawer-handoff-btn" id="handoff-copy-btn" data-copy-text="' + safePrompt + '" aria-label="Copy prompt for Local Analyst">\u{1F4CB} Copy prompt</button>';
+       html += '<a href="https://portal.azure.com/" id="handoff-portal-link" target="_blank" rel="noopener noreferrer" class="drawer-handoff-btn portal" aria-label="Open Azure Portal in new tab">\u{1F517} Azure Portal</a>';
+       html += '</div>';
+       html += '<p class="drawer-copy-status" id="handoff-copy-status" role="status" aria-live="polite" aria-atomic="true"></p>';
+       html += '<details class="drawer-prompt-preview" id="handoff-prompt-preview"><summary id="handoff-prompt-summary">View prompt text</summary><pre id="handoff-prompt-pre" tabindex="0">' + safePrompt + '</pre></details>';
+       html += '</div>';
        return html;
      }
      function openDetailDrawer(titleText, subtitleText, bodyHtml, citationText) {
@@ -1480,6 +1518,10 @@ data:
      function refreshDetailDrawerIfOpen() {
        var drawer = document.getElementById('detail-drawer');
        if (!drawer || drawer.hidden) return;
+       var _bodyEl0 = document.getElementById('drawer-body');
+       var _activeId = (_bodyEl0 && _bodyEl0.contains(document.activeElement) && document.activeElement.id) ? document.activeElement.id : null;
+       var _previewEl0 = document.getElementById('handoff-prompt-preview');
+       var _previewOpen = !!(_previewEl0 && _previewEl0.open);
        if (mapState.selectedNodeId) {
          var node = GRID_TOPOLOGY.nodes.find(function(n) { return n.id === mapState.selectedNodeId; });
          if (node) {
@@ -1504,12 +1546,35 @@ data:
            }
          }
        }
+       if (_previewOpen) { var _pe = document.getElementById('handoff-prompt-preview'); if (_pe) _pe.open = true; }
+       if (_activeId) { var _toFocus = document.getElementById(_activeId); if (_toFocus && typeof _toFocus.focus === 'function') _toFocus.focus(); }
      }
      function initDetailDrawer() {
        var closeBtn = document.getElementById('drawer-close');
        if (closeBtn) closeBtn.addEventListener('click', clearSelection);
        var drawer = document.getElementById('detail-drawer');
        if (drawer) drawer.addEventListener('keydown', function(e) { if (e.key === 'Escape') { e.preventDefault(); clearSelection(); } });
+       var bodyEl = document.getElementById('drawer-body');
+       if (bodyEl) bodyEl.addEventListener('click', function(e) {
+         var btn = e.target.closest ? e.target.closest('#handoff-copy-btn') : (e.target.id === 'handoff-copy-btn' ? e.target : null);
+         if (!btn) return;
+         var text = (btn.dataset && btn.dataset.copyText) ? btn.dataset.copyText : (btn.getAttribute ? btn.getAttribute('data-copy-text') : '');
+         if (!text) return;
+         var statusEl = document.getElementById('handoff-copy-status');
+         if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+           navigator.clipboard.writeText(text).then(function() {
+             if (statusEl) { statusEl.textContent = 'Prompt copied to clipboard.'; setTimeout(function() { if (statusEl) statusEl.textContent = ''; }, 3000); }
+           }, function() {
+             if (statusEl) statusEl.textContent = 'Copy failed \u2014 prompt shown below.';
+             var previewEl = document.getElementById('handoff-prompt-preview');
+             if (previewEl) previewEl.open = true;
+           });
+         } else {
+           if (statusEl) statusEl.textContent = 'Clipboard unavailable \u2014 see prompt below.';
+           var previewEl = document.getElementById('handoff-prompt-preview');
+           if (previewEl) previewEl.open = true;
+         }
+       });
      }
      function selectNode(nodeId) {
        mapState.selectedNodeId = nodeId;
@@ -1961,6 +2026,7 @@ data:
     </script>
     </body>
     </html>
+
 ---
 apiVersion: v1
 kind: ConfigMap
