@@ -4,7 +4,16 @@ import type { JobManager } from './JobManager.js';
 import { collectMissionState } from './MissionStateService.js';
 import { getRepoRoot } from '../utils/paths.js';
 import { logger } from '../utils/logger.js';
-import type { AssistantAskResponse, AssistantClientContext, AssistantConversationMessage } from '../types/index.js';
+import type {
+  AssistantAskResponse,
+  AssistantCitation,
+  AssistantClientContext,
+  AssistantConfidence,
+  AssistantConversationMessage,
+  AssistantEscalationLink,
+  AssistantResponseStatus,
+  MissionState,
+} from '../types/index.js';
 
 const ASSISTANT_MODEL = 'gpt-4.1';
 const ASSISTANT_TIMEOUT_MS = 60_000;
@@ -25,6 +34,12 @@ const STATE_LIMITATIONS = [
   'Client screen context is untrusted supplemental UX state and never authoritative for live cluster status',
   'Explains and triages Mission Control state; Azure SRE Agent remains the cloud diagnostic/remediation agent',
 ];
+const SRE_AGENT_HANDOFF_LINK: AssistantEscalationLink = {
+  label: 'Open Azure SRE Agent portal',
+  href: 'https://sre.azure.com',
+  kind: 'sre-agent',
+  description: 'Handoff only: ask Azure SRE Agent in the portal for cloud-side diagnosis and remediation guidance.',
+};
 
 const SYSTEM_MESSAGE = `You are Ask Copilot inside Mission Control: a local explainer and triage assistant for the Azure SRE Agent Energy Grid demo.
 You are not Azure SRE Agent, not an autonomous SRE agent, and not a replacement for Azure SRE Agent.
@@ -112,6 +127,43 @@ ${transcript}
 ${latestQuestion}`;
 }
 
+function buildCitations(missionState: MissionState): AssistantCitation[] {
+  const timestamp = missionState.collectedAt;
+
+  return [
+    {
+      label: 'Mission Control state snapshot',
+      detail: `Collected local preflight, energy namespace Kubernetes resources, scenario status, and job status at ${timestamp}.`,
+      timestamp,
+    },
+    {
+      label: 'Read-only Local Analyst boundary',
+      detail: 'Local Analyst cannot read secrets, raw deploy/destroy logs, arbitrary files, or perform remediation.',
+      timestamp,
+    },
+  ];
+}
+
+function responseStatus(missionState: MissionState, toolsUsed: Set<string>): AssistantResponseStatus {
+  if (missionState.cluster.errors && missionState.cluster.errors.length > 0) return 'partial';
+  if (!toolsUsed.has('get_mission_control_state')) return 'partial';
+  return 'ok';
+}
+
+function responseConfidence(status: AssistantResponseStatus, missionState: MissionState): AssistantConfidence {
+  if (status === 'partial') return 'low';
+  if (missionState.cluster.pods.length === 0 && missionState.cluster.deployments.length === 0) return 'medium';
+  return 'high';
+}
+
+function responseLimitations(missionState: MissionState): string[] {
+  const limitations = [...STATE_LIMITATIONS];
+  if (missionState.cluster.errors && missionState.cluster.errors.length > 0) {
+    limitations.push(...missionState.cluster.errors);
+  }
+  return limitations;
+}
+
 export async function askMissionControlAssistant(
   question: string,
   jobManager: JobManager,
@@ -157,15 +209,21 @@ export async function askMissionControlAssistant(
     const response = await session.sendAndWait({ prompt }, ASSISTANT_TIMEOUT_MS);
     const answer = response?.data.content?.trim();
 
+    const status = responseStatus(missionState, toolsUsed);
+
     return {
       answer: answer || 'Copilot completed without returning a text answer. Try asking a narrower state question.',
       metadata: {
         model: ASSISTANT_MODEL,
-        status: 'ok',
+        status,
+        uiState: status,
+        confidence: responseConfidence(status, missionState),
         toolsUsed: Array.from(toolsUsed),
         stateSnapshotTimestamp: missionState.collectedAt,
         sources: STATE_SOURCES,
-        limitations: STATE_LIMITATIONS,
+        citations: buildCitations(missionState),
+        limitations: responseLimitations(missionState),
+        escalationLinks: [SRE_AGENT_HANDOFF_LINK],
         timestamp: new Date().toISOString(),
       },
     };

@@ -14,6 +14,7 @@ import { registerPodRoutes } from './routes/pods.js';
 import { registerScenarioRoutes } from './routes/scenarios.js';
 import { registerAssistantRoutes } from './routes/assistant.js';
 import { registerPortalValidationRoutes } from './routes/portal-validations.js';
+import { registerAnalystRoutes } from './routes/analyst.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = 3333;
@@ -79,6 +80,7 @@ async function start() {
   registerScenarioRoutes(app);
   registerAssistantRoutes(app, jobManager);
   registerPortalValidationRoutes(app);
+  registerAnalystRoutes(app);
 
   // SPA fallback — must be after API routes
   if (existsSync(frontendDist)) {

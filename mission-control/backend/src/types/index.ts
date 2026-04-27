@@ -165,6 +165,145 @@ export interface PodLogsResponse {
   updatedAt: string;
 }
 
+export type AnalystConfidence = 'high' | 'medium' | 'low' | 'none';
+export type AnalystQueryStatus = 'complete' | 'partial' | 'unavailable' | 'denied';
+
+export interface AnalystEvidenceMetadata {
+  source: string;
+  collectedAt: string;
+  limitations: string[];
+  confidence: AnalystConfidence;
+  status: AnalystQueryStatus;
+}
+
+export type AnalystAksQueryName =
+  | 'pod-resources'
+  | 'node-capacity'
+  | 'deployment-replicas'
+  | 'namespace-events'
+  | 'service-endpoints-health';
+
+export interface KubernetesResourceList {
+  cpuMillicores?: number;
+  memoryBytes?: number;
+}
+
+export interface AnalystPodContainerResources {
+  name: string;
+  ready: boolean;
+  restartCount: number;
+  state: string;
+  reason?: string;
+  requests: KubernetesResourceList;
+  limits: KubernetesResourceList;
+}
+
+export interface AnalystPodResourceState {
+  name: string;
+  namespace: 'energy';
+  phase: string;
+  status: string;
+  ready: boolean;
+  nodeName?: string;
+  startTime?: string;
+  labels: Record<string, string>;
+  requests: KubernetesResourceList;
+  limits: KubernetesResourceList;
+  containers: AnalystPodContainerResources[];
+}
+
+export interface AnalystNodeAllocationSummary {
+  name: string;
+  capacity: KubernetesResourceList;
+  allocatable: KubernetesResourceList;
+  requested: KubernetesResourceList;
+  limited: KubernetesResourceList;
+  podCount: number;
+  conditions: Array<{
+    type: string;
+    status: string;
+    reason?: string;
+    lastTransitionTime?: string;
+  }>;
+}
+
+export interface AnalystDeploymentReplicaState {
+  name: string;
+  namespace: 'energy';
+  desiredReplicas: number;
+  readyReplicas: number;
+  updatedReplicas: number;
+  availableReplicas: number;
+  observedGeneration?: number;
+  conditions: Array<{
+    type: string;
+    status: string;
+    reason?: string;
+    message?: string;
+    lastUpdateTime?: string;
+    lastTransitionTime?: string;
+  }>;
+}
+
+export interface AnalystServiceEndpointsHealth {
+  serviceName: string;
+  namespace: 'energy';
+  type: string;
+  selector: Record<string, string>;
+  readyEndpoints: number;
+  notReadyEndpoints: number;
+  totalEndpoints: number;
+  matchingPods: number;
+  ports: ServicePort[];
+}
+
+export interface AnalystAksQueryResponse {
+  queryName: AnalystAksQueryName;
+  namespace: 'energy';
+  metadata: AnalystEvidenceMetadata & {
+    allowedVerb: 'get';
+    allowlist: AnalystAksQueryName[];
+  };
+  data:
+    | AnalystPodResourceState[]
+    | AnalystNodeAllocationSummary[]
+    | AnalystDeploymentReplicaState[]
+    | KubeEvent[]
+    | AnalystServiceEndpointsHealth[];
+}
+
+export type LogAnalyticsTemplateName =
+  | 'pod-restarts-lifecycle'
+  | 'service-log-excerpts'
+  | 'application-exceptions-errors';
+
+export interface LogAnalyticsQueryRequest {
+  templateName: LogAnalyticsTemplateName;
+  minutes: number;
+  limit: number;
+  service?: string;
+  pod?: string;
+  namespace: 'energy';
+  timeoutMs: number;
+}
+
+export interface LogAnalyticsQueryResponse {
+  templateName: LogAnalyticsTemplateName;
+  workspace: string;
+  timeRange: {
+    from: string;
+    to: string;
+    minutes: number;
+  };
+  rowCount: number;
+  rows: Record<string, unknown>[];
+  metadata: AnalystEvidenceMetadata & {
+    partial: boolean;
+    timeoutMs: number;
+    partialBehavior: string;
+  };
+}
+
 export interface Scenario {
   name: string;
   file: string;
@@ -327,15 +466,35 @@ export interface AssistantAskRequest {
   screenContext?: AssistantClientContext;
 }
 
+export type AssistantResponseStatus = 'ok' | 'partial' | 'error' | 'timeout' | 'escalation';
+export type AssistantConfidence = 'high' | 'medium' | 'low' | 'none';
+
+export interface AssistantCitation {
+  label: string;
+  detail?: string;
+  timestamp?: string;
+}
+
+export interface AssistantEscalationLink {
+  label: string;
+  href: string;
+  kind: 'sre-agent' | 'azure-portal' | 'log-analytics' | 'app-insights' | 'grafana';
+  description: string;
+}
+
 export interface AssistantAskResponse {
   answer: string;
   metadata: {
     model: string;
-    status: 'ok';
+    status: AssistantResponseStatus;
+    uiState?: AssistantResponseStatus;
+    confidence?: AssistantConfidence;
     toolsUsed: string[];
     stateSnapshotTimestamp: string;
     sources: string[];
+    citations?: AssistantCitation[];
     limitations: string[];
+    escalationLinks?: AssistantEscalationLink[];
     timestamp: string;
   };
 }

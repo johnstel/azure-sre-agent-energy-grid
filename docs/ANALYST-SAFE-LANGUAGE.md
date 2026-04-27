@@ -100,6 +100,18 @@ Approved wording for log-derived evidence:
 
 Do not return unrestricted raw logs, secret-bearing logs, full deploy/destroy transcripts, or arbitrary KQL results. If a requested log query does not match an approved template, fail closed and ask the operator to use an approved log view or Azure SRE Agent portal workflow.
 
+### Governed AKS-derived evidence
+
+Local Analyst may use AKS state only through governed query names approved by [Local Analyst Governance](LOCAL-ANALYST-GOVERNANCE.md). These queries are read-only, allowlisted, timeout-bounded, and citation-producing. They expose Kubernetes state observations for the `energy` namespace; they do not grant write, exec, port-forward, secret, remediation, deploy, destroy, patch, restart, or scale access.
+
+Approved wording for AKS-derived evidence:
+
+> Source: governed AKS query `{queryName}` scoped to the `energy` namespace, collected at `{collectedAt}`. Local Analyst can summarize observed Kubernetes state, but it cannot claim root cause or remediation certainty without Azure SRE Agent or operator evidence.
+
+For `node-capacity`, include the scope caveat:
+
+> Source: governed AKS query `node-capacity`, collected at `{collectedAt}`. This query includes cluster-level node capacity only to interpret `energy` namespace pod allocation. It does not grant write, exec, secret, or remediation access, and Local Analyst cannot infer root cause or remediation certainty from capacity data alone.
+
 ## Approved and prohibited phrases
 
 ### Approved phrases
