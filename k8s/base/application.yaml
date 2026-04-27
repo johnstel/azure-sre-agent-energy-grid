@@ -1201,7 +1201,7 @@ data:
       function refreshGridMapAfterHealthChange() {
         mapState.rendered = false;
         const mapView = document.getElementById('map-view');
-        if (mapView && !mapView.hidden) renderGridMap();
+        if (mapView && !mapView.hidden) renderGridMap({ preserveViewport: true });
       }
 
       function loadHealth() {
@@ -1421,7 +1421,7 @@ data:
        stage.appendChild(group);
      }
 
-     function renderGridMap() {
+     function renderGridMap(opts) {
        const svg = document.getElementById('grid-map-svg');
        const stage = document.getElementById('grid-map-stage');
        if (!svg || !stage || mapState.rendered) return;
@@ -1479,7 +1479,7 @@ data:
        applyNodeSelection();
        applyEdgeSelection();
        applySeverityFilter();
-       fitGridMap();
+       if (!opts || !opts.preserveViewport) fitGridMap();
      }
 
      function getMapBounds() {
@@ -1655,8 +1655,6 @@ data:
     </script>
     </body>
     </html>
-
-
 ---
 apiVersion: v1
 kind: ConfigMap
