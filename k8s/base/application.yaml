@@ -852,8 +852,8 @@ data:
       .map-node.selected .node-ring { stroke: var(--cyan); stroke-width: 3; filter: drop-shadow(0 0 8px rgba(34,211,238,.75)); }
       .map-node:focus-visible { outline: none; }
       .map-node:focus-visible .node-focus-ring { stroke: rgba(255,255,255,.88); stroke-width: 2; stroke-dasharray: 6 4; filter: drop-shadow(0 0 6px rgba(255,255,255,.45)); }
-      .map-node.dimmed { opacity: 0.40; }
-      .map-edge.dimmed { opacity: 0.28; }
+      .map-node.dimmed { opacity: 0.52; }
+      .map-edge.dimmed { opacity: 0.45; pointer-events: none; }
       .map-edge.selected { stroke: var(--cyan) !important; stroke-width: 5 !important; opacity: 1 !important; filter: drop-shadow(0 0 8px rgba(34,211,238,.65)); }
       .map-edge-hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
       .filter-bar { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: .75rem; }
@@ -1292,7 +1292,7 @@ data:
        mapState.selectedEdgeKey = null;
        applyNodeSelection();
        applyEdgeSelection();
-       updateSelectionStatus('');
+       updateSelectionStatus('Selection cleared.');
      }
      function applyNodeSelection() {
        document.querySelectorAll('.map-node').forEach(function(group) {
@@ -1335,7 +1335,7 @@ data:
          group.classList.toggle('dimmed', severity !== filter);
        });
        document.querySelectorAll('.map-edge').forEach(function(line) {
-         if (filter === 'all') { line.classList.remove('dimmed'); return; }
+         if (filter === 'all') { line.classList.remove('dimmed'); line.removeAttribute('aria-hidden'); return; }
          var key = line.dataset.edgeKey;
          if (!key) return;
          var parts = key.split(':');
@@ -1343,7 +1343,9 @@ data:
          var tgtNode = document.querySelector('.map-node[data-node-id="' + parts[1] + '"]');
          var srcDimmed = srcNode && srcNode.classList.contains('dimmed');
          var tgtDimmed = tgtNode && tgtNode.classList.contains('dimmed');
-         line.classList.toggle('dimmed', srcDimmed && tgtDimmed);
+         var isDimmed = srcDimmed && tgtDimmed;
+         line.classList.toggle('dimmed', isDimmed);
+         if (isDimmed) { line.setAttribute('aria-hidden', 'true'); } else { line.removeAttribute('aria-hidden'); }
        });
        updateFilterBadges();
      }
@@ -1385,13 +1387,13 @@ data:
         const symbol = createSvgElement('text', { class: 'map-node-symbol', x: x + MAP_NODE.width - 22, y: y + 24, 'text-anchor': 'middle', 'aria-hidden': 'true' });
         symbol.textContent = status.symbol;
         group.appendChild(symbol);
-        const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 23 });
+        const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 23, 'aria-hidden': 'true' });
         title.textContent = node.label;
         group.appendChild(title);
-       const subtitle = createSvgElement('text', { class: 'map-node-subtitle', x: x + 16, y: y + 46 });
+       const subtitle = createSvgElement('text', { class: 'map-node-subtitle', x: x + 16, y: y + 46, 'aria-hidden': 'true' });
        subtitle.textContent = node.metaphor;
        group.appendChild(subtitle);
-       const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 64 });
+       const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 64, 'aria-hidden': 'true' });
        state.textContent = status.text;
        group.appendChild(state);
        group.appendChild(createSvgElement('rect', { class: 'node-ring', x: x - 4, y: y - 4, width: MAP_NODE.width + 8, height: MAP_NODE.height + 8, rx: 18, ry: 18 }));
@@ -1418,13 +1420,13 @@ data:
         const symbol = createSvgElement('text', { class: 'map-node-symbol', x: x + MAP_NODE.width - 22, y: y + 27, 'text-anchor': 'middle', 'aria-hidden': 'true' });
         symbol.textContent = status.symbol;
         group.appendChild(symbol);
-        const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 27 });
+        const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 27, 'aria-hidden': 'true' });
        title.textContent = node.label;
        group.appendChild(title);
-       const subtitle = createSvgElement('text', { class: 'map-node-subtitle', x: x + 16, y: y + 50 });
+       const subtitle = createSvgElement('text', { class: 'map-node-subtitle', x: x + 16, y: y + 50, 'aria-hidden': 'true' });
        subtitle.textContent = node.metaphor;
        group.appendChild(subtitle);
-       const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 67 });
+       const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 67, 'aria-hidden': 'true' });
        state.textContent = status.text;
        group.appendChild(state);
        group.appendChild(createSvgElement('rect', { class: 'node-ring', x: x - 4, y: y - 4, width: MAP_NODE.width + 8, height: MAP_NODE.height + 8, rx: 14, ry: 14 }));
@@ -1591,6 +1593,8 @@ data:
          const hitLine = event.target.closest ? event.target.closest('.map-edge-hit') : null;
          if (hitLine && hitLine.dataset.edgeKey) {
            const key = hitLine.dataset.edgeKey;
+           const edgeLine = document.querySelector('.map-edge[data-edge-key="' + key + '"]');
+           if (edgeLine && edgeLine.classList.contains('dimmed')) return;
            if (mapState.selectedEdgeKey === key) clearSelection(); else selectEdge(key);
            return;
          }
