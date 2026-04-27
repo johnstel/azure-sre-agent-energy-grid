@@ -975,3 +975,16 @@ Used `"alert.scenarios": "oom-killed,crash-loop"` comma-separated format for mul
 
 **Status**: ✅ Issues #5, #10–#12 created; awaiting John approval for docs gates
 
+
+
+---
+
+## 2026-04-27: GitHub Custom Agent Prompt Slimmed
+
+**Task:** Make `.github/agents/squad.agent.md` active by reducing it below GitHub's 30,000 character prompt limit.
+
+**Delivered:** Replaced the monolithic 79,903-character runtime prompt with a slim 12,352-character kernel that preserves Squad v0.9.1 identity, mode detection, real `task` spawns, routing basics, reviewer lockout, directive capture, worktree/team-root awareness, source-of-truth hierarchy, Scribe/drop-box logging, and restart guidance. Detailed subsystem specs now point to `.squad/templates/` references on demand.
+
+**Validation:** Character count and markdown/frontmatter sanity checks passed; final count 12,352 characters.
+
+**Learning:** GitHub Custom Agents count the agent prompt plus repository instructions, so the active prompt should stay well below 30,000 characters and use template references for rarely used subsystem details.

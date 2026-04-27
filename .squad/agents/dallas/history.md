@@ -150,3 +150,13 @@ Developer starts Week of 2026-04-28. Dallas to review code against architect spe
 **Decision Artifact:** `.squad/decisions/inbox/dallas-wave-execution-sequence-2026-04-26.md`
 
 ---
+
+## Learnings
+
+### 2026-04-26 — GitHub Custom Agent Prompt Limit
+- GitHub Custom Agents have a **30,000 character** hard limit on the agent prompt (`.github/agents/*.agent.md`).
+- Squad's `squad.agent.md` at v0.9.1 is ~80K chars — 2.66× the limit. This is a known upstream issue.
+- **Strategy:** Keep per-turn behavioral rules inline (~20-24K), externalize lookup tables, init flows, and subsystem specs to `.squad/templates/`. Most templates already exist and are duplicated in the monolith.
+- **Decision artifact:** `.squad/decisions/inbox/dallas-agent-prompt-size.md`
+
+---
