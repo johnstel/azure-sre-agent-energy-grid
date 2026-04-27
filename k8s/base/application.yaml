@@ -1471,6 +1471,8 @@ data:
      function initDetailDrawer() {
        var closeBtn = document.getElementById('drawer-close');
        if (closeBtn) closeBtn.addEventListener('click', clearSelection);
+       var drawer = document.getElementById('detail-drawer');
+       if (drawer) drawer.addEventListener('keydown', function(e) { if (e.key === 'Escape') { e.preventDefault(); clearSelection(); } });
      }
      function selectNode(nodeId) {
        mapState.selectedNodeId = nodeId;
