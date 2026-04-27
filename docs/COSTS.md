@@ -47,6 +47,18 @@ This document provides estimated costs for running the Azure SRE Agent Energy Gr
 - Use Reserved Instances for 30-55% savings (if running long-term)
 - Use Spot instances for non-critical workloads
 
+#### Maintenance-Window Node Pool Recreation Cost
+
+When executing the blue/green `maxPods=30` drift fix (see [AKS-MAXPODS-MAINTENANCE-RUNBOOK.md](./AKS-MAXPODS-MAINTENANCE-RUNBOOK.md)), temporary `sys50` and `work50` pools run alongside the old pools before the originals are deleted.
+
+| Temporary Pool | VM Size | Extra Nodes | Cost/hour |
+|----------------|---------|-------------|-----------|
+| `sys50` | Standard_D2s_v5 | 1 | ~$0.096 |
+| `work50` | Standard_D2s_v5 | 4 | ~$0.384 |
+| **Total overlap** | | **5** | **~$0.48** |
+
+A typical 2–4 hour maintenance window adds **~$1–2 per run** — negligible relative to the ~$30–40/day baseline. Once the old pools are deleted, node count returns to its pre-maintenance level with **no net cost increase**.
+
 ### Azure Container Registry
 
 | SKU | Storage | Cost | Notes |
