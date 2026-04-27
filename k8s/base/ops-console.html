@@ -120,10 +120,10 @@
   .drawer-header { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
   .drawer-close { background: none; border: 1px solid #475569; border-radius: 6px; color: var(--muted); padding: .25rem .55rem; cursor: pointer; font: inherit; font-size: 1rem; line-height: 1; flex-shrink: 0; }
   .drawer-close:hover, .drawer-close:focus-visible { border-color: var(--cyan); color: var(--text); outline: 2px solid rgba(34,211,238,.75); outline-offset: 2px; }
-  .drawer-title { font-size: .95rem; font-weight: 700; color: var(--text); line-height: 1.3; }
+  .drawer-title { font-size: .95rem; font-weight: 700; color: var(--text); line-height: 1.3; margin: 0; }
   .drawer-subtitle { font-size: .78rem; color: var(--muted); margin-top: .15rem; }
   .drawer-section { border-top: 1px solid #334155; padding-top: .6rem; }
-  .drawer-section-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: .45rem; }
+  .drawer-section-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 0 0 .45rem; }
   .drawer-row { display: flex; justify-content: space-between; gap: .5rem; font-size: .82rem; margin-bottom: .3rem; line-height: 1.4; }
   .drawer-label { color: var(--muted); flex-shrink: 0; }
   .drawer-value { color: var(--text); text-align: right; }
@@ -238,10 +238,10 @@
              Increase the browser window or use a larger display to view the topology safely.
            </div>
          </div>
-          <aside id="detail-drawer" class="detail-drawer" hidden aria-label="Selection detail panel">
+          <aside id="detail-drawer" class="detail-drawer" hidden aria-labelledby="drawer-title">
             <div class="drawer-header">
               <div>
-                <div class="drawer-title" id="drawer-title"></div>
+                <h2 class="drawer-title" id="drawer-title"></h2>
                 <div class="drawer-subtitle" id="drawer-subtitle"></div>
               </div>
               <button type="button" class="drawer-close" id="drawer-close" aria-label="Close detail panel">&#x2715;</button>
@@ -578,7 +578,7 @@ function addLogEntry() {
    var result = node.healthSource === 'live' ? (mapState.healthById[node.id] || null) : null;
    var html = '';
    html += '<div class="drawer-section">';
-   html += '<div class="drawer-section-title">Status</div>';
+   html += '<h3 class="drawer-section-title">Status</h3>';
    html += '<div class="drawer-row"><span class="drawer-label">Reported status</span><span class="drawer-value ' + escHtml(status.className) + '">' + escHtml(status.text) + '</span></div>';
    html += '<div class="drawer-row"><span class="drawer-label">Role</span><span class="drawer-value">' + escHtml(node.metaphor) + '</span></div>';
    html += '<div class="drawer-row"><span class="drawer-label">Kind</span><span class="drawer-value">' + escHtml(node.kind) + '</span></div>';
@@ -588,7 +588,7 @@ function addLogEntry() {
    }
    html += '</div>';
    html += '<div class="drawer-section">';
-   html += '<div class="drawer-section-title">Health source</div>';
+   html += '<h3 class="drawer-section-title">Health source</h3>';
    if (node.healthSource === 'live' && result) {
      html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Cloud demo live endpoint</span></div>';
      html += '<div class="drawer-row"><span class="drawer-label">HTTP status</span><span class="drawer-value">' + (result.httpStatus ? result.httpStatus : '\u2014') + '</span></div>';
@@ -616,7 +616,7 @@ function addLogEntry() {
    }
    html += '</div>';
    html += '<div class="drawer-section">';
-   html += '<div class="drawer-section-title">Optional details</div>';
+   html += '<h3 class="drawer-section-title">Optional details</h3>';
    html += '<div class="drawer-unavailable">Pod-level metrics, recent events, and application logs are not available from the V1 cloud demo health contract. This panel shows only the health snapshot from the approved cloud demo data source.</div>';
    html += '</div>';
    return html;
@@ -627,25 +627,25 @@ function addLogEntry() {
    var edgeStatus = getEdgeStatus(edge, src, tgt);
    var html = '';
    html += '<div class="drawer-section">';
-   html += '<div class="drawer-section-title">Connection</div>';
+   html += '<h3 class="drawer-section-title">Connection</h3>';
    html += '<div class="drawer-row"><span class="drawer-label">Flow type</span><span class="drawer-value">' + escHtml(edge.type || 'sync') + '</span></div>';
    if (edge.disabled) html += '<div class="drawer-row"><span class="drawer-label">State</span><span class="drawer-value warning">Disabled path</span></div>';
    if (edge.optional) html += '<div class="drawer-row"><span class="drawer-label">Optional</span><span class="drawer-value">Yes \u2014 may be absent</span></div>';
    html += '</div>';
    html += '<div class="drawer-section">';
-   html += '<div class="drawer-section-title">Source endpoint</div>';
+   html += '<h3 class="drawer-section-title">Source endpoint</h3>';
    html += '<div class="drawer-row"><span class="drawer-label">Service</span><span class="drawer-value">' + escHtml(src.label) + '</span></div>';
    html += '<div class="drawer-row"><span class="drawer-label">Role</span><span class="drawer-value">' + escHtml(src.metaphor) + '</span></div>';
    html += '<div class="drawer-row"><span class="drawer-label">Status</span><span class="drawer-value ' + escHtml(srcStatus.className) + '">' + escHtml(srcStatus.text) + '</span></div>';
    html += '</div>';
    html += '<div class="drawer-section">';
-   html += '<div class="drawer-section-title">Target endpoint</div>';
+   html += '<h3 class="drawer-section-title">Target endpoint</h3>';
    html += '<div class="drawer-row"><span class="drawer-label">Service</span><span class="drawer-value">' + escHtml(tgt.label) + '</span></div>';
    html += '<div class="drawer-row"><span class="drawer-label">Role</span><span class="drawer-value">' + escHtml(tgt.metaphor) + '</span></div>';
    html += '<div class="drawer-row"><span class="drawer-label">Status</span><span class="drawer-value ' + escHtml(tgtStatus.className) + '">' + escHtml(tgtStatus.text) + '</span></div>';
    html += '</div>';
    html += '<div class="drawer-section">';
-   html += '<div class="drawer-section-title">Connection assessment</div>';
+   html += '<h3 class="drawer-section-title">Connection assessment</h3>';
    var assess = '';
    if (edge.disabled) {
      assess = 'This connection path is disabled in the current deployment. No active data flow is expected on this path.';
@@ -661,7 +661,7 @@ function addLogEntry() {
    html += '<div class="drawer-assessment">' + escHtml(assess) + '</div>';
    html += '</div>';
    html += '<div class="drawer-section">';
-   html += '<div class="drawer-section-title">Optional details</div>';
+   html += '<h3 class="drawer-section-title">Optional details</h3>';
    html += '<div class="drawer-unavailable">Endpoint-level telemetry, request rates, and error counts are not available from the V1 cloud demo health contract. This panel shows only connection state inferred from the approved cloud demo health snapshot.</div>';
    html += '</div>';
    return html;
