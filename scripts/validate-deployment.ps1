@@ -55,6 +55,18 @@ function Write-Section {
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 }
 
+# Returns the first non-empty DaemonSet list found for the given label selectors (kube-system).
+function Get-KubeSystemDaemonSet {
+    param([string[]]$LabelSelectors)
+    foreach ($selector in $LabelSelectors) {
+        $result = kubectl get daemonset -n kube-system -l $selector -o json 2>$null | ConvertFrom-Json
+        if ($result -and $result.items.Count -gt 0) {
+            return $result
+        }
+    }
+    return $null
+}
+
 # Banner
 Write-Host @"
 
@@ -207,11 +219,11 @@ if ($aksName) {
             }
         }
         else {
-            # Warning-only: drift is expected on clusters not yet through maintenance window
+            # Warning-only: drift is expected on clusters not yet through the maintenance window.
+            # $maxPodsDriftWarnings tracks how many pools need remediation; overall validation still passes.
             Write-Host "  ⚠️  One or more node pools still have maxPods < 50." -ForegroundColor Yellow
             Write-Host "     Run the maintenance-window procedure in docs/AKS-MAXPODS-MAINTENANCE-RUNBOOK.md" -ForegroundColor Gray
-            # Count as passed so this does not block overall validation
-            $passedChecks++
+            $passedChecks++ # non-blocking: drift warning does not count as a failed check
         }
     }
     else {
@@ -354,11 +366,8 @@ Write-Section "Security and Observability Add-ons (kube-system)"
 Write-Host "  Note: All add-ons must be Ready before any node pool maintenance begins." -ForegroundColor Gray
 
 # Microsoft Defender
-$defenderDs = kubectl get daemonset -n kube-system -l "app=microsoft-defender-collector-ds" -o json 2>$null | ConvertFrom-Json
-if (-not $defenderDs -or $defenderDs.items.Count -eq 0) {
-    $defenderDs = kubectl get daemonset -n kube-system -l "app=microsoft-defender-publisher-ds" -o json 2>$null | ConvertFrom-Json
-}
-if ($defenderDs -and $defenderDs.items.Count -gt 0) {
+$defenderDs = Get-KubeSystemDaemonSet @("app=microsoft-defender-collector-ds", "app=microsoft-defender-publisher-ds")
+if ($defenderDs) {
     foreach ($ds in $defenderDs.items) {
         $desired = $ds.status.desiredNumberScheduled
         $ready = $ds.status.numberReady
@@ -373,11 +382,8 @@ else {
 }
 
 # Retina
-$retinaDs = kubectl get daemonset -n kube-system -l "k8s-app=retina" -o json 2>$null | ConvertFrom-Json
-if (-not $retinaDs -or $retinaDs.items.Count -eq 0) {
-    $retinaDs = kubectl get daemonset -n kube-system -l "app=retina" -o json 2>$null | ConvertFrom-Json
-}
-if ($retinaDs -and $retinaDs.items.Count -gt 0) {
+$retinaDs = Get-KubeSystemDaemonSet @("k8s-app=retina", "app=retina")
+if ($retinaDs) {
     foreach ($ds in $retinaDs.items) {
         $desired = $ds.status.desiredNumberScheduled
         $ready = $ds.status.numberReady
@@ -392,11 +398,8 @@ else {
 }
 
 # Azure Monitor Agent (DaemonSet)
-$amaDs = kubectl get daemonset -n kube-system -l "app=ama-logs" -o json 2>$null | ConvertFrom-Json
-if (-not $amaDs -or $amaDs.items.Count -eq 0) {
-    $amaDs = kubectl get daemonset -n kube-system -l "component=oms-agent" -o json 2>$null | ConvertFrom-Json
-}
-if ($amaDs -and $amaDs.items.Count -gt 0) {
+$amaDs = Get-KubeSystemDaemonSet @("app=ama-logs", "component=oms-agent")
+if ($amaDs) {
     foreach ($ds in $amaDs.items) {
         $desired = $ds.status.desiredNumberScheduled
         $ready = $ds.status.numberReady

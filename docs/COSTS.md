@@ -57,7 +57,7 @@ When executing the blue/green `maxPods=30` drift fix (see [AKS-MAXPODS-MAINTENAN
 | `work50` | Standard_D2s_v5 | 4 | ~$0.384 |
 | **Total overlap** | | **5** | **~$0.48** |
 
-A typical 2–4 hour maintenance window adds **~$1–2 per run** — negligible relative to the ~$30–40/day baseline. Once the old pools are deleted, node count returns to its pre-maintenance level with **no net cost increase**.
+A typical 2-4 hour maintenance window adds **~$1-2 per run** - negligible relative to the ~$30-40/day baseline. Once the old pools are deleted, node count returns to its pre-maintenance level with **no net cost increase**.
 
 ### Azure Container Registry
 
