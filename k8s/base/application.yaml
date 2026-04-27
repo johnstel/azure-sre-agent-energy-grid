@@ -1462,15 +1462,18 @@ data:
      function closeDetailDrawer() {
        var drawer = document.getElementById('detail-drawer');
        if (!drawer) return;
+       var focusWasInDrawer = drawer.contains(document.activeElement);
        drawer.hidden = true;
-       var focusTarget = null;
-       if (_drawerLastFocusNodeId) {
-         focusTarget = document.querySelector('.map-node[data-node-id="' + _drawerLastFocusNodeId + '"]');
+       if (focusWasInDrawer) {
+         var focusTarget = null;
+         if (_drawerLastFocusNodeId) {
+           focusTarget = document.querySelector('.map-node[data-node-id="' + _drawerLastFocusNodeId + '"]');
+         }
+         if (!focusTarget && _drawerLastFocus && _drawerLastFocus.isConnected && typeof _drawerLastFocus.focus === 'function') {
+           focusTarget = _drawerLastFocus;
+         }
+         if (focusTarget) { try { focusTarget.focus(); } catch (e) {} }
        }
-       if (!focusTarget && _drawerLastFocus && _drawerLastFocus.isConnected && typeof _drawerLastFocus.focus === 'function') {
-         focusTarget = _drawerLastFocus;
-       }
-       if (focusTarget) { try { focusTarget.focus(); } catch (e) {} }
        _drawerLastFocus = null;
        _drawerLastFocusNodeId = null;
      }
