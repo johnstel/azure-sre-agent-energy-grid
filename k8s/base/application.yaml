@@ -771,6 +771,7 @@ data:
       .dot.green { background: var(--green); box-shadow: 0 0 6px var(--green); }
       .dot.amber { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
       .dot.red { background: var(--red); box-shadow: 0 0 6px var(--red); }
+      .dot.unknown { background: #94a3b8; box-shadow: 0 0 6px rgb(148 163 184 / 0.45); }
       main { padding: 1.5rem 2rem; }
       .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; margin-bottom: 1.5rem; }
       .card { background: var(--card); border-radius: 10px; padding: 1.2rem; border: 1px solid #334155; }
@@ -801,6 +802,9 @@ data:
       .map-button:hover, .map-button:focus-visible { border-color: var(--cyan); outline: 2px solid rgba(34,211,238,.35); outline-offset: 2px; }
       .map-meta { color: var(--muted); font-size: .8rem; }
       .map-disclaimer { border: 1px solid rgba(251,191,36,.35); background: rgba(120,53,15,.18); color: #fde68a; border-radius: 10px; padding: .8rem 1rem; margin-bottom: 1rem; font-size: .86rem; line-height: 1.45; }
+      .map-health-banner { border: 1px solid rgba(148,163,184,.38); background: rgba(15,23,42,.82); color: #cbd5e1; border-radius: 10px; padding: .75rem 1rem; margin-bottom: 1rem; font-size: .86rem; line-height: 1.45; }
+      .map-health-banner.warning { border-color: rgba(251,191,36,.58); background: rgba(120,53,15,.22); color: #fde68a; }
+      .map-health-banner[hidden] { display: none; }
       .grid-map-shell { position: relative; min-height: 560px; border: 1px solid #334155; border-radius: 12px; overflow: hidden; background: radial-gradient(circle at 50% 0%, rgba(34,211,238,.12), transparent 36%), linear-gradient(180deg, rgba(15,23,42,.96), rgba(2,6,23,.98)); }
       .grid-map-svg { width: 100%; height: 560px; display: block; touch-action: none; cursor: grab; }
       .grid-map-svg:active { cursor: grabbing; }
@@ -808,18 +812,32 @@ data:
       .map-fallback { position: absolute; inset: 0; display: grid; place-items: center; padding: 2rem; text-align: center; background: rgba(15,23,42,.96); color: var(--muted); line-height: 1.5; }
       .map-fallback[hidden] { display: none; }
       .map-edge { stroke: #64748b; stroke-width: 2.4; fill: none; opacity: .82; }
-      .map-edge.disabled { stroke-dasharray: 8 7; opacity: .58; }
+      .map-edge.healthy { stroke: var(--green); opacity: .86; }
+      .map-edge.warning { stroke: var(--amber); stroke-width: 3; opacity: .9; }
+      .map-edge.critical { stroke: var(--red); stroke-width: 3.4; opacity: .95; filter: drop-shadow(0 0 6px rgba(248,113,113,.45)); }
+      .map-edge.unknown { stroke: #94a3b8; stroke-dasharray: 8 7; opacity: .58; }
+      .map-edge.disabled { stroke: #94a3b8; stroke-dasharray: 3 7; opacity: .5; }
       .map-edge-label { fill: #cbd5e1; font-size: 11px; paint-order: stroke; stroke: #020617; stroke-width: 4px; stroke-linejoin: round; }
       .map-node .node-box { fill: #182338; stroke: #475569; stroke-width: 1.5; filter: drop-shadow(0 10px 18px rgba(2,6,23,.45)); }
       .map-node.service .node-box { stroke: rgba(34,211,238,.65); }
       .map-node.datastore .node-box, .map-node.datastore .node-cap { fill: #14213a; stroke: rgba(167,139,250,.75); stroke-width: 1.5; }
+      .map-node.healthy .node-box, .map-node.datastore.healthy .node-box, .map-node.datastore.healthy .node-cap { fill: rgba(6,78,59,.92); stroke: var(--green); stroke-width: 2.2; filter: drop-shadow(0 0 14px rgba(52,211,153,.36)); }
+      .map-node.warning .node-box, .map-node.datastore.warning .node-box, .map-node.datastore.warning .node-cap { fill: rgba(120,53,15,.92); stroke: var(--amber); stroke-width: 2.4; filter: drop-shadow(0 0 14px rgba(251,191,36,.34)); }
+      .map-node.critical .node-box, .map-node.datastore.critical .node-box, .map-node.datastore.critical .node-cap { fill: rgba(127,29,29,.92); stroke: var(--red); stroke-width: 2.6; filter: drop-shadow(0 0 16px rgba(248,113,113,.48)); }
+      .map-node.unknown .node-box, .map-node.datastore.unknown .node-box, .map-node.datastore.unknown .node-cap { fill: rgba(30,41,59,.88); stroke: #94a3b8; stroke-dasharray: 7 5; }
+      .map-node.static .node-box, .map-node.datastore.static .node-box, .map-node.datastore.static .node-cap { fill: rgba(30,41,59,.92); stroke: #cbd5e1; stroke-width: 1.8; }
       .map-node.disabled .node-box { stroke-dasharray: 7 5; opacity: .72; }
       .map-node text { pointer-events: none; }
+      .map-node-symbol { fill: #f8fafc; font-size: 13px; font-weight: 800; }
       .map-node-title { fill: var(--text); font-size: 14px; font-weight: 700; }
       .map-node-subtitle { fill: var(--muted); font-size: 11px; }
       .map-node-status { fill: #94a3b8; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
       .map-status-dot { fill: #94a3b8; }
       .map-status-dot.healthy { fill: var(--green); filter: drop-shadow(0 0 5px rgba(52,211,153,.85)); }
+      .map-status-dot.warning { fill: var(--amber); filter: drop-shadow(0 0 5px rgba(251,191,36,.85)); }
+      .map-status-dot.critical { fill: var(--red); filter: drop-shadow(0 0 5px rgba(248,113,113,.85)); }
+      .map-status-dot.static { fill: #cbd5e1; }
+      .map-status-dot.unknown { fill: #94a3b8; }
       .map-status-dot.disabled { fill: var(--amber); }
       @media (max-width: 799px), (max-height: 499px) {
         .grid-map-shell { min-height: 260px; }
@@ -890,7 +908,7 @@ data:
          <div class="map-toolbar">
            <div>
              <h2 class="section-title" style="margin-top:0">&#128506; Cloud Demo Grid Map</h2>
-             <div class="map-meta">Static topology from the approved cloud grid-map data contract. Live severity binding is intentionally deferred.</div>
+              <div class="map-meta">Topology and live service health use the approved cloud grid-map data contract. Live checks poll every 30 seconds.</div>
            </div>
            <div class="map-controls" aria-label="Grid map controls">
              <button class="map-button" type="button" id="map-zoom-in">Zoom in</button>
@@ -898,10 +916,13 @@ data:
              <button class="map-button" type="button" id="map-reset">Fit / Reset</button>
            </div>
          </div>
-         <div class="map-disclaimer" role="note">
-           Demo topology only. This map visualizes Kubernetes service/application health for the Azure SRE Agent demo and is not connected to real grid telemetry, SCADA, GIS, or utility infrastructure.
-         </div>
-         <div class="card">
+          <div class="map-disclaimer" role="note">
+            Demo topology only. This map visualizes Kubernetes service/application health for the Azure SRE Agent demo and is not connected to real grid telemetry, SCADA, GIS, or utility infrastructure.
+          </div>
+          <div class="map-health-banner warning" id="map-health-banner" role="status" aria-live="polite">
+            Live service health has not been received yet. Static and optional nodes are shown in a safe unknown/static state.
+          </div>
+          <div class="card">
            <div class="grid-map-shell" id="grid-map-shell">
              <svg id="grid-map-svg" class="grid-map-svg" role="img" aria-label="Static cloud demo topology graph with service and data-store nodes" tabindex="0">
                <g id="grid-map-stage"></g>
@@ -956,10 +977,14 @@ data:
          { source: 'load-simulator', target: 'meter-service', label: 'Simulated meter usage', type: 'sync' },
          { source: 'grid-worker', target: 'dispatch-service', label: 'Disabled dispatch processing path', type: 'sync', disabled: true }
        ]
-     };
-     const MAP_NODE = { width: 176, height: 76 };
-     const SVG_NS = 'http://www.w3.org/2000/svg';
-     const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0 };
+      };
+      const MAP_NODE = { width: 176, height: 76 };
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+      const LIVE_HEALTH_TIMEOUT_MS = 3000;
+      const MAP_HEALTH_POLL_MS = 30000;
+      const STALE_AFTER_MS = 60000;
+      const SEVERITY_RANK = { healthy: 0, warning: 1, critical: 2 };
+      const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0, healthById: {}, lastSuccessfulHealthPoll: null, healthPollInFlight: false };
 
     function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
@@ -1045,30 +1070,143 @@ data:
       if (box.children.length > 50) box.removeChild(box.lastChild);
     }
 
-     function loadHealth() {
-       const grid = document.getElementById('health-grid');
-       grid.innerHTML = '';
-      const svcs = [
-        { name: 'Asset Service', url: '/api/assets/health' },
-        { name: 'Meter Service', url: '/api/meter/health' },
-        { name: 'Dispatch Service', url: '/api/dispatch/health' },
-        { name: 'MongoDB', url: null },
-        { name: 'RabbitMQ', url: null },
-      ];
-      svcs.forEach(svc => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        if (svc.url) {
-          card.innerHTML = '<h3>' + svc.name + '</h3><div class="loading">Checking...</div>';
-          fetch(svc.url, { signal: AbortSignal.timeout(3000) })
-            .then(() => { card.innerHTML = '<h3>' + svc.name + '</h3><div style="color:var(--green)"><span class="dot green"></span> Healthy</div>'; })
-            .catch(() => { card.innerHTML = '<h3>' + svc.name + '</h3><div style="color:var(--red)"><span class="dot red"></span> Unreachable</div>'; });
-        } else {
-          card.innerHTML = '<h3>' + svc.name + '</h3><div style="color:var(--muted)"><span class="dot green"></span> In-Cluster</div>';
+      function liveHealthNodes() {
+        return GRID_TOPOLOGY.nodes.filter(node => node.healthSource === 'live' && node.healthPath);
+      }
+
+      function createTimeoutSignal(timeoutMs) {
+        if (window.AbortSignal && AbortSignal.timeout) return AbortSignal.timeout(timeoutMs);
+        const controller = new AbortController();
+        window.setTimeout(() => controller.abort(), timeoutMs);
+        return controller.signal;
+      }
+
+      function severityForHttpStatus(status) {
+        if (status >= 200 && status < 300) return 'healthy';
+        if (status >= 400 && status < 500) return 'warning';
+        if (status >= 500) return 'critical';
+        return 'warning';
+      }
+
+      function healthTextForResult(result) {
+        if (!result) return 'checking live health';
+        if (result.reason === 'network') return 'critical - endpoint unreachable';
+        if (result.severity === 'healthy') return 'healthy - HTTP ' + result.httpStatus;
+        if (result.severity === 'warning') return 'warning - HTTP ' + result.httpStatus;
+        if (result.severity === 'critical') return 'critical - HTTP ' + result.httpStatus;
+        return 'unknown';
+      }
+
+      function fetchLiveHealth(node) {
+        const checkedAt = Date.now();
+        return fetch(node.healthPath, { method: 'GET', cache: 'no-store', signal: createTimeoutSignal(LIVE_HEALTH_TIMEOUT_MS) })
+          .then(response => ({
+            id: node.id,
+            severity: severityForHttpStatus(response.status),
+            httpStatus: response.status,
+            checkedAt,
+            successAt: checkedAt,
+            reason: 'http'
+          }))
+          .catch(error => ({
+            id: node.id,
+            severity: 'critical',
+            checkedAt,
+            successAt: null,
+            reason: 'network',
+            errorName: error && error.name ? error.name : 'NetworkError'
+          }));
+      }
+
+      function statusDotClass(severity) {
+        if (severity === 'healthy') return 'green';
+        if (severity === 'warning') return 'amber';
+        if (severity === 'critical') return 'red';
+        return 'unknown';
+      }
+
+      function renderHealthGrid() {
+        const grid = document.getElementById('health-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        const svcs = [
+          ...liveHealthNodes().map(node => ({ name: node.label, node })),
+          { name: 'MongoDB', staticText: 'Static in-cluster - no browser health endpoint' },
+          { name: 'RabbitMQ', staticText: 'Static in-cluster - no browser health endpoint' },
+        ];
+        svcs.forEach(svc => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          if (svc.node) {
+            const result = mapState.healthById[svc.node.id];
+            const severity = result ? result.severity : 'unknown';
+            const dotClass = statusDotClass(severity);
+            const label = result ? healthTextForResult(result) : 'Checking approved health endpoint...';
+            card.innerHTML = '<h3>' + svc.name + '</h3><div style="color:var(--' + (severity === 'warning' ? 'amber' : severity === 'critical' ? 'red' : severity === 'healthy' ? 'green' : 'muted') + ')"><span class="dot ' + dotClass + '"></span> ' + label + '</div>';
+          } else {
+            card.innerHTML = '<h3>' + svc.name + '</h3><div style="color:var(--muted)"><span class="dot green"></span> ' + svc.staticText + '</div>';
+          }
+          grid.appendChild(card);
+        });
+      }
+
+      function updateMapHealthBanner() {
+        const banner = document.getElementById('map-health-banner');
+        if (!banner) return;
+        const now = Date.now();
+        const last = mapState.lastSuccessfulHealthPoll;
+        if (!last) {
+          banner.hidden = false;
+          banner.className = 'map-health-banner warning';
+          banner.textContent = mapState.healthPollInFlight
+            ? 'Checking approved cloud demo health endpoints. Static and optional nodes remain in safe unknown/static state while live data loads.'
+            : 'Live service health is unavailable. The map is showing safe severity states from the last known cloud demo contract, with endpoint failures marked critical only for application health.';
+          return;
         }
-         grid.appendChild(card);
-       });
-     }
+        const age = now - last;
+        if (age > STALE_AFTER_MS) {
+          banner.hidden = false;
+          banner.className = 'map-health-banner warning';
+          banner.textContent = 'Live service health data is stale (' + Math.round(age / 1000) + 's since the last successful health response). Static and optional nodes are not treated as causal impact.';
+          return;
+        }
+        banner.hidden = true;
+      }
+
+      function refreshGridMapAfterHealthChange() {
+        mapState.rendered = false;
+        const mapView = document.getElementById('map-view');
+        if (mapView && !mapView.hidden) renderGridMap();
+      }
+
+      function loadHealth() {
+        if (mapState.healthPollInFlight) return;
+        mapState.healthPollInFlight = true;
+        renderHealthGrid();
+        updateMapHealthBanner();
+        Promise.all(liveHealthNodes().map(fetchLiveHealth))
+          .then(results => {
+            let newestSuccess = mapState.lastSuccessfulHealthPoll;
+            results.forEach(result => {
+              mapState.healthById[result.id] = result;
+              if (result.successAt && (!newestSuccess || result.successAt > newestSuccess)) newestSuccess = result.successAt;
+            });
+            mapState.lastSuccessfulHealthPoll = newestSuccess;
+          })
+          .catch(() => {
+            liveHealthNodes().forEach(node => {
+              if (!mapState.healthById[node.id]) {
+                mapState.healthById[node.id] = { id: node.id, severity: 'critical', checkedAt: Date.now(), successAt: null, reason: 'network' };
+              }
+            });
+          })
+          .finally(() => {
+            mapState.healthPollInFlight = false;
+            renderHealthGrid();
+            updateMapHealthBanner();
+            refreshGridMapAfterHealthChange();
+          });
+      }
 
      function createSvgElement(name, attrs) {
        const el = document.createElementNS(SVG_NS, name);
@@ -1076,12 +1214,28 @@ data:
        return el;
      }
 
-     function getMapStatus(node) {
-       if (node.replicas === 0) return { text: 'disabled', className: 'disabled' };
-       if (node.optional) return { text: 'optional absent', className: 'unknown' };
-       if (node.healthSource === 'live') return { text: 'unknown', className: 'unknown' };
-       return { text: 'static in-cluster', className: 'unknown' };
-     }
+      function getMapStatus(node) {
+        if (node.replicas === 0) return { text: 'disabled - replicas 0', className: 'disabled', severity: 'unknown', symbol: 'Ⅱ' };
+        if (node.optional) return { text: 'optional absent', className: 'unknown', severity: 'unknown', symbol: '?' };
+        if (node.healthSource === 'live') {
+          const result = mapState.healthById[node.id];
+          if (!result) return { text: 'checking live health', className: 'unknown', severity: 'unknown', symbol: '?' };
+          const symbol = result.severity === 'healthy' ? '✓' : result.severity === 'warning' ? '!' : '×';
+          return { text: healthTextForResult(result), className: result.severity, severity: result.severity, symbol };
+        }
+        return { text: 'static in-cluster', className: 'static', severity: 'unknown', symbol: 'S' };
+      }
+
+      function getEdgeStatus(edge, source, target) {
+        if (edge.disabled) return { className: 'disabled', label: 'disabled path' };
+        const sourceStatus = getMapStatus(source);
+        const targetStatus = getMapStatus(target);
+        const known = [sourceStatus.severity, targetStatus.severity].filter(severity => severity in SEVERITY_RANK);
+        if (known.includes('critical')) return { className: 'critical', label: 'visual impact: critical endpoint' };
+        if (known.includes('warning')) return { className: 'warning', label: 'visual impact: warning endpoint' };
+        if (known.length === 2 && known.every(severity => severity === 'healthy')) return { className: 'healthy', label: 'both endpoints healthy' };
+        return { className: 'unknown', label: 'unknown/static endpoint state' };
+      }
 
      function nodeCenter(node) {
        return { x: node.position.x + MAP_NODE.width / 2, y: node.position.y + MAP_NODE.height / 2 };
@@ -1104,13 +1258,16 @@ data:
          role: 'img',
          'aria-label': node.label + ', ' + node.metaphor + ', ' + status.text
        });
-       const x = node.position.x;
-       const y = node.position.y;
-       group.appendChild(createSvgElement('rect', { class: 'node-box', x, y, width: MAP_NODE.width, height: MAP_NODE.height, rx: 14, ry: 14 }));
-       group.appendChild(createSvgElement('circle', { class: 'map-status-dot ' + status.className, cx: x + 16, cy: y + 18, r: 5 }));
-       const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 23 });
-       title.textContent = node.label;
-       group.appendChild(title);
+        const x = node.position.x;
+        const y = node.position.y;
+        group.appendChild(createSvgElement('rect', { class: 'node-box', x, y, width: MAP_NODE.width, height: MAP_NODE.height, rx: 14, ry: 14 }));
+        group.appendChild(createSvgElement('circle', { class: 'map-status-dot ' + status.className, cx: x + 16, cy: y + 18, r: 5 }));
+        const symbol = createSvgElement('text', { class: 'map-node-symbol', x: x + MAP_NODE.width - 22, y: y + 24, 'text-anchor': 'middle', 'aria-hidden': 'true' });
+        symbol.textContent = status.symbol;
+        group.appendChild(symbol);
+        const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 23 });
+        title.textContent = node.label;
+        group.appendChild(title);
        const subtitle = createSvgElement('text', { class: 'map-node-subtitle', x: x + 16, y: y + 46 });
        subtitle.textContent = node.metaphor;
        group.appendChild(subtitle);
@@ -1130,11 +1287,14 @@ data:
        });
        const x = node.position.x;
        const y = node.position.y;
-       group.appendChild(createSvgElement('rect', { class: 'node-box', x, y: y + 12, width: MAP_NODE.width, height: MAP_NODE.height - 24, rx: 6, ry: 6 }));
-       group.appendChild(createSvgElement('ellipse', { class: 'node-cap', cx: x + MAP_NODE.width / 2, cy: y + 13, rx: MAP_NODE.width / 2, ry: 14 }));
-       group.appendChild(createSvgElement('ellipse', { class: 'node-cap', cx: x + MAP_NODE.width / 2, cy: y + MAP_NODE.height - 12, rx: MAP_NODE.width / 2, ry: 14 }));
-       group.appendChild(createSvgElement('circle', { class: 'map-status-dot ' + status.className, cx: x + 16, cy: y + 22, r: 5 }));
-       const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 27 });
+        group.appendChild(createSvgElement('rect', { class: 'node-box', x, y: y + 12, width: MAP_NODE.width, height: MAP_NODE.height - 24, rx: 6, ry: 6 }));
+        group.appendChild(createSvgElement('ellipse', { class: 'node-cap', cx: x + MAP_NODE.width / 2, cy: y + 13, rx: MAP_NODE.width / 2, ry: 14 }));
+        group.appendChild(createSvgElement('ellipse', { class: 'node-cap', cx: x + MAP_NODE.width / 2, cy: y + MAP_NODE.height - 12, rx: MAP_NODE.width / 2, ry: 14 }));
+        group.appendChild(createSvgElement('circle', { class: 'map-status-dot ' + status.className, cx: x + 16, cy: y + 22, r: 5 }));
+        const symbol = createSvgElement('text', { class: 'map-node-symbol', x: x + MAP_NODE.width - 22, y: y + 27, 'text-anchor': 'middle', 'aria-hidden': 'true' });
+        symbol.textContent = status.symbol;
+        group.appendChild(symbol);
+        const title = createSvgElement('text', { class: 'map-node-title', x: x + 30, y: y + 27 });
        title.textContent = node.label;
        group.appendChild(title);
        const subtitle = createSvgElement('text', { class: 'map-node-subtitle', x: x + 16, y: y + 50 });
@@ -1164,23 +1324,25 @@ data:
 
        GRID_TOPOLOGY.edges.forEach(edge => {
          const source = nodesById[edge.source];
-         const target = nodesById[edge.target];
-         if (!source || !target) return;
-         const start = edgeAnchor(source, target);
-         const end = edgeAnchor(target, source);
-         const edgeLine = createSvgElement('line', {
-           class: 'map-edge' + (edge.disabled || edge.optional ? ' disabled' : ''),
-           x1: start.x,
-           y1: start.y,
-           x2: end.x,
-           y2: end.y,
-           'marker-end': 'url(#map-arrowhead)'
-         });
-         stage.appendChild(edgeLine);
-         const label = createSvgElement('text', { class: 'map-edge-label', x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 8, 'text-anchor': 'middle' });
-         label.textContent = edge.label;
-         stage.appendChild(label);
-       });
+          const target = nodesById[edge.target];
+          if (!source || !target) return;
+          const start = edgeAnchor(source, target);
+          const end = edgeAnchor(target, source);
+          const edgeStatus = getEdgeStatus(edge, source, target);
+          const edgeLine = createSvgElement('line', {
+            class: 'map-edge ' + edgeStatus.className,
+            x1: start.x,
+            y1: start.y,
+            x2: end.x,
+            y2: end.y,
+            'marker-end': 'url(#map-arrowhead)',
+            'aria-label': edge.label + ', ' + edgeStatus.label
+          });
+          stage.appendChild(edgeLine);
+          const label = createSvgElement('text', { class: 'map-edge-label', x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 8, 'text-anchor': 'middle' });
+          label.textContent = edge.label + (edgeStatus.className === 'unknown' ? ' · unknown' : edgeStatus.className === 'critical' ? ' · critical' : edgeStatus.className === 'warning' ? ' · warning' : '');
+          stage.appendChild(label);
+        });
 
        GRID_TOPOLOGY.nodes.forEach(node => {
          if (node.kind === 'datastore') renderDataStoreNode(stage, node);
@@ -1330,11 +1492,12 @@ data:
      updateClock(); updateMetrics(); loadDispatches(); loadAssets(); loadHealth();
     for (let i = 0; i < 10; i++) addLogEntry();
     setInterval(updateClock, 1000);
-    setInterval(updateMetrics, 5000);
-    setInterval(loadDispatches, 10000);
-    setInterval(addLogEntry, 3000);
-    setInterval(loadHealth, 30000);
-    setInterval(loadAssets, 60000);
+     setInterval(updateMetrics, 5000);
+     setInterval(loadDispatches, 10000);
+     setInterval(addLogEntry, 3000);
+     setInterval(loadHealth, MAP_HEALTH_POLL_MS);
+     setInterval(updateMapHealthBanner, 5000);
+     setInterval(loadAssets, 60000);
     </script>
     </body>
     </html>
