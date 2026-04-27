@@ -55,6 +55,26 @@ function Write-Section {
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 }
 
+# Returns all unique DaemonSets found for the given label selectors (kube-system).
+function Get-KubeSystemDaemonSet {
+    param([string[]]$LabelSelectors)
+    $itemsByName = [ordered]@{}
+    foreach ($selector in $LabelSelectors) {
+        $result = kubectl get daemonset -n kube-system -l $selector -o json 2>$null | ConvertFrom-Json
+        if ($result -and $result.items) {
+            foreach ($item in $result.items) {
+                if ($item.metadata.name -and -not $itemsByName.Contains($item.metadata.name)) {
+                    $itemsByName[$item.metadata.name] = $item
+                }
+            }
+        }
+    }
+    if ($itemsByName.Count -gt 0) {
+        return [pscustomobject]@{ items = @($itemsByName.Values) }
+    }
+    return $null
+}
+
 # Banner
 Write-Host @"
 
@@ -68,6 +88,8 @@ Write-Host @"
 
 $totalChecks = 0
 $passedChecks = 0
+$maxPodsDriftWarnings = 0
+$securityAddonWarnings = 0
 
 # =============================================================================
 # AZURE RESOURCE CHECKS
@@ -173,6 +195,52 @@ $healthyNodes = ($nodes.items | Where-Object {
 $totalNodes = $nodes.items.Count
 if (Write-Check "All nodes are Ready" ($healthyNodes -eq $totalNodes) "$healthyNodes/$totalNodes nodes ready") {
     $passedChecks++
+}
+
+# =============================================================================
+# NODE POOL MAXPODS CHECK
+# =============================================================================
+Write-Section "Node Pool maxPods Configuration"
+
+if ($aksName) {
+    $nodePools = az aks nodepool list --resource-group $ResourceGroupName --cluster-name $aksName --output json 2>$null | ConvertFrom-Json
+    if ($nodePools -and $nodePools.Count -gt 0) {
+        Write-Host "`n  Node Pool maxPods (target: 50 after maintenance window):" -ForegroundColor White
+        $allAtTarget = $true
+        foreach ($pool in $nodePools) {
+            $poolName = $pool.name
+            $poolMode = $pool.mode
+            $poolMaxPods = $pool.maxPods
+            $atTarget = $poolMaxPods -ge 50
+            $icon = if ($atTarget) { "✅" } else { "⚠️ " }
+            $color = if ($atTarget) { "Green" } else { "Yellow" }
+            Write-Host "    $icon $poolName  mode=$poolMode  maxPods=$poolMaxPods" -ForegroundColor $color
+            if (-not $atTarget) {
+                $allAtTarget = $false
+                $maxPodsDriftWarnings++
+            }
+        }
+
+        $totalChecks++
+        if ($allAtTarget) {
+            if (Write-Check "All node pools maxPods >= 50" $true) {
+                $passedChecks++
+            }
+        }
+        else {
+            # Warning-only: drift is expected on clusters not yet through the maintenance window.
+            # $maxPodsDriftWarnings tracks how many pools need remediation; overall validation still passes.
+            Write-Host "  ⚠️  One or more node pools still have maxPods < 50." -ForegroundColor Yellow
+            Write-Host "     Run the maintenance-window procedure in docs/AKS-MAXPODS-MAINTENANCE-RUNBOOK.md" -ForegroundColor Gray
+            $passedChecks++ # non-blocking: drift warning does not count as a failed check
+        }
+    }
+    else {
+        Write-Host "  ℹ️  Could not retrieve node pool list" -ForegroundColor Gray
+    }
+}
+else {
+    Write-Host "  ℹ️  Skipped (AKS cluster not found)" -ForegroundColor Gray
 }
 
 # =============================================================================
@@ -301,11 +369,82 @@ else {
 }
 
 # =============================================================================
+# SECURITY AND OBSERVABILITY ADD-ONS (kube-system)
+# =============================================================================
+Write-Section "Security and Observability Add-ons (kube-system)"
+Write-Host "  Note: All add-ons must be Ready before any node pool maintenance begins." -ForegroundColor Gray
+
+# Microsoft Defender
+$defenderDs = Get-KubeSystemDaemonSet @("app=microsoft-defender-collector-ds", "app=microsoft-defender-publisher-ds")
+if ($defenderDs) {
+    foreach ($ds in $defenderDs.items) {
+        $desired = $ds.status.desiredNumberScheduled
+        $ready = $ds.status.numberReady
+        $statusAvailable = $null -ne $desired -and $null -ne $ready
+        $message = if ($statusAvailable) { "$ready/$desired pods" } else { "Status unavailable" }
+        $totalChecks++
+        if (Write-Check "Defender DaemonSet '$($ds.metadata.name)' Ready" ($statusAvailable -and $ready -eq $desired) $message) {
+            $passedChecks++
+        }
+    }
+}
+else {
+    Write-Host "  ⚠️  Microsoft Defender DaemonSet not detected; reconcile against approved cluster posture before maintenance" -ForegroundColor Yellow
+    $securityAddonWarnings++
+}
+
+# Retina
+$retinaDs = Get-KubeSystemDaemonSet @("k8s-app=retina", "app=retina")
+if ($retinaDs) {
+    foreach ($ds in $retinaDs.items) {
+        $desired = $ds.status.desiredNumberScheduled
+        $ready = $ds.status.numberReady
+        $statusAvailable = $null -ne $desired -and $null -ne $ready
+        $message = if ($statusAvailable) { "$ready/$desired pods" } else { "Status unavailable" }
+        $totalChecks++
+        if (Write-Check "Retina DaemonSet '$($ds.metadata.name)' Ready" ($statusAvailable -and $ready -eq $desired) $message) {
+            $passedChecks++
+        }
+    }
+}
+else {
+    Write-Host "  ⚠️  Retina DaemonSet not detected; reconcile against approved cluster posture before maintenance" -ForegroundColor Yellow
+    $securityAddonWarnings++
+}
+
+# Azure Monitor Agent (DaemonSet)
+$amaDs = Get-KubeSystemDaemonSet @("app=ama-logs", "component=oms-agent")
+if ($amaDs) {
+    foreach ($ds in $amaDs.items) {
+        $desired = $ds.status.desiredNumberScheduled
+        $ready = $ds.status.numberReady
+        $statusAvailable = $null -ne $desired -and $null -ne $ready
+        $message = if ($statusAvailable) { "$ready/$desired pods" } else { "Status unavailable" }
+        $totalChecks++
+        if (Write-Check "Azure Monitor Agent DaemonSet '$($ds.metadata.name)' Ready" ($statusAvailable -and $ready -eq $desired) $message) {
+            $passedChecks++
+        }
+    }
+}
+else {
+    Write-Host "  ⚠️  Azure Monitor Agent DaemonSet not detected; reconcile against approved cluster posture before maintenance" -ForegroundColor Yellow
+    $securityAddonWarnings++
+}
+
+# =============================================================================
 # SUMMARY
 # =============================================================================
 Write-Host "`n"
 Write-Host "══════════════════════════════════════════════════════════════" -ForegroundColor $(if ($passedChecks -eq $totalChecks) { "Green" } else { "Yellow" })
 Write-Host "  VALIDATION SUMMARY: $passedChecks/$totalChecks checks passed" -ForegroundColor $(if ($passedChecks -eq $totalChecks) { "Green" } else { "Yellow" })
+if ($maxPodsDriftWarnings -gt 0) {
+    Write-Host "  ⚠️  maxPods drift warnings: $maxPodsDriftWarnings pool(s) still at maxPods < 50" -ForegroundColor Yellow
+    Write-Host "     See docs/AKS-MAXPODS-MAINTENANCE-RUNBOOK.md to schedule remediation." -ForegroundColor Gray
+}
+if ($securityAddonWarnings -gt 0) {
+    Write-Host "  ⚠️  security/observability add-on warnings: $securityAddonWarnings expected component(s) not detected" -ForegroundColor Yellow
+    Write-Host "     Reconcile missing components against the approved cluster posture before maintenance." -ForegroundColor Gray
+}
 Write-Host "══════════════════════════════════════════════════════════════" -ForegroundColor $(if ($passedChecks -eq $totalChecks) { "Green" } else { "Yellow" })
 
 if ($passedChecks -eq $totalChecks) {
