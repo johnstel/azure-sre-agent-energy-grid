@@ -26,6 +26,8 @@ This lab deploys the **Propose & Approve** tier. For the full RBAC matrix (demo 
 - [Capability Contracts](docs/CAPABILITY-CONTRACTS.md) — shared contracts, RBAC matrix, data retention
 - [Demo Narrative](docs/DEMO-NARRATIVE.md) — 20-minute customer story arc and Q&A prep
 - [Safe Language Guardrails](docs/SAFE-LANGUAGE-GUARDRAILS.md) — what to claim and what not to claim
+- [Local Analyst Governance](docs/LOCAL-ANALYST-GOVERNANCE.md) — read-only analyst tool, RBAC, audit, and approval boundaries
+- [Analyst Safe Language](docs/ANALYST-SAFE-LANGUAGE.md) — approved Local Analyst wording, confidence levels, and redaction examples
 - [Demo Runbook](docs/DEMO-RUNBOOK.md) — step-by-step operator checklist
 
 ## ⚡ Energy Grid Architecture
@@ -163,6 +165,8 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - [Demo Runbook](docs/DEMO-RUNBOOK.md) — operator checklist for running the demo
 - [Demo Narrative](docs/DEMO-NARRATIVE.md) — 20-minute customer story arc
 - [Safe Language Guardrails](docs/SAFE-LANGUAGE-GUARDRAILS.md) — claims to avoid during demos
+- [Local Analyst Governance](docs/LOCAL-ANALYST-GOVERNANCE.md) — read-only analyst tool, RBAC, audit, and approval boundaries
+- [Analyst Safe Language](docs/ANALYST-SAFE-LANGUAGE.md) — approved Local Analyst wording, confidence levels, and redaction examples
 - [Capability Contracts](docs/CAPABILITY-CONTRACTS.md) — shared contracts, RBAC, retention
 - [SRE Agent Setup Guide](docs/SRE-AGENT-SETUP.md)
 - [Prompts Guide](docs/PROMPTS-GUIDE.md)
