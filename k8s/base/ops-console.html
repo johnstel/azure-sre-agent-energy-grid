@@ -49,7 +49,7 @@
   .map-toolbar { display: flex; gap: .6rem; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: .8rem; }
   .map-controls { display: flex; gap: .5rem; flex-wrap: wrap; }
   .map-button { background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: var(--text); padding: .45rem .65rem; cursor: pointer; font: inherit; font-size: .85rem; }
-  .map-button:hover, .map-button:focus-visible { border-color: var(--cyan); outline: 2px solid rgba(34,211,238,.35); outline-offset: 2px; }
+  .map-button:hover, .map-button:focus-visible { border-color: var(--cyan); outline: 2px solid rgba(34,211,238,.75); outline-offset: 2px; }
   .map-meta { color: var(--muted); font-size: .8rem; }
   .map-disclaimer { border: 1px solid rgba(251,191,36,.35); background: rgba(120,53,15,.18); color: #fde68a; border-radius: 10px; padding: .8rem 1rem; margin-bottom: 1rem; font-size: .86rem; line-height: 1.45; }
   .map-health-banner { border: 1px solid rgba(148,163,184,.38); background: rgba(15,23,42,.82); color: #cbd5e1; border-radius: 10px; padding: .75rem 1rem; margin-bottom: 1rem; font-size: .86rem; line-height: 1.45; }
@@ -102,26 +102,27 @@
   .map-node.selected .node-ring { stroke: var(--cyan); stroke-width: 3; filter: drop-shadow(0 0 8px rgba(34,211,238,.75)); }
   .map-node:focus-visible { outline: none; }
   .map-node:focus-visible .node-focus-ring { stroke: rgba(255,255,255,.88); stroke-width: 2; stroke-dasharray: 6 4; filter: drop-shadow(0 0 6px rgba(255,255,255,.45)); }
-  .map-node.dimmed { opacity: 0.22; }
-  .map-edge.dimmed { opacity: 0.12; }
+  .map-node.dimmed { opacity: 0.40; }
+  .map-edge.dimmed { opacity: 0.28; }
   .map-edge.selected { stroke: var(--cyan) !important; stroke-width: 5 !important; opacity: 1 !important; filter: drop-shadow(0 0 8px rgba(34,211,238,.65)); }
   .map-edge-hit { stroke: transparent; stroke-width: 14; fill: none; cursor: pointer; }
   .filter-bar { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: .75rem; }
   .filter-btn { background: rgba(15,23,42,.8); border: 1px solid #475569; border-radius: 8px; color: var(--muted); padding: .35rem .7rem; cursor: pointer; font: inherit; font-size: .82rem; display: inline-flex; align-items: center; gap: .4rem; }
-  .filter-btn:hover, .filter-btn:focus-visible { border-color: var(--cyan); color: var(--text); outline: 2px solid rgba(34,211,238,.35); outline-offset: 2px; }
+  .filter-btn:hover, .filter-btn:focus-visible { border-color: var(--cyan); color: var(--text); outline: 2px solid rgba(34,211,238,.75); outline-offset: 2px; }
   .filter-btn[aria-pressed="true"] { background: rgba(34,211,238,.15); border-color: var(--cyan); color: var(--cyan); font-weight: 600; }
   .filter-btn[data-filter="critical"][aria-pressed="true"] { background: rgba(248,113,113,.15); border-color: var(--red); color: var(--red); }
   .filter-btn[data-filter="warning"][aria-pressed="true"] { background: rgba(251,191,36,.15); border-color: var(--amber); color: var(--amber); }
   .filter-badge { display: inline-block; min-width: 1.3em; padding: .1em .35em; background: rgba(255,255,255,.1); border-radius: 999px; font-size: .75em; font-weight: 700; text-align: center; line-height: 1.4; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 </style>
 </head>
  <body>
  <header>
    <div class="header-left">
      <h1>&#9881; Grid Operations Console</h1>
-     <nav class="view-toggle" aria-label="Console views">
-       <button type="button" id="operations-tab" data-view-target="operations" aria-selected="true">Operations</button>
-       <button type="button" id="map-tab" data-view-target="map" aria-selected="false">Grid Map</button>
+     <nav class="view-toggle" role="tablist" aria-label="Console views">
+       <button type="button" id="operations-tab" role="tab" aria-controls="operations-view" data-view-target="operations" aria-selected="true">Operations</button>
+       <button type="button" id="map-tab" role="tab" aria-controls="map-view" data-view-target="map" aria-selected="false">Grid Map</button>
      </nav>
    </div>
    <div class="status-bar">
@@ -130,7 +131,7 @@
    </div>
  </header>
  <main>
-   <section id="operations-view" class="app-view" data-view="operations">
+   <section id="operations-view" class="app-view" role="tabpanel" aria-labelledby="operations-tab" data-view="operations">
      <div class="grid">
        <div class="card">
          <h3>Dispatch Queue Depth</h3>
@@ -173,13 +174,13 @@
      <div class="grid" id="health-grid"></div>
    </section>
 
-   <section id="map-view" class="app-view" data-view="map" hidden>
+   <section id="map-view" class="app-view" role="tabpanel" aria-labelledby="map-tab" data-view="map" hidden>
      <div class="map-toolbar">
        <div>
          <h2 class="section-title" style="margin-top:0">&#128506; Cloud Demo Grid Map</h2>
           <div class="map-meta">Topology and live service health use the approved cloud grid-map data contract. Live checks poll every 30 seconds.</div>
        </div>
-       <div class="map-controls" aria-label="Grid map controls">
+       <div class="map-controls" role="group" aria-label="Grid map controls">
          <button class="map-button" type="button" id="map-zoom-in">Zoom in</button>
          <button class="map-button" type="button" id="map-zoom-out">Zoom out</button>
          <button class="map-button" type="button" id="map-reset">Fit / Reset</button>
@@ -187,9 +188,9 @@
      </div>
       <div class="filter-bar" role="group" aria-label="Severity filter">
         <span style="color:var(--muted);font-size:.82rem">Filter:</span>
-        <button class="filter-btn" type="button" data-filter="all" aria-pressed="true">All <span class="filter-badge" id="badge-all">—</span></button>
-        <button class="filter-btn" type="button" data-filter="critical" aria-pressed="false">Critical <span class="filter-badge" id="badge-critical">—</span></button>
-        <button class="filter-btn" type="button" data-filter="warning" aria-pressed="false">Warning <span class="filter-badge" id="badge-warning">—</span></button>
+        <button class="filter-btn" type="button" data-filter="all" aria-pressed="true">All <span class="filter-badge" id="badge-all" aria-label="loading">—</span></button>
+        <button class="filter-btn" type="button" data-filter="critical" aria-pressed="false">Critical <span class="filter-badge" id="badge-critical" aria-label="loading">—</span></button>
+        <button class="filter-btn" type="button" data-filter="warning" aria-pressed="false">Warning <span class="filter-badge" id="badge-warning" aria-label="loading">—</span></button>
       </div>
       <div class="map-disclaimer" role="note">
         Demo topology only. This map visualizes Kubernetes service/application health for the Azure SRE Agent demo and is not connected to real grid telemetry, SCADA, GIS, or utility infrastructure.
@@ -197,9 +198,11 @@
       <div class="map-health-banner warning" id="map-health-banner" role="status" aria-live="polite">
         Live service health has not been received yet. Static and optional nodes are shown in a safe unknown/static state.
       </div>
+      <p class="sr-only">Interactive topology map. Tab between nodes, Enter to select, Escape to deselect. Use arrow keys to pan, + / &#8722; to zoom, 0 to fit.</p>
+      <div id="map-selection-status" role="status" aria-live="polite" class="sr-only"></div>
       <div class="card">
        <div class="grid-map-shell" id="grid-map-shell">
-         <svg id="grid-map-svg" class="grid-map-svg" role="img" aria-label="Static cloud demo topology graph with service and data-store nodes" tabindex="0">
+         <svg id="grid-map-svg" class="grid-map-svg" role="application" aria-roledescription="interactive topology map" aria-label="Interactive cloud demo topology map" tabindex="0">
            <g id="grid-map-stage"></g>
          </svg>
          <div class="map-fallback" id="map-fallback" hidden>
@@ -513,29 +516,40 @@ function addLogEntry() {
     return { className: 'unknown', label: 'unknown/static endpoint state' };
   }
 
+ function updateSelectionStatus(text) {
+   var el = document.getElementById('map-selection-status');
+   if (el) el.textContent = text;
+ }
  function selectNode(nodeId) {
    mapState.selectedNodeId = nodeId;
    mapState.selectedEdgeKey = null;
    applyNodeSelection();
    applyEdgeSelection();
+   var node = GRID_TOPOLOGY.nodes.find(function(n) { return n.id === nodeId; });
+   updateSelectionStatus(node ? node.label + ' selected' : '');
  }
  function selectEdge(key) {
    mapState.selectedEdgeKey = key;
    mapState.selectedNodeId = null;
    applyNodeSelection();
    applyEdgeSelection();
+   var parts = key ? key.split(':') : [];
+   var edge = GRID_TOPOLOGY.edges.find(function(e) { return e.source === parts[0] && e.target === parts[1]; });
+   updateSelectionStatus(edge ? edge.label + ' connection selected' : '');
  }
  function clearSelection() {
    mapState.selectedNodeId = null;
    mapState.selectedEdgeKey = null;
    applyNodeSelection();
    applyEdgeSelection();
+   updateSelectionStatus('');
  }
  function applyNodeSelection() {
    document.querySelectorAll('.map-node').forEach(function(group) {
      var isSelected = group.dataset.nodeId === mapState.selectedNodeId && !!mapState.selectedNodeId;
      group.classList.toggle('selected', isSelected);
-     group.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+     var base = (group.getAttribute('aria-label') || '').replace(', selected', '');
+     group.setAttribute('aria-label', isSelected ? base + ', selected' : base);
    });
  }
  function applyEdgeSelection() {
@@ -554,9 +568,9 @@ function addLogEntry() {
    var badgeAll = document.getElementById('badge-all');
    var badgeCritical = document.getElementById('badge-critical');
    var badgeWarning = document.getElementById('badge-warning');
-   if (badgeAll) badgeAll.textContent = total;
-   if (badgeCritical) badgeCritical.textContent = critical;
-   if (badgeWarning) badgeWarning.textContent = warning;
+   if (badgeAll) { badgeAll.textContent = total; badgeAll.removeAttribute('aria-label'); }
+   if (badgeCritical) { badgeCritical.textContent = critical; badgeCritical.removeAttribute('aria-label'); }
+   if (badgeWarning) { badgeWarning.textContent = warning; badgeWarning.removeAttribute('aria-label'); }
  }
  function applySeverityFilter() {
    var filter = mapState.activeFilter;
@@ -612,8 +626,7 @@ function addLogEntry() {
      tabindex: '0',
      role: 'img',
      'aria-label': node.label + ', ' + node.metaphor + ', ' + status.text,
-     'data-node-id': node.id,
-     'aria-selected': mapState.selectedNodeId === node.id ? 'true' : 'false'
+     'data-node-id': node.id
    });
     const x = node.position.x;
     const y = node.position.y;
@@ -644,8 +657,7 @@ function addLogEntry() {
      tabindex: '0',
      role: 'img',
      'aria-label': node.label + ', data store, ' + node.metaphor + ', ' + status.text,
-     'data-node-id': node.id,
-     'aria-selected': mapState.selectedNodeId === node.id ? 'true' : 'false'
+     'data-node-id': node.id
    });
    const x = node.position.x;
    const y = node.position.y;
@@ -714,7 +726,7 @@ function addLogEntry() {
          'aria-hidden': 'true'
        });
        stage.appendChild(edgeHit);
-       const label = createSvgElement('text', { class: 'map-edge-label', x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 8, 'text-anchor': 'middle' });
+       const label = createSvgElement('text', { class: 'map-edge-label', x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 8, 'text-anchor': 'middle', 'aria-hidden': 'true' });
        label.textContent = edge.label + (edgeStatus.className === 'unknown' ? ' · unknown' : edgeStatus.className === 'critical' ? ' · critical' : edgeStatus.className === 'warning' ? ' · warning' : '');
        stage.appendChild(label);
     });
