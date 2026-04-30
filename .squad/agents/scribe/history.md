@@ -138,3 +138,72 @@ Document-flow scrolling—allowing the entire page to scroll vertically as one c
 Layout constraints inherited from parent systems (grid, container queries, viewport locks) can make content unreadable when applied to context-incompatible content types. Removing unsuitable constraints (e.g., 4-column widget grid from evidence validation interface) and replacing with purpose-built responsive grids (2-col desktop, 1-col mobile) improves readability without schema changes. The pattern: identify constraint source → verify it's unsuitable for content → extract/reposition component → apply responsive grid tailored to scanning needs → preserve gating and business logic throughout. QA verification should confirm both layout changes *and* preservation of policy/access-control layers (two-axis verification).
 
 **Status:** ✅ Orchestration complete. Portal Evidence Validation readability fix documented and ready for team review.
+
+## 2026-04-29T21:16:52Z: Product Marketing Contractor Addition Logged
+
+**Task:** Append-only logging for Dallas-approved temporary Vasquez engagement.
+
+**What I Did:**
+- Created `.squad/log/2026-04-29T21-16-52Z-vasquez-product-marketing-contractor.md`.
+- Recorded provenance, model lane, advisory/review boundaries, and pending decision inbox review.
+- Did not edit `.squad/decisions.md` or `.squad/lambert-history.md`.
+
+**Status:** ✅ Logged. Decision inbox remains pending Scribe merge/review.
+
+## 2026-04-29T21:20:38Z: Product Marketing Demo Evaluation Issues Logged
+
+**Task:** Append-only logging for Vasquez demo evaluation, Dallas governance approval, and GitHub issue creation.
+
+**What I Did:**
+- Created `.squad/log/2026-04-29T21-20-38Z-product-marketing-demo-evaluation-issues.md`.
+- Recorded 6 created GitHub issues (#38-#43), Dallas-approved labels/routes, and the parked P2 recovery playbook.
+- Preserved boundary that Vasquez remains recommender/reviewer, not implementation owner.
+- Did not edit `.squad/decisions.md` or touch `.squad/lambert-history.md`.
+
+**Status:** ✅ Logged. Backlog issues ready for routed owner follow-up.
+
+## 2026-04-29T21:36:02Z: Product Marketing Implementation Wave Logged
+
+**Task:** Append-only logging for the implementation wave started from product-marketing demo issues #38-#43.
+
+**What I Did:**
+- Created `.squad/log/2026-04-29T21-36-02Z-product-marketing-implementation-wave.md` (`.squad/log/` is gitignored local runtime state).
+- Recorded Lambert, Parker, Ripley, Vasquez, and Dallas outcomes plus support issues #44-#47.
+- Captured validation summary and unresolved blockers: real screenshots still require live lab/portal access; visual evidence external use requires #45 and Dallas approval.
+- Did not edit `.squad/decisions.md` or touch `.squad/lambert-history.md`.
+
+**Status:** ✅ Logged. Text-only #40 approval recorded; visual evidence remains blocked pending #45 and Dallas approval.
+
+## 2026-04-30T12:56:43Z: Second Iteration Wave Logged
+
+**Task:** Append-only logging for the second iteration wave on support issues #44-#47.
+
+**What I Did:**
+- Created `.squad/log/2026-04-30T12-56-43Z-second-iteration-wave-issues-44-47.md` (`.squad/log/` is gitignored local runtime state).
+- Recorded Dallas sequencing, Vasquez #46 copy guidance, Lambert #44/#45 readiness, Ripley #46/#47 implementations, approvals, and coordinator validation.
+- Captured unresolved #45 blocker: real redacted SRE Agent portal screenshots require John/demo operator live lab/portal access and Dallas approval before external visual use.
+- Did not edit `.squad/decisions.md` or touch `.squad/lambert-history.md`.
+
+**Status:** ✅ Logged. #44/#46/#47 iteration outcomes recorded; #45 remains blocked on live portal evidence and Dallas approval for external visual use.
+
+## 2026-04-30T13-48-53Z: Next Items Wave Logged
+
+**Task:** Append-only logging for the latest next-items wave following complete-failure-bundle and readiness work.
+
+**Wave Participants & Models:**
+- Dallas (claude-sonnet-4.6): Next-item sequencing and #37 gates
+- Parker (gpt-5.3-codex): #37 analysis/implementation and blocker fixes
+- Lambert (gpt-5.3-codex): #38-#47 readiness audit and #37 final review
+
+**What I Did:**
+- Created `.squad/log/2026-04-30T13-48-53Z-next-items-wave.md` (`.squad/log/` is gitignored local runtime state).
+- Recorded #37 complete-failure-bundle as PR-ready provisional, blocked on #48 live Azure SRE Agent recovery evidence.
+- Documented #48 creation for evidence collection and PR packaging tracker per Dallas recommendation.
+- Noted #45 remains blocked on live visual evidence screenshots requiring John/demo operator lab access + Dallas approval.
+- Did not edit `.squad/decisions.md` or touch `.squad/lambert-history.md`.
+
+**Remaining Blockers:**
+- #48: Live Azure SRE Agent recovery evidence collection (gates #37 closure)
+- #45: Live portal redacted screenshots for visual evidence (requires lab/portal access + Dallas approval for external use)
+
+**Status:** ✅ Logged. Next items wave captured with models and blocker tracking. Ready for team execution.
