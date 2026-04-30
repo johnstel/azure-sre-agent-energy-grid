@@ -112,9 +112,9 @@ The active wallboard surface is `MissionWallboard.vue`, where scenario buttons l
 
 The narration panel is customer-facing presenter support. It must inherit the constraints in `docs/SAFE-LANGUAGE-GUARDRAILS.md`, especially:
 
-- Azure SRE Agent is in Public Preview.
+- Azure SRE Agent is GA, while this lab remains pinned to `Microsoft.App/agents@2025-05-01-preview` in the current subscription.
 - Say "diagnoses issues you point it to" rather than "autonomously detects incidents."
-- Say "recommends; operator executes" for this demo unless real Preview approval evidence exists.
+- Say "recommends; operator executes" for this demo unless real approval evidence exists.
 - Do not claim production readiness, production-grade RBAC, full audit trail, or quantified MTTR reduction.
 - Do not claim Azure SRE Agent diagnosed a scenario until real portal evidence has been captured and validated.
 

@@ -1,12 +1,12 @@
 # Azure SRE Agent Energy Grid Demo Lab ⚡
 
-> **Azure SRE Agent is in Public Preview.** Features, APIs, telemetry schemas, and pricing may change before General Availability. This lab uses the `2025-05-01-preview` API version and presents remediation as operator-controlled unless real Preview approval evidence is captured.
+> **Azure SRE Agent is generally available (GA).** This lab currently keeps Bicep pinned to `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata exposes only that API version today. We will move to `2026-01-01` after provider exposure and successful `what-if` validation. Remediation remains operator-controlled unless real approval UI/API evidence is captured.
 
 ## Why This Demo Exists
 
 **Customer question:** Can AI help my SRE team diagnose faster without giving up control?
 
-This lab demonstrates a Preview-safe, evidence-oriented path for AI-assisted SRE triage: break a realistic AKS energy-grid application, ask SRE Agent to investigate, and keep remediation operator-controlled in Review mode. It is designed for buyer conversations about diagnosis quality, dependency reasoning, and trust boundaries — not autonomous production remediation. For customer follow-up, use the [Preview-safe leave-behind](docs/CUSTOMER-LEAVE-BEHIND.md); for the full speaker flow, see the [Demo Narrative](docs/DEMO-NARRATIVE.md).
+This lab demonstrates a GA-language, evidence-oriented path for AI-assisted SRE triage: break a realistic AKS energy-grid application, ask SRE Agent to investigate, and keep remediation operator-controlled in Review mode. It is designed for buyer conversations about diagnosis quality, dependency reasoning, and trust boundaries — not autonomous production remediation. For customer follow-up, use the [customer leave-behind](docs/CUSTOMER-LEAVE-BEHIND.md); for the full speaker flow, see the [Demo Narrative](docs/DEMO-NARRATIVE.md).
 
 A fully automated Azure environment for demonstrating **Azure SRE Agent** capabilities using an **Energy Grid Operations Platform**.
 
@@ -21,12 +21,12 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 
 ## 🛡️ Trust & Safety Model
 
-> **Azure SRE Agent is in Public Preview.** This demo runs in **Review mode** — the agent recommends actions and the operator executes them unless a real Preview approval UI/API is captured during portal validation. Nothing should be presented as autonomous remediation.
+> **Azure SRE Agent is generally available (GA).** This demo runs in **Review mode** — the agent recommends actions and the operator executes them unless a real approval UI/API is captured during portal validation. Nothing should be presented as autonomous remediation.
 
 | Trust Tier | Configuration | What the Agent Can Do | Approval |
 |------------|--------------|----------------------|----------|
 | **Diagnosis Only** | `accessLevel: 'Low'` | Read logs, query metrics, analyze state | N/A — read-only |
-| **Recommend & Execute** | `accessLevel: 'High'`, `mode: 'Review'` | Diagnose + recommend remediation | ✅ Operator executes unless a real Preview approval UI/API is captured |
+| **Recommend & Execute** | `accessLevel: 'High'`, `mode: 'Review'` | Diagnose + recommend remediation | ✅ Operator executes unless a real approval UI/API is captured |
 | **Autonomous** | `accessLevel: 'High'`, `mode: 'Auto'` | Diagnose + execute autonomously | ❌ **Not demonstrated** |
 
 This lab deploys the **Recommend & Execute** tier. For the full RBAC matrix (demo vs. production), security guardrails, and safe language guidance, see:

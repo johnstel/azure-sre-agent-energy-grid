@@ -11,7 +11,7 @@ const FORBIDDEN_PHRASES = [
   'You should see the agent say',
   'quantified MTTR',
   'Production-ready',
-  'GA',
+  'GA-ready',
   'fully autonomous',
 ];
 

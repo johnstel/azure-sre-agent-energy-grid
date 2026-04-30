@@ -219,20 +219,20 @@ Several queries require Wave 1 infrastructure that is now **defined in Bicep** b
 | `alert-history.kql` | Activity Log diagnostic export to Log Analytics | Defined via `activity-log-diagnostics.bicep` | Pending deployment/UAT |
 | `alert-history.kql` | Alerts deployed (`deployAlerts = true`) | Enabled in `main.bicep` and `main.bicepparam` | Pending deployment/UAT |
 | `activity-log-rbac.kql` | Activity Log diagnostic export | Defined via `activity-log-diagnostics.bicep` | Pending deployment/UAT |
-| `sre-agent-telemetry.kql` | SRE Agent deployed with App Insights | Defined in Bicep | Pending Preview schema verification |
+| `sre-agent-telemetry.kql` | SRE Agent deployed with App Insights | Defined in Bicep | Pending SRE Agent telemetry schema verification |
 
 **Expected behavior during Wave 1 UAT:**
 - Queries will **parse successfully** but may **return no results** until prerequisites are deployed
 - This is expected and documented in each query file
 - UAT checklist includes "verify query syntax" as a separate step from "verify query returns data"
 
-### SCHEMA_TBD — Preview Telemetry Warning
+### SCHEMA_TBD — SRE Agent Telemetry Warning
 
 Queries in `docs/evidence/kql/schema-tbd/` reference **SRE Agent App Insights telemetry** and are tagged with `// SCHEMA_TBD` comments per [`CAPABILITY-CONTRACTS.md`](../../CAPABILITY-CONTRACTS.md) §8 and Security SR-2.
 
 **What this means:**
-- Azure SRE Agent is in **Public Preview** (`2025-05-01-preview` API)
-- App Insights telemetry fields (custom dimensions, trace formats) **may change** before GA
+- Azure SRE Agent is generally available, but this lab currently pins `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata exposes only that API version
+- App Insights telemetry fields (custom dimensions, trace formats) require live validation before customer evidence claims
 - Queries marked `SCHEMA_TBD` require field name verification after deployment
 - **Physical separation**: SCHEMA_TBD queries live in `schema-tbd/` directory, stable queries in `stable/` directory
 

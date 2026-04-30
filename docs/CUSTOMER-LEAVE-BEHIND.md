@@ -1,14 +1,14 @@
 # Customer Leave-Behind: Azure SRE Agent Energy Grid Demo
 
-> **Azure SRE Agent is in Public Preview.** Features, APIs, telemetry schemas, supported regions, and pricing may change before General Availability. This document is a Preview-safe summary of the demo lab and **requires Dallas approval before external customer use**.
+> **Azure SRE Agent is generally available (GA).** This lab currently uses `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata only exposes that API version today. This document is an evidence-safe summary of the demo lab and **requires Dallas approval before external customer use**.
 
 **Version date:** 2026-04-29
 
-**Valid for API version:** `2025-05-01-preview` · **Check for updates:** Ask your Microsoft contact for the latest version of this document before sharing internally. Preview APIs and capabilities may change between versions.
+**Valid for API version:** `2025-05-01-preview` · **Check for updates:** Ask your Microsoft contact for the latest version of this document before sharing internally. We will move to `2026-01-01` after provider exposure and successful `what-if` validation.
 
 ## What Azure SRE Agent Is
 
-Azure SRE Agent is a Preview Azure service that helps operators investigate reliability issues through natural-language diagnosis. In this lab, it reviews signals from a breakable AKS-based energy grid platform and recommends next investigative or remediation steps. The demo keeps operational control with the human operator unless real Preview approval evidence is captured.
+Azure SRE Agent is a GA Azure service that helps operators investigate reliability issues through natural-language diagnosis. In this lab, it reviews signals from a breakable AKS-based energy grid platform and recommends next investigative or remediation steps. The demo keeps operational control with the human operator unless real approval evidence is captured.
 
 ## Three-Tier Trust Model
 
@@ -31,7 +31,7 @@ Azure SRE Agent is a Preview Azure service that helps operators investigate reli
 - Alert-triggered auto-actions.
 - Production-hardened least-privilege RBAC.
 - Application-level custom telemetry (demo apps use infrastructure signals only).
-- Final post-Preview telemetry schemas or pricing.
+- Finalized telemetry schema guarantees across all API versions.
 - A full compliance audit package.
 
 ## Cost Guidance
@@ -40,7 +40,7 @@ Use [docs/COSTS.md](COSTS.md) as the canonical cost reference. Do not copy estim
 
 ## Next Steps
 
-1. Confirm Preview access in a supported region: East US 2, Sweden Central, or Australia East.
+1. Confirm service access in a supported region: East US 2, Sweden Central, or Australia East.
 2. Review the trust and RBAC model before any production-style pilot.
-3. Open the Preview portal entry point: <https://aka.ms/sreagent/portal>.
+3. Open the service portal entry point: <https://aka.ms/sreagent/portal>.
 4. Run a scoped pilot with evidence capture and customer-specific approval boundaries.

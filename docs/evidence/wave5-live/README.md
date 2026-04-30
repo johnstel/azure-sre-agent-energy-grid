@@ -3,11 +3,11 @@
 **Date**: 2026-04-26
 **Owner**: Compliance/Audit
 **Customer scope**: Azure SRE Agent Service capabilities only
-**Out of scope**: Mission Control UI, Mission Control source code, and any unvalidated SRE Agent Preview portal behavior
+**Out of scope**: Mission Control UI, Mission Control source code, and any unvalidated SRE Agent portal behavior
 **Inherited gated status**: Wave 2 passed with pending human portal validation; Waves 3 and 4 have safe-language-compliant documentation.
 **Verdict recommendation**: `PASS_WITH_PENDING_HUMAN_PORTAL`
 
-> **Preview disclosure**: Azure SRE Agent is in Public Preview. Treat SRE Agent telemetry fields, conversation retention, action history fields, and portal approval UX as unverified unless captured in live evidence. In this package, SRE Agent operational telemetry remains `SCHEMA_TBD`.
+> **GA/lab API disclosure**: Azure SRE Agent is generally available, but this lab currently pins `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata exposes only that API version. Treat SRE Agent telemetry fields, conversation retention, action history fields, and portal approval UX as unverified unless captured in live evidence. In this package, SRE Agent operational telemetry remains `SCHEMA_TBD`.
 
 ## Compliance/audit artifacts
 

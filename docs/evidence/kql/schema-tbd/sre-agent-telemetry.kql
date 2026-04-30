@@ -8,14 +8,14 @@
 //   - TimeRange: Time window for analysis (default: 24h)
 //   - timeBin: Time bucket granularity for trending (default: 15m)
 //
-// ⚠️ SCHEMA_TBD — Azure SRE Agent Preview (2025-05-01-preview)
+// ⚠️ SCHEMA_TBD — Azure SRE Agent telemetry (lab API pin: 2025-05-01-preview)
 //
 // WARNING: This query references SRE Agent App Insights telemetry fields that are
-// subject to change during Public Preview. Field names, dimensions, and schema may
-// change without notice before GA.
+// not yet validated in this lab. Field names, dimensions, and schema require live
+// verification before customer evidence claims.
 //
 // PHYSICAL SEPARATION: This query lives under docs/evidence/kql/schema-tbd/ to
-// isolate Preview-dependent queries from stable Container Insights/Activity Log queries.
+// isolate SRE Agent telemetry queries from stable Container Insights/Activity Log queries.
 // Per Security SR-2, stable queries must not reference SCHEMA_TBD fields.
 //
 // Known TBD fields (observed in 2025-05-01-preview, subject to change):

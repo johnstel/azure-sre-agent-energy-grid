@@ -163,7 +163,7 @@ If you just ran the MongoDBDown manual path, say: "Now we'll ask SRE Agent the s
 
 If SRE Agent recommends a fix in Review mode:
 - [ ] Screenshot the recommendation/proposal exactly as shown → `docs/evidence/screenshots/<scenario>_proposal.png`
-- [ ] If the Preview portal exposes a real approval UI, capture it before use; otherwise use safe language: **agent recommends, operator executes**
+- [ ] If the portal exposes a real approval UI, capture it before use; otherwise use safe language: **agent recommends, operator executes**
 - [ ] Manually apply the fix from an authorized operator shell
 
 Or restore manually:
@@ -239,14 +239,14 @@ All evidence artifacts go under `docs/evidence/`. See [docs/evidence/README.md](
 
 ## Fallback Plan: SRE Agent Unavailable
 
-Azure SRE Agent is in **Public Preview**. If the portal is unresponsive during a live demo:
+Azure SRE Agent is **GA**. If the portal is unresponsive during a live demo:
 
-1. **Acknowledge it**: "SRE Agent is in Preview — let me show you the diagnosis path manually while we wait."
+1. **Acknowledge it**: "SRE Agent is available, and this lab keeps operator control — let me show you the diagnosis path manually while we wait."
 2. **Use kubectl diagnosis**: Walk through the `What to observe` commands in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md) for the active scenario. For MongoDBDown, use the manual path in Step 4c above.
 3. **Show the prompt library**: Open [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) and explain the prompt progression — "These are the prompts we'd use when the portal is available." Do not describe a live SRE Agent result unless it is visible in the portal or captured as previous-run evidence.
 4. **Show prior evidence**: If you have screenshots from a previous run in `docs/evidence/screenshots/`, use those.
 5. **Pivot to architecture**: Use the trust model diagram in README to discuss Review vs. Auto mode and RBAC controls.
-6. **Resume when available**: Keep the portal tab open — Preview services often recover within minutes.
+6. **Resume when available**: Keep the portal tab open and continue once service responsiveness returns.
 
 **Do NOT**: claim the service is GA, promise specific uptime, or skip the scenario entirely.
 
@@ -257,8 +257,8 @@ Azure SRE Agent is in **Public Preview**. If the portal is unresponsive during a
 | Issue | Workaround |
 |-------|------------|
 | Port 3333 conflict with Mission Control | Change port in Mission Control config or stop conflicting process |
-| `managedResources: []` in SRE Agent | Preview limitation — add managed resources manually via Azure Portal after deployment |
-| Public AKS API server required | SRE Agent Preview requires public endpoint; do not enable private cluster |
+| `managedResources: []` in SRE Agent | Current API-version limitation in this subscription (`2025-05-01-preview`) — add managed resources manually via Azure Portal after deployment |
+| Public AKS API server required | Current SRE Agent deployment path in this lab requires a public endpoint; do not enable private cluster |
 | Deployment output scrolls past SRE Agent URL | Use Option B or C in Step 3 above |
 | RabbitMQ severity stickiness after recovery | Wallboard may show warning after fix-all; redeploy RabbitMQ if needed |
 | `menu` command only works in dev container | Outside dev container, refer to Commands Reference in README |

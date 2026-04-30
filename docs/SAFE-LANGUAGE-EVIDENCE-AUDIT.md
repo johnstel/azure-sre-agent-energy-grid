@@ -2,7 +2,7 @@
 
 > **Status:** Issue #44 readiness artifact · **Date:** 2026-04-30 · **Owner:** Lambert (QA/Docs)
 >
-> Azure SRE Agent is in Public Preview. This audit does not certify customer readiness; Dallas approval is still required before external use of customer-facing evidence or screenshots.
+> Azure SRE Agent is GA. This audit does not certify customer readiness; Dallas approval is still required before external use of customer-facing evidence or screenshots.
 
 ## Scope
 
@@ -22,9 +22,9 @@ Audited surfaces:
 
 | Check | Result | Notes |
 |-------|--------|-------|
-| Preview disclosure appears in customer-facing docs | Pass | README, narrative, leave-behind, and runbook disclose Preview status. |
+| GA + API-pin disclosure appears in customer-facing docs | Pass | README, narrative, leave-behind, and runbook disclose GA status plus the `2025-05-01-preview` subscription API pin caveat. |
 | No MTTR percentage claims in audited customer-facing docs | Pass | Existing MTTR timestamp/model references remain measurement scaffolding, not improvement percentages. |
-| No autonomous-remediation claim | Pass | Wording consistently says Review mode, recommendations, and operator execution unless real Preview approval evidence exists. |
+| No autonomous-remediation claim | Pass | Wording consistently says Review mode, recommendations, and operator execution unless real approval evidence exists. |
 | No fabricated portal output or deterministic agent transcript | Pass after updates | Scenario highlights and Wave 1 evidence instructions now require real portal output rather than expected agent wording. |
 | Evidence screenshots are real/redacted or blocked | Pending live capture | Screenshot README now gives operator-ready capture steps and blocker-note wording for #45. |
 | Mission Control portal-validation status avoids customer-ready overclaim | Pass after updates | UI label changed from demo-ready to evidence-confirmed; README states Dallas approval is still required. |
@@ -57,7 +57,7 @@ Live visual evidence remains blocked in this environment because no live Azure S
 - `service-mismatch_sre-agent-diagnosis.png`
 - `service-mismatch_after-fix.png`
 
-Capture `{scenario}_proposal.png` only if a real Preview action proposal or approval UI is visible. Otherwise, document that no approval UI was captured and use: **agent recommends, operator executes**.
+Capture `{scenario}_proposal.png` only if a real action proposal or approval UI is visible. Otherwise, document that no approval UI was captured and use: **agent recommends, operator executes**.
 
 ## #45 Packaging Note
 

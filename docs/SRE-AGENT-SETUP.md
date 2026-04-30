@@ -4,7 +4,7 @@ This guide walks you through setting up Azure SRE Agent to work with the demo la
 
 ## What is Azure SRE Agent?
 
-Azure SRE Agent (Preview) is an AI-powered site reliability engineering automation tool that helps you:
+Azure SRE Agent (GA) is an AI-powered site reliability engineering automation tool that helps you:
 
 - **Diagnose issues** in Azure resources using natural language
 - **Investigate incidents** across AKS, App Service, Container Apps, and more
@@ -31,6 +31,8 @@ The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using th
 - Creates a user-assigned managed identity
 - Assigns Log Analytics Reader, Reader, and Contributor roles
 - Grants the deploying user the **SRE Agent Administrator** role
+
+> **API caveat for this lab**: Although Azure SRE Agent is GA, this subscription currently exposes only `Microsoft.App/agents@2025-05-01-preview` in provider metadata. Keep this API pin until `2026-01-01` is exposed and validated with `az deployment sub what-if`.
 
 To skip SRE Agent deployment, set `deploySreAgent = false` in `infra/bicep/main.bicepparam`.
 

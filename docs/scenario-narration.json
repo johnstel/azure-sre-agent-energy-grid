@@ -76,7 +76,7 @@
         }
       ],
       "safetyNotes": [
-        "Azure SRE Agent is in Public Preview; do not describe a live diagnosis unless real portal evidence is captured.",
+        "Azure SRE Agent is GA; this lab remains pinned to Microsoft.App/agents@2025-05-01-preview in the current subscription, and you should not describe a live diagnosis unless real portal evidence is captured.",
         "Frame remediation as recommendation-first; the operator executes recovery in this demo."
       ]
     },
@@ -127,7 +127,7 @@
       ],
       "safetyNotes": [
         "Use observable pod state and logs; do not invent portal wording.",
-        "Keep action language operator-controlled unless real Preview approval evidence is available."
+        "Keep action language operator-controlled unless real approval evidence is available."
       ]
     },
     {
@@ -402,7 +402,7 @@
       ],
       "safetyNotes": [
         "Use Kubernetes events as the evidence path; do not fabricate portal wording.",
-        "Reference Public Preview status before discussing Azure SRE Agent behavior in a customer demo."
+        "Reference GA status and this lab's API-version pin before discussing Azure SRE Agent behavior in a customer demo."
       ]
     },
     {
@@ -502,7 +502,7 @@
       ],
       "safetyNotes": [
         "Do not claim the portal identified the selector mismatch until real portal evidence has been captured.",
-        "Keep recovery operator-controlled in this demo unless a real Preview approval UI/API is captured."
+        "Keep recovery operator-controlled in this demo unless a real approval UI/API is captured."
       ]
     }
   ]

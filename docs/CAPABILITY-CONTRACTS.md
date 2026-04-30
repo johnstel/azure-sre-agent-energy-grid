@@ -1,7 +1,7 @@
 # Capability Contracts
 
 > **Version**: 0.2 · **Wave**: 0 — Contracts only, no runtime changes
-> **Status**: Azure SRE Agent is in **Public Preview**
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
 > **Repo**: [`johnstel/azure-sre-agent-energy-grid`](https://github.com/johnstel/azure-sre-agent-energy-grid)
 
 This document defines the shared contracts that every capability in the demo lab consumes. No implementation work should start for a wave until the contracts it depends on are locked here.
@@ -266,7 +266,7 @@ The demo supports three access profiles. Each corresponds to a distinct configur
 | Profile | SRE Agent Mode | Access Level | Human Approval | Use Case |
 |---------|---------------|--------------|----------------|----------|
 | `review-readonly` | `Review` | `Low` | N/A (read ops only) | Diagnosis-only demos; safe for untrusted audiences |
-| `review-remediate` | `Review` | `High` | ✅ Required for writes | **Default demo profile** — agent recommends, operator executes unless a real Preview approval UI/API is captured |
+| `review-remediate` | `Review` | `High` | ✅ Required for writes | **Default demo profile** — agent recommends, operator executes unless a real approval UI/API is captured |
 | `auto-remediate` | `Auto` | `High` | ❌ Agent acts autonomously | Advanced demo only; document risk prominently |
 
 > **Current state**: The Bicep deployment uses `mode: 'Review'` and `accessLevel: 'High'` — this maps to `review-remediate`. See `infra/bicep/modules/sre-agent.bicep:92-96`.
@@ -343,9 +343,9 @@ These are placeholders. Do not implement burn-rate alerts until real data source
 
 ---
 
-## 8 · Preview Telemetry — `SCHEMA_TBD` Rule
+## 8 · API-Version Telemetry — `SCHEMA_TBD` Rule
 
-Azure SRE Agent is in **Public Preview**. App Insights telemetry emitted by the agent (custom dimensions, dependency names, trace formats) may change between preview versions.
+Azure SRE Agent is GA. App Insights telemetry emitted by the agent (custom dimensions, dependency names, trace formats) may still change across API versions.
 
 > **S0-4 Contract**: This section constitutes the formal SCHEMA_TBD contract required by the Security Wave 0 review. Known TBD scope: all App Insights telemetry emitted via `logConfiguration.applicationInsightsConfiguration` in `sre-agent.bicep`.
 
@@ -353,7 +353,7 @@ Azure SRE Agent is in **Public Preview**. App Insights telemetry emitted by the 
 
 1. Any KQL query or dashboard that references SRE Agent-specific App Insights fields must be tagged with a `// SCHEMA_TBD` comment.
 2. Do not build production-grade dashboards or alerts against `SCHEMA_TBD` fields.
-3. When the SRE Agent GA API is available, audit all `SCHEMA_TBD` references and update or remove the tag.
+3. When this subscription exposes `Microsoft.App/agents@2026-01-01` and `what-if` validates it, audit all `SCHEMA_TBD` references and update or remove the tag.
 4. Document observed field names in `docs/evidence/kql/README.md` with the preview API version where they were seen.
 
 ### Example
@@ -371,7 +371,7 @@ traces
 
 This demo proves **Review mode only**. Auto mode exists but is out of scope for this wave.
 
-No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'` and `accessLevel: 'High'`, which means the agent may recommend remediation but a human operator remains responsible for executing write actions. If the Azure SRE Agent Preview portal exposes a specific approval/denial UX in this environment, capture it as evidence before mentioning it; otherwise use “agent recommends, operator executes.”
+No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'` and `accessLevel: 'High'`, which means the agent may recommend remediation but a human operator remains responsible for executing write actions. If the Azure SRE Agent portal exposes a specific approval/denial UX in this environment, capture it as evidence before mentioning it; otherwise use “agent recommends, operator executes.”
 
 Any future Auto mode demo requires a separate security review with evidence of:
 
@@ -410,7 +410,7 @@ The current demo profile intentionally grants broad roles through `scripts/confi
 | App Insights (SRE Agent telemetry) | 90 days | Yes | Wired to LA workspace | Sufficient |
 | Activity Log (ARM operations) | 90 days platform retention; export configured in Bicep | Yes after diagnostic setting deployment | `activity-log-diagnostics.bicep` | Verify export and ingestion during UAT |
 | Key Vault audit | 7 days soft-delete | No | No diagnostic setting | Enable diagnostic setting; extend soft-delete to 90 days |
-| SRE Agent conversations | Unknown (Preview service) | Unknown | Unknown | Track Microsoft Preview data handling docs |
+| SRE Agent conversations | Unknown (service-managed) | Unknown | Unknown | Track Microsoft data handling docs for current API version |
 
 > **Wave 1 implementation:** Log Analytics retention is configured to 90 days and Activity Log export is defined in Bicep. Do not claim complete 90-day audit evidence until live UAT verifies the deployed retention setting and Activity Log records arrive in Log Analytics.
 

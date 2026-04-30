@@ -1,7 +1,7 @@
 # Demo Narrative: Energy Grid SRE Agent
 
 > **Duration**: 20 minutes · **Audience**: SRE managers, security reviewers, executive buyers
-> **Status**: Azure SRE Agent is in **Public Preview**
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
 > **Pre-read**: [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) · [DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)
 
 ---
@@ -26,7 +26,7 @@
 4. **Use the MongoDBDown wow moment:** show the dashboard or captured evidence if available; then ask the SRE Agent prompt or replay real captured evidence. Do not invent portal output.
 5. **Close with buyer next steps:** supported Preview regions, portal entry point, and cost pointer to [COSTS.md](COSTS.md).
 
-**Emphasis:** decision confidence, operator control, and Preview-safe next steps.
+**Emphasis:** decision confidence, operator control, and evidence-safe next steps.
 
 ### SRE Manager Path (20 minutes)
 
@@ -45,7 +45,7 @@
 
 1. **Start with Preview disclosure and safe-language rules:** link directly to [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md).
 2. **Front-load trust controls:** Review mode, operator execution, and Autonomous mode explicitly out of scope.
-3. **Show RBAC and audit framing:** use [CAPABILITY-CONTRACTS.md](CAPABILITY-CONTRACTS.md) §10 and explain that exact SRE Agent conversation/action fields are `SCHEMA_TBD` until verified in the deployed Preview service.
+3. **Show RBAC and audit framing:** use [CAPABILITY-CONTRACTS.md](CAPABILITY-CONTRACTS.md) §10 and explain that exact SRE Agent conversation/action fields are `SCHEMA_TBD` until verified in the deployed API version.
 4. **Run or replay ServiceMismatch:** it demonstrates analysis without requiring destructive remediation. Use only live output or captured evidence.
 5. **Close with production-hardening gaps:** least-privilege RBAC, customer approval gates, evidence capture, and alert-to-agent automation as future work.
 
@@ -73,10 +73,10 @@ Show the healthy energy grid:
 | Tier | SRE Agent Config | What It Can Do | Who Approves |
 |------|-----------------|----------------|--------------|
 | **Diagnosis Only** | `mode: 'Review'`, `accessLevel: 'Low'` | Read logs, query metrics, analyze state | N/A — read-only |
-| **Recommend & Execute** | `mode: 'Review'`, `accessLevel: 'High'` | Diagnose + recommend remediation actions | ✅ Operator executes unless a real Preview approval UI/API is captured |
+| **Recommend & Execute** | `mode: 'Review'`, `accessLevel: 'High'` | Diagnose + recommend remediation actions | ✅ Operator executes unless a real approval UI/API is captured |
 | **Autonomous** | `mode: 'Auto'`, `accessLevel: 'High'` | Diagnose + execute without approval | ❌ Not demonstrated in this lab |
 
-> **Key message**: "SRE Agent recommends actions; the operator executes them in this demo unless a real Preview approval UI/API is captured. Operational telemetry is configured to App Insights, ARM-level actions appear in the Activity Log, and autonomous remediation is not demonstrated. You choose the trust level."
+> **Key message**: "SRE Agent recommends actions; the operator executes them in this demo unless a real approval UI/API is captured. Operational telemetry is configured to App Insights, ARM-level actions appear in the Activity Log, and autonomous remediation is not demonstrated. You choose the trust level."
 
 **This demo runs in Recommend & Execute mode** — the agent recommends, the operator decides and executes.
 
@@ -108,8 +108,8 @@ Show the healthy energy grid:
 4. **Ask SRE Agent**: "Meter readings are being accepted but never dispatched. What's wrong?"
 5. **Contrast live, don't fabricate**:
    - If the portal responds, compare what the agent recommends against the manual conclusion: MongoDB is scaled to zero, the `mongodb` Service has no endpoints, and dispatch cannot persist meter readings.
-   - If the portal is unavailable, say: "SRE Agent is in Public Preview; we'll complete the manual diagnosis and show the prompt/evidence path without claiming a live agent result."
-6. **Fix**: `kubectl apply -f k8s/base/application.yaml` — the agent recommends; the operator executes in this demo unless real Preview approval UI evidence exists.
+   - If the portal is unavailable, say: "SRE Agent is GA; we'll complete the manual diagnosis and show the prompt/evidence path without claiming a live agent result."
+6. **Fix**: `kubectl apply -f k8s/base/application.yaml` — the agent recommends; the operator executes in this demo unless real approval UI evidence exists.
 
 **Why this is the climax**: Cascading failures are hard SRE problems. This scenario tests whether live SRE Agent output can help trace the same dependency chain shown in the manual path.
 
@@ -134,7 +134,7 @@ Show the healthy energy grid:
 
 If during any scenario SRE Agent proposes an action:
 1. Show the action proposal in the portal
-2. If the Preview portal exposes a real approval UI/API, capture it before use and describe only what is visible
+2. If the portal exposes a real approval UI/API, capture it before use and describe only what is visible
 3. Otherwise point out: "The agent has recommended a fix. In this demo, the operator decides what to execute."
 4. Apply the recovery from an authorized operator shell and show the result
 
@@ -142,8 +142,8 @@ If during any scenario SRE Agent proposes an action:
 
 ### The Audit Story
 
-- "SRE Agent operational telemetry is configured to App Insights — exact conversation/action fields are SCHEMA_TBD until verified in the deployed Preview service"
-- "If action proposals are visible in the Preview portal, capture exactly what is shown; ARM-level executions appear in the Activity Log"
+- "SRE Agent operational telemetry is configured to App Insights — exact conversation/action fields are SCHEMA_TBD until verified in the deployed API version"
+- "If action proposals are visible in the portal, capture exactly what is shown; ARM-level executions appear in the Activity Log"
 - Show the RBAC matrix: "The agent's permissions are explicitly scoped — Reader + Contributor on this resource group, nothing more"
 - Reference: [CAPABILITY-CONTRACTS.md](CAPABILITY-CONTRACTS.md) §10 for the full RBAC matrix
 
@@ -151,7 +151,7 @@ If during any scenario SRE Agent proposes an action:
 
 "What we've shown:
 1. **AI-assisted diagnosis** intended to reduce manual multi-tool triage
-2. **Human-in-the-loop controls** — the operator executes remediation in this demo unless a real Preview approval UI/API is captured
+2. **Human-in-the-loop controls** — the operator executes remediation in this demo unless a real approval UI/API is captured
 3. **Transparent permissions** — you control what the agent can see and do
 4. **Evidence-oriented by design** — operational telemetry is configured to App Insights, ARM actions appear in the Activity Log, and we capture evidence per demo run (exact conversation/action schema is SCHEMA_TBD per Preview)
 
@@ -191,10 +191,10 @@ For a 10-minute demo, use only scenarios 1 and 2. For a 5-minute demo, use scena
 |---|----------|-----------------|
 | 1 | "Can it break things?" | "In this Review-mode demo, treat agent output as recommendations. The operator decides what to execute; do not claim a specific approval/denial API unless portal evidence exists." |
 | 2 | "What permissions does it need?" | "Minimum: Reader + Log Analytics Reader (`accessLevel: 'Low'`). For remediation: add Contributor (`accessLevel: 'High'`). See our RBAC matrix in CAPABILITY-CONTRACTS.md §10." |
-| 3 | "Is this production-ready?" | "SRE Agent is in Public Preview. The demo lab uses broad permissions for convenience — see our demo-vs-production RBAC guidance for what production looks like." |
+| 3 | "Is this production-ready?" | "Azure SRE Agent is GA, but this demo lab is not a production blueprint. We keep operator-controlled remediation, broad demo permissions, and a `2025-05-01-preview` API pin in this subscription until `2026-01-01` is exposed and validated." |
 | 4 | "What about auto-remediation?" | "Auto mode exists but we deliberately run in Review mode. Auto requires a separate security review — rollback procedures, blast radius containment, and kill-switch documentation." |
-| 5 | "Where's the audit trail?" | "SRE Agent operational telemetry is configured to App Insights; ARM-level actions appear in the Activity Log. Exact conversation/action fields are SCHEMA_TBD until verified in the deployed Preview service. We capture KQL evidence for every demo run." |
-| 6 | "What if the agent is wrong?" | "In Review mode for this demo, treat the output as a recommendation. If it's wrong, the operator does not execute it. Do not claim a specific reject/deny API unless the Preview portal exposes it and you capture evidence." |
+| 5 | "Where's the audit trail?" | "SRE Agent operational telemetry is configured to App Insights; ARM-level actions appear in the Activity Log. Exact conversation/action fields are SCHEMA_TBD until verified in the deployed API version. We capture KQL evidence for every demo run." |
+| 6 | "What if the agent is wrong?" | "In Review mode for this demo, treat the output as a recommendation. If it's wrong, the operator does not execute it. Do not claim a specific reject/deny API unless the portal exposes it and you capture evidence." |
 | 7 | "Does it replace my SRE team?" | "No. It assists with repetitive early manual triage. Your SREs still make the decisions — they just get a clearer diagnosis path." |
 | 8 | "How does it know about my infrastructure?" | "It reads your Azure resource graph, Container Insights logs, and App Insights telemetry. It has the same view as an SRE with Reader access." |
 | 9 | "What about data privacy?" | "SRE Agent operates within your Azure tenant. Conversation data handling follows Azure's standard data processing terms. See Microsoft's Preview terms for specifics." |
@@ -218,7 +218,7 @@ See [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for the complete 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
 | 2026-04-29 | 0.5 | Added persona routing for executive buyer, SRE manager, and security reviewer paths | Lambert (QA/Docs) |
-| 2025-07-22 | 0.4 | SCHEMA_TBD audit fix — replace all "conversations logged in App Insights" with Preview-safe telemetry language | Lambert (QA/Docs) |
+| 2025-07-22 | 0.4 | SCHEMA_TBD audit fix — replace all "conversations logged in App Insights" with evidence-safe telemetry language | Lambert (QA/Docs) |
 | 2025-07-22 | 0.3 | Security fix — soften 3 audit overclaims per SAFE-LANGUAGE-GUARDRAILS alignment | Lambert (QA/Docs) |
 | 2026-04-26 | 0.2 | Wave 0 polish — Core/Extended demo split, scenario table alignment | Lambert (QA/Docs) |
 | 2026-04-26 | 0.1 | Wave 0 — Initial demo narrative | Lambert (QA/Docs) |
