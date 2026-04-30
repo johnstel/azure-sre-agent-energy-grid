@@ -87,6 +87,7 @@ alias break-network='kubectl apply -f k8s/scenarios/network-block.yaml'
 alias break-config='kubectl apply -f k8s/scenarios/missing-config.yaml'
 alias break-mongodb='kubectl apply -f k8s/scenarios/mongodb-down.yaml'
 alias break-service='kubectl apply -f k8s/scenarios/service-mismatch.yaml'
+alias break-complete='kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml'
 
 # Fix commands
 alias fix-all='kubectl apply -f k8s/base/application.yaml'
@@ -146,6 +147,7 @@ function break-network { kubectl apply -f k8s/scenarios/network-block.yaml }
 function break-config { kubectl apply -f k8s/scenarios/missing-config.yaml }
 function break-mongodb { kubectl apply -f k8s/scenarios/mongodb-down.yaml }
 function break-service { kubectl apply -f k8s/scenarios/service-mismatch.yaml }
+function break-complete { kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml }
 function fix-all { kubectl apply -f k8s/base/application.yaml }
 function fix-network { kubectl delete networkpolicy deny-meter-service -n energy 2>$null }
 function fix-extras { kubectl delete deployment frequency-calc-overload substation-monitor grid-health-monitor grid-zone-config -n energy 2>$null }
@@ -191,6 +193,7 @@ function menu {
 ║    break-config                - Missing ConfigMap                           ║
 ║    break-mongodb               - MongoDB down (cascading failure)            ║
 ║    break-service               - Service selector mismatch                   ║
+║    break-complete              - Complete application failure bundle          ║
 ║                                                                              ║
 ║  Fix Commands:                                                               ║
 ║    fix-all                     - Restore all services to healthy state       ║

@@ -102,6 +102,8 @@ Every breakable scenario must have a metadata block (YAML front matter or struct
 | `mongodb-down` | 9 | Meter Database Outage (Cascading) | critical | dependency | mongodb, meter-service, dispatch-service |
 | `service-mismatch` | 10 | Meter Service Routing Failure | critical | configuration | meter-service |
 
+> **Provisional bundle (outside locked Wave 0 registry):** `complete-failure-bundle` (`k8s/scenarios/complete-failure-bundle/scenario.yaml`) is intentionally excluded from the 1–10 schema and validated via explicit exclusion policy in `scripts/validate-scenario-metadata.ps1` and `docs/evidence/scenarios/scenario-manifest.yaml`.
+
 ---
 
 ## 4 · Alert Naming & Severity Taxonomy

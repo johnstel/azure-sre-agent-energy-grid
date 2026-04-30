@@ -12,6 +12,47 @@
 
 ---
 
+## Persona Routing
+
+> **Before you begin — who is in the room?** Pick the path that matches the buyer, operator, or reviewer. Every path must follow [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md): no MTTR percentage claims, no fabricated portal output, no autonomous-remediation claims, and no full-auditability overclaims.
+
+### Executive Buyer Path (5-10 minutes)
+
+**Goal:** Show why the demo matters without opening with `kubectl`.
+
+1. **Open with the business question:** "Can AI help my SRE team diagnose faster without giving up control?"
+2. **Frame the value:** AI-assisted diagnosis, human-controlled remediation, and clear trust boundaries.
+3. **Show the trust model first:** Diagnosis Only → Recommend & Execute → Autonomous (not demonstrated).
+4. **Use the MongoDBDown wow moment:** show the dashboard or captured evidence if available; then ask the SRE Agent prompt or replay real captured evidence. Do not invent portal output.
+5. **Close with buyer next steps:** supported Preview regions, portal entry point, and cost pointer to [COSTS.md](COSTS.md).
+
+**Emphasis:** decision confidence, operator control, and Preview-safe next steps.
+
+### SRE Manager Path (20 minutes)
+
+**Goal:** Run the full operational story using the existing three-act structure.
+
+1. **Act 1:** Healthy baseline, architecture context, and trust model.
+2. **Act 2:** OOMKilled opener, MongoDBDown dependency chain, ServiceMismatch subtle failure.
+3. **Act 3:** Review-mode framing, evidence capture, and operator-applied recovery.
+4. **Q&A:** Use the prepared answers below and cross-check claims against [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md).
+
+**Emphasis:** signal gathering, dependency reasoning, runbook fit, and repeatable evidence.
+
+### Security Reviewer Path (15 minutes)
+
+**Goal:** Prove the boundaries before showing the scenario.
+
+1. **Start with Preview disclosure and safe-language rules:** link directly to [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md).
+2. **Front-load trust controls:** Review mode, operator execution, and Autonomous mode explicitly out of scope.
+3. **Show RBAC and audit framing:** use [CAPABILITY-CONTRACTS.md](CAPABILITY-CONTRACTS.md) §10 and explain that exact SRE Agent conversation/action fields are `SCHEMA_TBD` until verified in the deployed Preview service.
+4. **Run or replay ServiceMismatch:** it demonstrates analysis without requiring destructive remediation. Use only live output or captured evidence.
+5. **Close with production-hardening gaps:** least-privilege RBAC, customer approval gates, evidence capture, and alert-to-agent automation as future work.
+
+**Emphasis:** blast-radius control, permission transparency, evidence boundaries, and what was not demonstrated.
+
+---
+
 ## Act 1: Setup & Context (5 minutes)
 
 ### The Hook
@@ -50,7 +91,7 @@ Show the healthy energy grid:
 1. **Break**: `kubectl apply -f k8s/scenarios/oom-killed.yaml`
 2. **Show the failure**: `kubectl get pods -n energy -w` — watch pods restart
 3. **Ask SRE Agent**: "Why is the meter-service pod restarting repeatedly?"
-4. **Highlight**: SRE Agent identifies OOMKilled as root cause, recommends memory limit increase
+4. **Highlight conditionally**: If live portal output or approved prior evidence shows it, point to the real diagnosis and recommendation. Otherwise say: "The scenario's observable root cause is OOMKilled; we will not claim an SRE Agent diagnosis until portal evidence is captured."
 5. **Fix**: `kubectl apply -f k8s/base/application.yaml`
 
 **Why this scenario first**: Simple, fast, universally understood. Every SRE has seen OOMKilled.
@@ -60,14 +101,17 @@ Show the healthy energy grid:
 **Narrative**: "The meter readings database goes offline. But the symptoms appear in three different services."
 
 1. **Break**: `kubectl apply -f k8s/scenarios/mongodb-down.yaml`
-2. **Show the cascade**: MongoDB is at 0 replicas → dispatch-service fails health checks → meter events queue up in RabbitMQ but never get processed
-3. **The manual investigation** (describe, don't do):
-   - "Traditionally, you'd run `kubectl get pods`, see dispatch-service failing, check its logs, find connection errors, trace to MongoDB, check MongoDB status — 5+ commands, 10+ minutes of context-switching."
+2. **Show the cascade**: MongoDB is at 0 replicas → the `mongodb` Service has no endpoints → dispatch-service cannot persist meter readings
+3. **Run the manual path first**:
+   - Follow `DEMO-RUNBOOK.md` Step 4c: start with `kubectl get pods -n energy`, trace deployment readiness, check `mongodb` endpoints, confirm `dispatch-service` depends on `mongodb://mongodb:27017`, and use logs/events as corroborating evidence.
+   - Say: "This is the manual breadcrumb trail. Watch for the same dependency chain when we ask SRE Agent."
 4. **Ask SRE Agent**: "Meter readings are being accepted but never dispatched. What's wrong?"
-5. **The wow moment**: SRE Agent traces the dependency chain — dispatch-service → MongoDB → root cause identified in a single conversation
-6. **Fix**: `kubectl apply -f k8s/base/application.yaml`
+5. **Contrast live, don't fabricate**:
+   - If the portal responds, compare what the agent recommends against the manual conclusion: MongoDB is scaled to zero, the `mongodb` Service has no endpoints, and dispatch cannot persist meter readings.
+   - If the portal is unavailable, say: "SRE Agent is in Public Preview; we'll complete the manual diagnosis and show the prompt/evidence path without claiming a live agent result."
+6. **Fix**: `kubectl apply -f k8s/base/application.yaml` — the agent recommends; the operator executes in this demo unless real Preview approval UI evidence exists.
 
-**Why this is the climax**: Cascading failures are the hardest SRE problem. If the agent can trace dependency chains, it earns trust.
+**Why this is the climax**: Cascading failures are hard SRE problems. This scenario tests whether live SRE Agent output can help trace the same dependency chain shown in the manual path.
 
 ### Scenario 3 — The Subtle One: Service Mismatch (2 min)
 
@@ -77,10 +121,10 @@ Show the healthy energy grid:
 2. **Show the trap**: `kubectl get pods -n energy` — everything looks healthy!
 3. **But**: `kubectl get endpoints meter-service -n energy` — zero endpoints
 4. **Ask SRE Agent**: "The grid dashboard loads but meter readings fail. Everything looks healthy."
-5. **Highlight**: SRE Agent catches the selector mismatch — the Service points to `meter-service-v2` but pods are labeled `meter-service`
+5. **Highlight conditionally**: If live portal output or approved prior evidence shows it, point to the real diagnosis. Otherwise say: "The observable root cause is a selector mismatch — the Service points to `meter-service-v2` but pods are labeled `meter-service`."
 6. **Fix**: `kubectl apply -f k8s/base/application.yaml`
 
-**Why this scenario last**: It shows the agent catches things humans miss. Pods are green, logs are clean, but the agent checks endpoints and selectors.
+**Why this scenario last**: It tests a subtle failure pattern that humans can miss. Pods are green and logs may be quiet, so the evidence path checks endpoints and selectors before any SRE Agent claim is made.
 
 ---
 
@@ -90,16 +134,16 @@ Show the healthy energy grid:
 
 If during any scenario SRE Agent proposes an action:
 1. Show the action proposal in the portal
-2. Point out: "The agent has identified the fix. But it's waiting for MY approval."
-3. Approve it (or reject it to show the safe-fail)
-4. Show the result
+2. If the Preview portal exposes a real approval UI/API, capture it before use and describe only what is visible
+3. Otherwise point out: "The agent has recommended a fix. In this demo, the operator decides what to execute."
+4. Apply the recovery from an authorized operator shell and show the result
 
 > **Key message**: "This is not a black box. You see what it wants to do before it does it."
 
 ### The Audit Story
 
 - "SRE Agent operational telemetry is configured to App Insights — exact conversation/action fields are SCHEMA_TBD until verified in the deployed Preview service"
-- "Action proposals are visible in the portal; ARM-level executions appear in the Activity Log"
+- "If action proposals are visible in the Preview portal, capture exactly what is shown; ARM-level executions appear in the Activity Log"
 - Show the RBAC matrix: "The agent's permissions are explicitly scoped — Reader + Contributor on this resource group, nothing more"
 - Reference: [CAPABILITY-CONTRACTS.md](CAPABILITY-CONTRACTS.md) §10 for the full RBAC matrix
 
@@ -109,7 +153,7 @@ If during any scenario SRE Agent proposes an action:
 1. **AI-assisted diagnosis** intended to reduce manual multi-tool triage
 2. **Human-in-the-loop controls** — the operator executes remediation in this demo unless a real Preview approval UI/API is captured
 3. **Transparent permissions** — you control what the agent can see and do
-4. **Auditable by design** — operational telemetry is configured to App Insights, ARM actions appear in the Activity Log, and we capture evidence per demo run (exact conversation/action schema is SCHEMA_TBD per Preview)
+4. **Evidence-oriented by design** — operational telemetry is configured to App Insights, ARM actions appear in the Activity Log, and we capture evidence per demo run (exact conversation/action schema is SCHEMA_TBD per Preview)
 
 This is not about replacing SREs. It's about giving SREs a tireless pair that reads every log, checks every dependency, and presents the diagnosis — so you can make the decision."
 
@@ -151,7 +195,7 @@ For a 10-minute demo, use only scenarios 1 and 2. For a 5-minute demo, use scena
 | 4 | "What about auto-remediation?" | "Auto mode exists but we deliberately run in Review mode. Auto requires a separate security review — rollback procedures, blast radius containment, and kill-switch documentation." |
 | 5 | "Where's the audit trail?" | "SRE Agent operational telemetry is configured to App Insights; ARM-level actions appear in the Activity Log. Exact conversation/action fields are SCHEMA_TBD until verified in the deployed Preview service. We capture KQL evidence for every demo run." |
 | 6 | "What if the agent is wrong?" | "In Review mode for this demo, treat the output as a recommendation. If it's wrong, the operator does not execute it. Do not claim a specific reject/deny API unless the Preview portal exposes it and you capture evidence." |
-| 7 | "Does it replace my SRE team?" | "No. It replaces the first 15 minutes of manual triage. Your SREs still make the decisions — they just get the diagnosis faster." |
+| 7 | "Does it replace my SRE team?" | "No. It assists with repetitive early manual triage. Your SREs still make the decisions — they just get a clearer diagnosis path." |
 | 8 | "How does it know about my infrastructure?" | "It reads your Azure resource graph, Container Insights logs, and App Insights telemetry. It has the same view as an SRE with Reader access." |
 | 9 | "What about data privacy?" | "SRE Agent operates within your Azure tenant. Conversation data handling follows Azure's standard data processing terms. See Microsoft's Preview terms for specifics." |
 | 10 | "What does it cost?" | "The demo lab costs ~$34-40/day including SRE Agent. Production pricing follows Azure's standard consumption model — see our COSTS.md for the full breakdown." |
@@ -173,6 +217,7 @@ See [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for the complete 
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
+| 2026-04-29 | 0.5 | Added persona routing for executive buyer, SRE manager, and security reviewer paths | Lambert (QA/Docs) |
 | 2025-07-22 | 0.4 | SCHEMA_TBD audit fix — replace all "conversations logged in App Insights" with Preview-safe telemetry language | Lambert (QA/Docs) |
 | 2025-07-22 | 0.3 | Security fix — soften 3 audit overclaims per SAFE-LANGUAGE-GUARDRAILS alignment | Lambert (QA/Docs) |
 | 2026-04-26 | 0.2 | Wave 0 polish — Core/Extended demo split, scenario table alignment | Lambert (QA/Docs) |

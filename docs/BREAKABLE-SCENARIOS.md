@@ -16,6 +16,7 @@ This guide explains each failure scenario available in the Energy Grid SRE Demo 
 | Missing Config | `missing-config.yaml` | Grid zone configuration missing | Configuration troubleshooting |
 | MongoDB Down | `mongodb-down.yaml` | Meter database outage — cascading dispatch failure | Dependency tracing, root cause |
 | Service Mismatch | `service-mismatch.yaml` | Meter service routing failure after "v2 upgrade" | Endpoint/selector analysis |
+| Complete Failure Bundle | `complete-failure-bundle/scenario.yaml` | Multi-component outage across dependencies + routing | Root cause prioritization and staged recovery |
 
 ## Scenario Details
 
@@ -449,6 +450,73 @@ kubectl apply -f k8s/base/application.yaml
 
 ---
 
+### 11. Complete Application Failure Bundle — Cascading Outage + Service Isolation
+
+**File:** `k8s/scenarios/complete-failure-bundle/scenario.yaml`
+
+**What happens:**
+- Applies an orchestrated bundle of existing scenarios:
+  - `mongodb-down.yaml` (data layer outage)
+  - `network-block.yaml` (meter-service traffic isolation)
+  - `service-mismatch.yaml` (meter-service endpoints empty)
+- Simulates broad application failure where dependencies and request paths fail at once
+- Forces root-cause prioritization: fix foundational dependencies before downstream symptoms
+
+**How to break:**
+```bash
+kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml
+```
+
+**What to observe:**
+```bash
+# Dependency outage
+kubectl get deployment mongodb -n energy
+
+# Silent routing failure (selector mismatch)
+kubectl get endpoints meter-service -n energy
+
+# Traffic isolation
+kubectl get networkpolicy deny-meter-service -n energy
+
+# Overall blast radius snapshot
+kubectl get pods,svc,endpoints -n energy
+kubectl get events -n energy --sort-by=.lastTimestamp | tail -30
+```
+
+**SRE Agent prompts:**
+- "Why is the entire energy grid platform down?"
+- "Separate root cause from downstream symptoms across the energy namespace"
+- "Recommend the safest recovery order for this outage"
+- "After each step, re-check health and tell me what to do next"
+
+**Recovery pattern (safe language):**
+1. Ask SRE Agent for prioritized recovery recommendations.
+2. **Operator executes** first dependency recovery step (typically restore data layer).
+3. **Operator validates** health signals after each step.
+4. Continue until endpoints, connectivity, and pod health are restored.
+
+**Suggested operator execution order:**
+```bash
+# 1) Remove network isolation
+kubectl delete networkpolicy deny-meter-service -n energy
+
+# 2) Restore baseline workloads/services
+kubectl apply -f k8s/base/application.yaml
+
+# 3) Verify platform recovery
+kubectl get pods -n energy
+kubectl get endpoints meter-service -n energy
+```
+
+**Pass/Fail Criteria:**
+- ✅ **PASS**: SRE Agent distinguishes upstream root cause(s) from downstream symptoms
+- ✅ **PASS**: SRE Agent recommends staged recovery (dependencies first, then service path checks)
+- ✅ **PASS**: Operator can restore healthy baseline cleanly with documented steps
+- ❌ **FAIL**: Recommendations treat every symptom as an independent root cause
+- ❌ **FAIL**: Recovery leaves `meter-service` endpoints empty or network policy still blocking
+
+---
+
 ## Demo Flow Suggestions
 
 ### Quick Demo (5 minutes)
@@ -482,5 +550,5 @@ Some scenarios benefit from running longer to gather metrics:
 - ✅ Keep fix commands ready
 - ✅ If public LoadBalancer IPs stop responding, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#-public-loadbalancer-not-responding) before assuming a scenario broke it
 - ✅ For Kubernetes service issues (endpoints empty, selectors wrong, port mismatches), see [KUBERNETES-SERVICE-TROUBLESHOOTING.md](KUBERNETES-SERVICE-TROUBLESHOOTING.md)
-- ❌ Don't apply multiple breaking scenarios simultaneously
+- ❌ Don't apply multiple breaking scenarios simultaneously (except the explicit `complete-failure-bundle` scenario)
 - ❌ Don't leave scenarios running unattended

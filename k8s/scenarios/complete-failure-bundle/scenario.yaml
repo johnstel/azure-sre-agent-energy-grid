@@ -1,0 +1,117 @@
+# =============================================================================
+# SCENARIO BUNDLE: Complete Application Failure (Cascading Outage)
+# =============================================================================
+# Simulates broad platform unavailability by combining dependency outage,
+# network isolation, and service selector mismatch in one injection.
+#
+# HOW TO BREAK:
+# kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml
+#
+# HOW TO FIX:
+# kubectl delete networkpolicy deny-meter-service -n energy
+# kubectl apply -f k8s/base/application.yaml
+# =============================================================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: energy
+  labels:
+    app: mongodb
+    scenario: complete-failure-bundle
+    sre-demo: breakable
+  annotations:
+    sre.scenario: complete-failure-bundle
+    sre.service: mongodb
+    sre.namespace: energy
+    sre.component: mongodb
+    sre.runbook_id: RB-011-complete-failure-bundle
+    sre.root_cause_category: dependency
+    sre.change_source: scenario-bundle
+    sre.version: "2026-04-30"
+spec:
+  replicas: 0
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+        scenario: complete-failure-bundle
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: mongodb
+          image: mongo:4.4
+          ports:
+            - containerPort: 27017
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+      volumes:
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: mongodb-data-pvc
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-meter-service
+  namespace: energy
+  labels:
+    scenario: complete-failure-bundle
+    sre-demo: breakable
+  annotations:
+    sre.scenario: complete-failure-bundle
+    sre.service: meter-service
+    sre.namespace: energy
+    sre.component: network-policy
+    sre.runbook_id: RB-011-complete-failure-bundle
+    sre.root_cause_category: networking
+    sre.change_source: scenario-bundle
+    sre.version: "2026-04-30"
+spec:
+  podSelector:
+    matchLabels:
+      app: meter-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: meter-service
+  namespace: energy
+  labels:
+    scenario: complete-failure-bundle
+    sre-demo: breakable
+  annotations:
+    sre.scenario: complete-failure-bundle
+    sre.service: meter-service
+    sre.namespace: energy
+    sre.component: service
+    sre.runbook_id: RB-011-complete-failure-bundle
+    sre.root_cause_category: configuration
+    sre.change_source: scenario-bundle
+    sre.version: "2026-04-30"
+spec:
+  selector:
+    app: meter-service-v2
+  ports:
+    - port: 3000
+      targetPort: 3000

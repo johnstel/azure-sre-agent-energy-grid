@@ -14,12 +14,22 @@
 # DRIFT RISK: This is a docs-only file. Changes to K8s manifests must be
 # manually synchronized here. See README.md for drift mitigation strategy.
 #
-# VERSION: 1.1.0 (2026-04-26)
-# LAST UPDATED: 2026-04-26
+# VERSION: 1.1.1 (2026-04-30)
+# LAST UPDATED: 2026-04-30
 # =============================================================================
 
-version: "1.1.0"
+version: "1.1.1"
 schema_version: "2026-04-25"
+
+# Explicitly excluded from the locked Wave 0 1-10 registry.
+# This bundle composes existing scenarios and is validated via script exclusion
+# policy + YAML checks until schema/versioning expands beyond 10 scenarios.
+excluded_from_wave0_registry:
+  rationale: "Wave 0 registry is locked to scenario IDs 1-10."
+  scenarios:
+    - scenario_id: complete-failure-bundle
+      k8s_manifest: k8s/scenarios/complete-failure-bundle/scenario.yaml
+      reason: "Composite outage bundle (mongodb-down + network-block + service-mismatch) tracked outside base registry."
 
 # =============================================================================
 # ALL 10 SCENARIOS — Complete Wave 0 Metadata

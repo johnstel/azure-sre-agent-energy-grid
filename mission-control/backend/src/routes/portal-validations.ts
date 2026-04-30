@@ -3,6 +3,7 @@ import {
   getValidationState,
   getScenarioPrompt,
   getScenarioDescription,
+  PORTAL_VALIDATION_SCENARIOS,
   updateValidation,
   confirmValidation,
   resetValidation,
@@ -10,10 +11,8 @@ import {
 } from '../services/PortalValidationService.js';
 import type { ConfirmPortalValidationRequest, PortalValidationScenarioName, UpdatePortalValidationRequest } from '../types/index.js';
 
-const VALIDATION_SCENARIOS: PortalValidationScenarioName[] = ['OOMKilled', 'MongoDBDown', 'ServiceMismatch'];
-
 function isValidationScenario(value: string): value is PortalValidationScenarioName {
-  return VALIDATION_SCENARIOS.includes(value as PortalValidationScenarioName);
+  return PORTAL_VALIDATION_SCENARIOS.includes(value as PortalValidationScenarioName);
 }
 
 function getErrorMessage(error: unknown): string {

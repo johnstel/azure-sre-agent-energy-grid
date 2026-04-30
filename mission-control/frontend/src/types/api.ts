@@ -183,11 +183,59 @@ export interface PodLogResponse {
   updatedAt: string;
 }
 
+export type ScenarioNarrationPromptStage = 'open-ended' | 'direct' | 'specific' | 'remediation';
+export type ScenarioNarrationDemoTier = 'core' | 'extended';
+
+export interface ScenarioNarrationPrompt {
+  stage: ScenarioNarrationPromptStage;
+  text: string;
+  source: string;
+}
+
+export interface ScenarioNarrationRestorePath {
+  label: string;
+  command?: string;
+  missionControlAction?: 'repair-scenario' | 'repair-all';
+}
+
+export interface ScenarioNarrationSourceRef {
+  label: string;
+  path: string;
+  section?: string;
+}
+
+export interface ScenarioNarration {
+  scenarioName: string;
+  title: string;
+  demoTier: ScenarioNarrationDemoTier;
+  order?: number;
+  hook: string[];
+  observe: string[];
+  suggestedPrompt: ScenarioNarrationPrompt;
+  restorePath: ScenarioNarrationRestorePath;
+  sourceRefs: ScenarioNarrationSourceRef[];
+  safetyNotes: string[];
+}
+
+export interface ScenarioNarrationCatalog {
+  schemaVersion: number;
+  contentContract: {
+    purpose: string;
+    agentResponseContent: string;
+    safeLanguageSource: string;
+    promptStageTaxonomy?: Record<ScenarioNarrationPromptStage, string>;
+    catalogRules?: string[];
+    forbiddenPhrases?: string[];
+  };
+  scenarios: ScenarioNarration[];
+}
+
 export interface Scenario {
   name: string;
   file: string;
   description: string;
   enabled: boolean;
+  narration?: ScenarioNarration;
 }
 
 export interface Job {
@@ -397,4 +445,10 @@ export interface PortalValidationState {
   validations: PortalValidation[];
   confirmedCount: number;
   updatedAt: string;
+}
+
+export interface PortalValidationPromptMetadata {
+  scenarioName: PortalValidationScenarioName;
+  prompt: string;
+  description: string;
 }

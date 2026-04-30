@@ -1,6 +1,14 @@
 # Azure SRE Agent Energy Grid Demo Lab ⚡
 
-A fully automated Azure environment for demonstrating **Azure SRE Agent** capabilities using an **Energy Grid Operations Platform**. Deploy a breakable multi-service energy grid application on AKS and let SRE Agent diagnose issues and recommend fixes!
+> **Azure SRE Agent is in Public Preview.** Features, APIs, telemetry schemas, and pricing may change before General Availability. This lab uses the `2025-05-01-preview` API version and presents remediation as operator-controlled unless real Preview approval evidence is captured.
+
+## Why This Demo Exists
+
+**Customer question:** Can AI help my SRE team diagnose faster without giving up control?
+
+This lab demonstrates a Preview-safe, evidence-oriented path for AI-assisted SRE triage: break a realistic AKS energy-grid application, ask SRE Agent to investigate, and keep remediation operator-controlled in Review mode. It is designed for buyer conversations about diagnosis quality, dependency reasoning, and trust boundaries — not autonomous production remediation. For customer follow-up, use the [Preview-safe leave-behind](docs/CUSTOMER-LEAVE-BEHIND.md); for the full speaker flow, see the [Demo Narrative](docs/DEMO-NARRATIVE.md).
+
+A fully automated Azure environment for demonstrating **Azure SRE Agent** capabilities using an **Energy Grid Operations Platform**.
 
 ## 🎯 What This Lab Provides
 
@@ -81,6 +89,9 @@ break-crash
 
 # Dispatch service deployment failure — bad image release
 break-image
+
+# Complete application failure bundle (multi-component outage)
+break-complete
 
 # See all scenarios
 menu
