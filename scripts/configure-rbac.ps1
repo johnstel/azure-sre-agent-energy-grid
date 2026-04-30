@@ -223,10 +223,10 @@ if ($SreAgentPrincipalId) {
     if ($logAnalytics) {
         Set-RoleAssignment `
             -Scope $logAnalytics.id `
-            -RoleDefinition "Log Analytics Contributor" `
+            -RoleDefinition "Log Analytics Reader" `
             -PrincipalId $SreAgentPrincipalId `
             -PrincipalType "ServicePrincipal" `
-            -Description "Log Analytics Contributor for SRE Agent (query and manage logs)"
+            -Description "Log Analytics Reader for SRE Agent (query logs)"
     }
 
     # Application Insights read access for telemetry correlation
@@ -266,10 +266,10 @@ if ($SreAgentPrincipalId) {
     if ($acr) {
         Set-RoleAssignment `
             -Scope $acr.id `
-            -RoleDefinition "AcrPush" `
+            -RoleDefinition "AcrPull" `
             -PrincipalId $SreAgentPrincipalId `
             -PrincipalType "ServicePrincipal" `
-            -Description "ACR Push for SRE Agent (push/pull images)"
+            -Description "ACR Pull for SRE Agent (pull images)"
     }
 }
 

@@ -84,9 +84,15 @@ spec:
             - name: ORDER_QUEUE_PORT
               value: "5672"
             - name: ORDER_QUEUE_USERNAME
-              value: "guest"
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: rabbitmq-username
             - name: ORDER_QUEUE_PASSWORD
-              value: "guest"
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: rabbitmq-password
             - name: ORDER_QUEUE_NAME
               value: "meter-events"
             - name: FASTIFY_ADDRESS

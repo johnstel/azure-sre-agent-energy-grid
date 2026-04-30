@@ -86,15 +86,15 @@ The script assigns these roles to enable both **diagnosis AND remediation**:
 | **AKS Cluster** | AKS Cluster Admin Role | kubectl access to cluster |
 | **AKS Cluster** | AKS RBAC Cluster Admin | Full Kubernetes RBAC permissions |
 | **AKS Cluster** | AKS Contributor Role | Scale nodes, update cluster config |
-| **Log Analytics** | Log Analytics Contributor | Query and analyze logs |
+| **Log Analytics** | Log Analytics Reader | Query and analyze logs |
 | **Key Vault** | Key Vault Secrets Officer | Manage secrets |
-| **Container Registry** | AcrPush | Push/pull container images |
+| **Container Registry** | AcrPull | Pull container images |
 
-> **Note**: These are **write permissions** that allow SRE Agent to take actions like:
+> **Note**: This profile still includes broad **write permissions** through Contributor, AKS admin/contributor roles, and Key Vault Secrets Officer. Log Analytics and ACR are read/pull-only.
 > - Restart pods, scale deployments, delete stuck resources
 > - Query and analyze logs
 > - Access/update Key Vault secrets
-> - Push/pull container images
+> - Pull container images
 
 ### SRE Agent User Roles
 

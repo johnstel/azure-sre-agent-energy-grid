@@ -391,10 +391,10 @@ The current demo profile intentionally grants broad roles through `scripts/confi
 | AKS Cluster Admin | AKS | ⚠️ DEMO ONLY | ❌ Remove — use namespace-scoped RBAC | Over-privileged for diagnosis |
 | AKS RBAC Cluster Admin | AKS | ⚠️ DEMO ONLY | ❌ Remove — use namespace-scoped RBAC | Over-privileged |
 | AKS Contributor | AKS | ⚠️ DEMO ONLY | Azure Kubernetes Service Cluster User Role | Minimum for kubectl access |
-| Log Analytics Contributor | Resource Group | ⚠️ DEMO ONLY | Log Analytics Reader | Agent only queries logs |
+| Log Analytics Reader | Workspace | ✅ | ✅ Keep | Agent only queries logs |
 | Monitoring Reader | Resource Group | ✅ | ✅ Keep | Needed for metrics |
 | Key Vault Secrets Officer | Key Vault | ⚠️ DEMO ONLY | ❌ Remove or Key Vault Secrets User | Agent doesn't manage secrets |
-| AcrPush | ACR | ⚠️ DEMO ONLY | ❌ Remove or AcrPull | No scenario requires image push |
+| AcrPull | ACR | ✅ | ✅ Keep if image metadata/pull access is needed | No scenario requires image push |
 | Reader | Subscription | ⚠️ DEMO ONLY | Reader (Resource Group scope) | Limit enumeration surface |
 | Contributor | Resource Group | ⚠️ DEMO ONLY (`accessLevel: 'High'`) | ❌ Remove (`accessLevel: 'Low'`) | Use Low for read-only diagnosis |
 
@@ -444,7 +444,7 @@ Known TBD scope includes all fields emitted by the SRE Agent App Insights teleme
 
 | Shortcut | Location | Risk | Production Recommendation |
 |----------|----------|------|--------------------------|
-| ⚠️ DEMO ONLY — RabbitMQ `guest/guest` credentials | `k8s/base/application.yaml` lines 85-87, 286-288, 356-360 | Plaintext default credentials | Use Key Vault + Workload Identity for credentials |
+| ⚠️ DEMO ONLY — RabbitMQ static `guest/guest` credentials | `k8s/base/application.yaml` (`Secret/rabbitmq-credentials`) | Static credentials are stored in Git and not rotated | Use Key Vault + Workload Identity for credentials |
 | ⚠️ DEMO ONLY — MongoDB without authentication | `k8s/base/application.yaml` | Any pod can read/write all data | Enable `--auth`, create service accounts |
 | ⚠️ DEMO ONLY — No pod `securityContext` | All deployments in `application.yaml` | Containers run as root with full capabilities | Set `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, drop all capabilities |
 | ⚠️ DEMO ONLY — No default-deny NetworkPolicy | `energy` namespace | Any pod can reach any pod | Add default-deny policy, allow only required paths |

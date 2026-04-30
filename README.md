@@ -158,6 +158,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 **Deploy script parameters:**
 - `-Location`: Azure region (`eastus2`, `swedencentral`, `australiaeast`) - Default: `eastus2`
 - `-WorkloadName`: Resource prefix - Default: `srelab`
+- `-AksApiServerAuthorizedIpRanges`: Optional AKS API server CIDR allowlist (for external demos). Example: `-AksApiServerAuthorizedIpRanges @('203.0.113.10/32')`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
 - `-SkipSreAgent`: Skip Azure SRE Agent deployment (useful for regions/subscriptions without Preview access)
 - `-WhatIf`: Preview deployment without making changes
