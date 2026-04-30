@@ -48,6 +48,18 @@ param logAnalyticsWorkspaceId string
 @description('Azure Container Registry ID for image pull permissions')
 param acrId string
 
+@description('Optional CIDR ranges allowed to reach the AKS API server public endpoint (for example, ["203.0.113.10/32"]). Leave empty for current demo behavior.')
+param aksApiServerAuthorizedIpRanges array = []
+
+var apiServerAccessProfile = length(aksApiServerAuthorizedIpRanges) > 0
+  ? {
+      enablePrivateCluster: false
+      authorizedIPRanges: aksApiServerAuthorizedIpRanges
+    }
+  : {
+      enablePrivateCluster: false
+    }
+
 // =============================================================================
 // RESOURCES
 // =============================================================================
@@ -88,9 +100,7 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-02-01' = {
     }
     
     // API server access - Enable public access for SRE Agent
-    apiServerAccessProfile: {
-      enablePrivateCluster: false // IMPORTANT: Must be false for SRE Agent
-    }
+    apiServerAccessProfile: apiServerAccessProfile
     
     // System node pool
     agentPoolProfiles: [

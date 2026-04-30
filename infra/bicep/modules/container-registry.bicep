@@ -22,7 +22,7 @@ param tags object
 param sku string = 'Basic'
 
 @description('Enable admin user for local development')
-param adminUserEnabled bool = true
+param adminUserEnabled bool = false
 
 // =============================================================================
 // RESOURCES

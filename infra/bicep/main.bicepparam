@@ -31,6 +31,18 @@ param userNodeCount = 3
 param systemMaxPods = 50
 param userMaxPods = 50
 
+// Optional AKS API server CIDR allowlist for external demos.
+// Leave empty to preserve current behavior (public endpoint without IP filtering).
+// Example:
+// param aksApiServerAuthorizedIpRanges = [
+//   '203.0.113.10/32'
+//   '198.51.100.0/24'
+// ]
+param aksApiServerAuthorizedIpRanges = []
+
+// ACR admin account is disabled by default; use role-based auth for pull/push.
+param acrAdminUserEnabled = false
+
 // Tags
 param tags = {
   workload: 'energy-grid-demo'

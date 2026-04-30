@@ -15,6 +15,10 @@
 .PARAMETER WorkloadName
     Name prefix for resources. Default: srelab
 
+.PARAMETER AksApiServerAuthorizedIpRanges
+    Optional CIDR ranges allowed to reach the AKS API server public endpoint.
+    Example: -AksApiServerAuthorizedIpRanges @('203.0.113.10/32','198.51.100.0/24')
+
 .PARAMETER SkipRbac
     Skip RBAC role assignments (useful if subscription policies block them)
 
@@ -46,6 +50,9 @@ param(
     [string]$WorkloadName = 'srelab',
 
     [Parameter()]
+    [string[]]$AksApiServerAuthorizedIpRanges = @(),
+
+    [Parameter()]
     [switch]$SkipRbac,
 
     [Parameter()]
@@ -60,64 +67,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Invoke-AzCliJson {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]
-        [string]$Command
-    )
-
-    # Run command and capture all output
-    $raw = Invoke-Expression $Command 2>&1 | Out-String
-    $exitCode = $LASTEXITCODE
-
-    if ($exitCode -ne 0) {
-        return [pscustomobject]@{
-            ExitCode = $exitCode
-            Raw      = $raw
-            Json     = $null
-        }
-    }
-
-    # Extract JSON from output (skip any warning lines before the JSON)
-    $jsonObjectStart = $raw.IndexOf('{')
-    $jsonArrayStart = $raw.IndexOf('[')
-
-    if ($jsonObjectStart -ge 0 -and $jsonArrayStart -ge 0) {
-        $jsonStart = [Math]::Min($jsonObjectStart, $jsonArrayStart)
-    }
-    elseif ($jsonObjectStart -ge 0) {
-        $jsonStart = $jsonObjectStart
-    }
-    elseif ($jsonArrayStart -ge 0) {
-        $jsonStart = $jsonArrayStart
-    }
-    else {
-        $jsonStart = -1
-    }
-
-    if ($jsonStart -ge 0) {
-        $jsonContent = $raw.Substring($jsonStart)
-    }
-    else {
-        $jsonContent = $raw
-    }
-
-    try {
-        $json = $jsonContent | ConvertFrom-Json
-    }
-    catch {
-        return [pscustomobject]@{
-            ExitCode = $exitCode
-            Raw      = $raw
-            Json     = $null
-        }
-    }
-
-    return [pscustomobject]@{
-        ExitCode = $exitCode
-        Raw      = $raw
-        Json     = $json
+if ($AksApiServerAuthorizedIpRanges.Count -gt 0) {
+    $cidrPattern = '^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\/([0-9]|[12][0-9]|3[0-2])$'
+    $invalidCidrs = @($AksApiServerAuthorizedIpRanges | Where-Object { $_ -notmatch $cidrPattern })
+    if ($invalidCidrs.Count -gt 0) {
+        throw "Invalid CIDR value(s) for -AksApiServerAuthorizedIpRanges: $($invalidCidrs -join ', ')"
     }
 }
 
@@ -252,14 +206,35 @@ function Write-ResourceGroupDeploymentFailureSummary {
         [string]$Indent = '    '
     )
 
-    $operations = Invoke-AzCliJson -Command "az deployment operation group list --resource-group $ResourceGroupName --name $DeploymentName --output json"
+    $operations = Invoke-AzCliJsonArgs -Arguments @(
+        'deployment'
+        'operation'
+        'group'
+        'list'
+        '--resource-group'
+        $ResourceGroupName
+        '--name'
+        $DeploymentName
+        '--output'
+        'json'
+    )
     if ($operations.ExitCode -ne 0 -or -not $operations.Json) {
         return
     }
 
     $failedOperations = @($operations.Json | Where-Object { $_.properties.provisioningState -eq 'Failed' })
     if ($failedOperations.Count -eq 0) {
-        $deployment = Invoke-AzCliJson -Command "az deployment group show --resource-group $ResourceGroupName --name $DeploymentName --output json"
+        $deployment = Invoke-AzCliJsonArgs -Arguments @(
+            'deployment'
+            'group'
+            'show'
+            '--resource-group'
+            $ResourceGroupName
+            '--name'
+            $DeploymentName
+            '--output'
+            'json'
+        )
         if ($deployment.ExitCode -ne 0 -or -not $deployment.Json -or -not $deployment.Json.properties.error) {
             return
         }
@@ -300,7 +275,16 @@ function Write-SubscriptionDeploymentFailureSummary {
         [string]$ResourceGroupName
     )
 
-    $operations = Invoke-AzCliJson -Command "az deployment operation sub list --name $DeploymentName --output json"
+    $operations = Invoke-AzCliJsonArgs -Arguments @(
+        'deployment'
+        'operation'
+        'sub'
+        'list'
+        '--name'
+        $DeploymentName
+        '--output'
+        'json'
+    )
     if ($operations.ExitCode -ne 0 -or -not $operations.Json) {
         return
     }
@@ -335,7 +319,17 @@ function Get-DeletedKeyVaultConflict {
         [string]$ResourceGroupName
     )
 
-    $deployment = Invoke-AzCliJson -Command "az deployment group show --resource-group $ResourceGroupName --name deploy-keyvault --output json"
+    $deployment = Invoke-AzCliJsonArgs -Arguments @(
+        'deployment'
+        'group'
+        'show'
+        '--resource-group'
+        $ResourceGroupName
+        '--name'
+        'deploy-keyvault'
+        '--output'
+        'json'
+    )
     if ($deployment.ExitCode -ne 0 -or -not $deployment.Json -or -not $deployment.Json.properties.error) {
         return $null
     }
@@ -345,7 +339,18 @@ function Get-DeletedKeyVaultConflict {
         return $null
     }
 
-    $operations = Invoke-AzCliJson -Command "az deployment operation group list --resource-group $ResourceGroupName --name deploy-keyvault --output json"
+    $operations = Invoke-AzCliJsonArgs -Arguments @(
+        'deployment'
+        'operation'
+        'group'
+        'list'
+        '--resource-group'
+        $ResourceGroupName
+        '--name'
+        'deploy-keyvault'
+        '--output'
+        'json'
+    )
     if ($operations.ExitCode -ne 0 -or -not $operations.Json) {
         return $null
     }
@@ -627,6 +632,7 @@ Write-Host "  • Workload Name:   $WorkloadName" -ForegroundColor White
 Write-Host "  • Resource Group:  $resourceGroupName" -ForegroundColor White
 Write-Host "  • Deployment Name: $deploymentName" -ForegroundColor White
 Write-Host "  • SRE Agent:       $(if ($deploySreAgent) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • AKS API CIDRs:   $(if ($AksApiServerAuthorizedIpRanges.Count -gt 0) { $AksApiServerAuthorizedIpRanges -join ', ' } else { '(none - unrestricted public API endpoint)' })" -ForegroundColor White
 if ($sreAgentSkipReason) {
     Write-Host "  • SRE Agent Note:  $sreAgentSkipReason" -ForegroundColor Gray
 }
@@ -657,6 +663,10 @@ if ($WhatIf) {
     }
     if ($userMaxPodsParam) {
         $whatIfParameterArgs += "userMaxPods=$userMaxPodsParam"
+    }
+    if ($AksApiServerAuthorizedIpRanges.Count -gt 0) {
+        $authorizedRangesJson = $AksApiServerAuthorizedIpRanges | ConvertTo-Json -Compress
+        $whatIfParameterArgs += "aksApiServerAuthorizedIpRanges=$authorizedRangesJson"
     }
 
     $whatIfOutput = az deployment sub what-if `
@@ -707,6 +717,10 @@ try {
     if ($userMaxPodsParam) {
         $deployParameterArgs += "userMaxPods=$userMaxPodsParam"
     }
+    if ($AksApiServerAuthorizedIpRanges.Count -gt 0) {
+        $authorizedRangesJson = $AksApiServerAuthorizedIpRanges | ConvertTo-Json -Compress
+        $deployParameterArgs += "aksApiServerAuthorizedIpRanges=$authorizedRangesJson"
+    }
 
     $createArgs = @(
         'deployment'
@@ -740,8 +754,15 @@ try {
         }
 
         # Best-effort: if a deployment record exists, pull structured error details.
-        $showCmd = "az deployment sub show --name $deploymentName --output json"
-        $show = Invoke-AzCliJson -Command $showCmd
+        $show = Invoke-AzCliJsonArgs -Arguments @(
+            'deployment'
+            'sub'
+            'show'
+            '--name'
+            $deploymentName
+            '--output'
+            'json'
+        )
         if ($show.ExitCode -eq 0 -and $show.Json) {
             $state = $show.Json.properties.provisioningState
             Write-Host "`nDeployment provisioningState: $state" -ForegroundColor Yellow

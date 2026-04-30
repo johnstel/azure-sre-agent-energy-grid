@@ -196,7 +196,7 @@ actionConfiguration: {
 }
 ```
 
-With `accessLevel: 'High'`, the managed identity holds: Log Analytics Reader + Reader + **Contributor** (RG-scoped). Additional roles granted via RBAC script: AKS Cluster Admin, AKS RBAC Cluster Admin, AKS Contributor, Log Analytics Contributor, Key Vault Secrets Officer, AcrPush.
+With `accessLevel: 'High'`, the managed identity holds: Log Analytics Reader + Reader + **Contributor** (RG-scoped). Additional roles granted via RBAC script: AKS Cluster Admin, AKS RBAC Cluster Admin, AKS Contributor, Log Analytics Reader, Key Vault Secrets Officer, AcrPull.
 
 **Mission Control Backend** — Mixed read/write with confirmation gates:
 - Read: `GET /api/pods`, `GET /api/services`, `GET /api/events`, `GET /api/deployments` via structured `execFile()` (no `shell: true`)
@@ -448,11 +448,11 @@ graph TD
 | Identity | Roles Granted | Assessment |
 |----------|--------------|------------|
 | **SRE Agent MI (Bicep)** | Reader + Contributor + Log Analytics Reader (on RG) | Overprivileged for diagnosis-only; appropriate for remediation demo |
-| **SRE Agent MI (RBAC script)** | AKS Cluster Admin, AKS RBAC Cluster Admin, AKS Contributor, Log Analytics Contributor, Key Vault Secrets Officer, AcrPush | Deliberately broad — write permissions for "remediate" demo story |
+| **SRE Agent MI (RBAC script)** | AKS Cluster Admin, AKS RBAC Cluster Admin, AKS Contributor, Log Analytics Reader, Key Vault Secrets Officer, AcrPull | Deliberately broad for the demo; Log Analytics and ACR are now read/pull-only |
 | **AKS kubelet identity** | AcrPull (on RG) | ✅ Correct — read-only image pull |
 | **Grafana identity** | Monitoring Reader (on subscription) | ✅ Acceptable — read-only |
 | **Mission Control backend** | Inherits operator's `az` CLI session + `kubectl` context | Implicit — no dedicated service identity |
-| **AKS cluster** | Public API server (not private) | Required for SRE Agent Preview — expands attack surface |
+| **AKS cluster** | Public API server (not private) | Required for this lab's SRE Agent access model — expands attack surface |
 
 > **Critical customer note**: The current RBAC profile is demo-scoped. For a diagnosis-only deployment, `accessLevel: 'Low'` (Reader + Log Analytics Reader) eliminates all write permissions from the managed identity. This is not documented in the repo.
 >

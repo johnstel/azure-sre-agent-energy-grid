@@ -97,6 +97,12 @@ param systemMaxPods int = 50
 @maxValue(110)
 param userMaxPods int = 50
 
+@description('Optional CIDR ranges allowed to reach the AKS API server public endpoint for external demos. Leave empty to preserve current public-access behavior.')
+param aksApiServerAuthorizedIpRanges array = []
+
+@description('Enable ACR admin user account (not required for default deploy path)')
+param acrAdminUserEnabled bool = false
+
 @description('Tags to apply to all resources')
 param tags object = {
   workload: 'energy-grid-demo'
@@ -196,6 +202,7 @@ module containerRegistry 'modules/container-registry.bicep' = {
     location: location
     tags: tags
     sku: 'Basic'
+    adminUserEnabled: acrAdminUserEnabled
   }
 }
 
@@ -214,6 +221,7 @@ module aks 'modules/aks.bicep' = {
     userNodeCount: userNodeCount
     systemMaxPods: systemMaxPods
     userMaxPods: userMaxPods
+    aksApiServerAuthorizedIpRanges: aksApiServerAuthorizedIpRanges
     vnetSubnetId: network.outputs.aksSubnetId
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     acrId: containerRegistry.outputs.acrId
