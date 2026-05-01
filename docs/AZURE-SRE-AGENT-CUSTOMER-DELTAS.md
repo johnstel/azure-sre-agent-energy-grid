@@ -1,6 +1,6 @@
 # Azure SRE Agent Service Demo — Customer Readiness Delta Analysis
 
-> **Version**: 1.0 &middot; **Date**: 2026-04-25 &middot; **Status**: Azure SRE Agent is in **Public Preview**
+> **Version**: 1.0 &middot; **Date**: 2026-04-25 &middot; **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
 > **Applicable regions**: East US 2, Sweden Central, Australia East
 > **Repo**: [`johnstel/azure-sre-agent-energy-grid`](https://github.com/johnstel/azure-sre-agent-energy-grid)
 
@@ -14,7 +14,7 @@ The Azure SRE Agent Energy Grid demo lab deploys a fully automated Azure environ
 
 | Proof Point | Evidence |
 |-------------|----------|
-| **Human-in-the-loop by default** | SRE Agent deploys with `mode: 'Review'`; this demo presents write actions as recommendation-only until a real Preview approval UI/API is captured. |
+| **Human-in-the-loop by default** | SRE Agent deploys with `mode: 'Review'`; this demo presents write actions as recommendation-only until a real approval UI/API is captured. |
 | **Three-tier action model** | Azure SRE Agent (cloud, review/recommendation mode) · Mission Control API (local, confirmation-gated; out of scope as Azure SRE Agent proof) · Ask Copilot (local, strictly read-only) — clear trust separation |
 | **Full IaC reproducibility** | Single `deploy.ps1` provisions all infrastructure via Bicep; deterministic, auditable, teardown-safe |
 | **10 deterministic failure scenarios** | Each scenario injects a discrete, well-documented failure mode with curated prompt progressions from open-ended → specific → remediation |
@@ -196,7 +196,7 @@ actionConfiguration: {
 }
 ```
 
-With `accessLevel: 'High'`, the managed identity holds: Log Analytics Reader + Reader + **Contributor** (RG-scoped). Additional roles granted via RBAC script: AKS Cluster Admin, AKS RBAC Cluster Admin, AKS Contributor, Log Analytics Contributor, Key Vault Secrets Officer, AcrPush.
+With `accessLevel: 'High'`, the managed identity holds: Log Analytics Reader + Reader + **Contributor** (RG-scoped). Additional roles granted via RBAC script: AKS Cluster Admin, AKS RBAC Cluster Admin, AKS Contributor, Log Analytics Reader, Key Vault Secrets Officer, AcrPull.
 
 **Mission Control Backend** — Mixed read/write with confirmation gates:
 - Read: `GET /api/pods`, `GET /api/services`, `GET /api/events`, `GET /api/deployments` via structured `execFile()` (no `shell: true`)
@@ -393,7 +393,7 @@ graph TD
 | Layer | What Exists | Retention | Evidence |
 |-------|------------|-----------|----------|
 | **Log Analytics** | Container Insights: pod lifecycle, resource metrics, K8s events | 30 days (configurable 30-730) | `log-analytics.bicep:43` |
-| **Application Insights** | Application telemetry + SRE Agent operational telemetry. Exact SRE Agent schema is TBD: `logConfiguration` is configured in Bicep, but emitted fields depend on the Preview service. | 90 days | `app-insights.bicep:43`, `sre-agent.bicep:97-101` |
+| **Application Insights** | Application telemetry + SRE Agent operational telemetry. Exact SRE Agent schema is TBD: `logConfiguration` is configured in Bicep, but emitted fields depend on the deployed API version. | 90 days | `app-insights.bicep:43`, `sre-agent.bicep:97-101` |
 | **Key Vault** | Soft delete enabled, purge protection **disabled** (demo convenience) | 7-day soft delete | `key-vault.bicep:42-43` |
 | **Mission Control** | No persistent data store — K8s state is read-only, jobs are in-memory | Session-only | `server.ts:19` |
 | **Ask Copilot** | System message prohibits requesting secrets, tokens, and kubeconfig. `redactSensitiveText()` strips Bearer tokens, password/secret/key values, `AccountKey` credentials, and URI-embedded credentials. | Session-only | `AssistantService.ts:23-27`, `KubeClient.ts:631-636` |
@@ -414,7 +414,7 @@ graph TD
 
 | Layer | What Exists | Evidence |
 |-------|------------|----------|
-| **Azure SRE Agent** | `mode: 'Review'` ensures proposals are visible before execution; operational telemetry is configured through App Insights `logConfiguration`, with exact schema dependent on the Preview service | `sre-agent.bicep:93-96, 97-101` |
+| **Azure SRE Agent** | `mode: 'Review'` ensures proposals are visible before execution; operational telemetry is configured through App Insights `logConfiguration`, with exact schema dependent on the deployed API version | `sre-agent.bicep:93-96, 97-101` |
 | **Mission Control Ask Copilot** | Returns per-response metadata: `model`, `toolsUsed`, `stateSnapshotTimestamp`, `sources[]`, `limitations[]` | `AssistantService.ts:160-170` |
 | **kubectl interactions** | All calls use `execFile` (not shell) with structured args — every invocation is traceable | `KubeClient.ts:184-186` |
 
@@ -448,11 +448,11 @@ graph TD
 | Identity | Roles Granted | Assessment |
 |----------|--------------|------------|
 | **SRE Agent MI (Bicep)** | Reader + Contributor + Log Analytics Reader (on RG) | Overprivileged for diagnosis-only; appropriate for remediation demo |
-| **SRE Agent MI (RBAC script)** | AKS Cluster Admin, AKS RBAC Cluster Admin, AKS Contributor, Log Analytics Contributor, Key Vault Secrets Officer, AcrPush | Deliberately broad — write permissions for "remediate" demo story |
+| **SRE Agent MI (RBAC script)** | AKS Cluster Admin, AKS RBAC Cluster Admin, AKS Contributor, Log Analytics Reader, Key Vault Secrets Officer, AcrPull | Deliberately broad for the demo; Log Analytics and ACR are now read/pull-only |
 | **AKS kubelet identity** | AcrPull (on RG) | ✅ Correct — read-only image pull |
 | **Grafana identity** | Monitoring Reader (on subscription) | ✅ Acceptable — read-only |
 | **Mission Control backend** | Inherits operator's `az` CLI session + `kubectl` context | Implicit — no dedicated service identity |
-| **AKS cluster** | Public API server (not private) | Required for SRE Agent Preview — expands attack surface |
+| **AKS cluster** | Public API server (not private) | Required for this lab's SRE Agent access model — expands attack surface |
 
 > **Critical customer note**: The current RBAC profile is demo-scoped. For a diagnosis-only deployment, `accessLevel: 'Low'` (Reader + Log Analytics Reader) eliminates all write permissions from the managed identity. This is not documented in the repo.
 >
@@ -471,7 +471,7 @@ graph TD
 | Audit Source | What's Captured | Retention | Surfaced in Demo? |
 |-------------|----------------|-----------|-------------------|
 | Log Analytics | Container Insights (pod lifecycle, metrics, K8s events) | 30 days | ⚠️ Data exists but no pre-built queries |
-| App Insights | Application telemetry + SRE Agent operational telemetry. Exact SRE Agent schema is TBD and depends on the Preview service. | 90 days | ⚠️ Data exists but no pre-built queries |
+| App Insights | Application telemetry + SRE Agent operational telemetry. Exact SRE Agent schema is TBD and depends on the deployed API version. | 90 days | ⚠️ Data exists but no pre-built queries |
 | Azure Activity Log | ARM operations, RBAC changes, resource mutations | 90 days (platform) | ❌ Not surfaced |
 | Prometheus / Grafana | Cluster metrics | Managed retention | ⚠️ Grafana deployed but no audit-specific dashboards |
 | AKS Audit Logs | K8s API server audit events | Via Container Insights to Log Analytics | ❌ Not surfaced |
@@ -572,13 +572,13 @@ graph TB
 | P1-4 | No runbook library | Governance | Create structured runbooks for top scenarios (OOMKilled, CrashLoop, MongoDBDown) |
 | P1-5 | No compound/multi-symptom failure demo | Diagnosis | Create at least one scenario with >1 contributing factor |
 | P1-6 | SRE Agent MI has Contributor on entire RG | Security | Document as demo simplification; provide production-scoped role recommendation |
-| P1-7 | `managedResources: []` — IaC doesn't complete AKS ↔ SRE Agent connection | Setup | Document as Preview API limitation; cite RBAC script and portal step as workaround |
+| P1-7 | `managedResources: []` — IaC doesn't complete AKS ↔ SRE Agent connection | Setup | Document as current API-version limitation in this subscription; cite RBAC script and portal step as workaround |
 | P1-8 | No SRE Agent reasoning chain visibility | Explainability | Investigate App Insights tracing in `logConfiguration`; document what's visible |
 | P1-9 | No data classification statement | Compliance | Add explicit statement: demo contains zero PII/PHI (simulated energy grid data) |
 | P1-10 | Key Vault purge protection disabled | Security | Add `// DEMO ONLY` callout; document production recommendation |
-| P1-11 | Azure SRE Agent conversation retention undocumented | Compliance | Link to Microsoft's data handling policy for the Preview service |
+| P1-11 | Azure SRE Agent conversation retention undocumented | Compliance | Link to Microsoft's data handling policy for the service/API version in use |
 | P1-12 | No documented escalation/reject flow | HITL | Document what happens when operator rejects a proposed action |
-| P1-13 | Public AKS API server | Security | Document as Preview requirement; note private cluster + private endpoint as production path |
+| P1-13 | Public AKS API server | Security | Document as current deployment-path requirement; note private cluster + private endpoint as production path |
 | P1-14 | No Activity Log export to long-term storage | Audit | Add diagnostic setting in Bicep to export Activity Log to Log Analytics |
 | P1-15 | Alert grouping / deduplication not demonstrated | Noise Reduction | Configure overlapping alert rules for cascading failure scenarios |
 | P1-16 | No execution audit trail visible in demo | Audit | Surface SRE Agent execution history; document App Insights as the mechanism |

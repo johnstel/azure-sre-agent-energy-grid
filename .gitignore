@@ -28,6 +28,7 @@ azureconfig.json
 !tasks.json
 !settings.json
 !extensions.json
+!docs/scenario-narration.json
 !**/bicepconfig.json
 
 # Bicep lock files

@@ -2,7 +2,7 @@
   <section id="portal-validation" class="portal-validation">
     <div class="portal-validation__heading">
       <div class="portal-validation__heading-content">
-        <p class="wallboard-kicker wallboard-kicker--urgent">Required before customer demo</p>
+        <p class="wallboard-kicker wallboard-kicker--urgent">Evidence capture gate</p>
         <h2>Portal Evidence Validation</h2>
         <p class="section-help">
           Record confirmations after capturing real Azure SRE Agent portal evidence for each scenario.
@@ -13,7 +13,7 @@
 
     <div class="portal-validation__alert">
       <p>
-        <strong>Redaction reminder:</strong> Before recording confirmation, redact subscription ID, tenant ID, resource IDs, principal IDs, and all sensitive identifiers from screenshots and transcripts.
+        <strong>Redaction reminder:</strong> Before recording confirmation, redact subscription ID, tenant ID, resource IDs, principal IDs, and all sensitive identifiers from screenshots and transcripts. Confirmation tracks local evidence completeness only; Dallas approval is still required before external/customer use.
       </p>
     </div>
 
@@ -22,7 +22,7 @@
         <div class="portal-validation__header">
           <div>
             <h3>{{ validation.scenarioName }}</h3>
-            <p class="scenario-description">{{ scenarioDescriptions[validation.scenarioName] }}</p>
+            <p class="scenario-description">{{ descriptionFor(validation.scenarioName) }}</p>
           </div>
           <span class="badge" :class="validation.status === 'confirmed' ? 'badge-online' : 'badge-warning'">
             {{ validation.status === 'confirmed' ? 'Confirmed ✓' : 'Awaiting ⏳' }}
@@ -32,12 +32,13 @@
         <div class="portal-validation__prompt">
           <label class="wallboard-kicker" :for="`prompt-${validation.scenarioName}`">Portal prompt</label>
           <p :id="`prompt-${validation.scenarioName}`" class="portal-validation__prompt-text">
-            {{ scenarioPrompts[validation.scenarioName] }}
+            {{ promptFor(validation.scenarioName) }}
           </p>
           <div class="portal-validation__prompt-actions">
             <button
               class="command-button command-button--neutral"
               type="button"
+              :disabled="!hasPrompt(validation.scenarioName)"
               :aria-label="`Copy ${validation.scenarioName} prompt to clipboard`"
               @click="copyPrompt(validation.scenarioName)"
             >
@@ -107,7 +108,7 @@
             @change="updateAccuracy(validation.scenarioName, ($event.target as HTMLSelectElement).value as PortalValidationAccuracy | '')"
           >
             <option value="">Not assessed</option>
-            <option value="PASS">PASS — Matched expected root cause</option>
+            <option value="PASS">PASS — Matched observed root cause</option>
             <option value="PARTIAL">PARTIAL — Partially helpful</option>
             <option value="FAIL">FAIL — Unhelpful response</option>
           </select>
@@ -201,25 +202,20 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import type { PortalValidation, PortalValidationAccuracy, PortalValidationScenarioName, PortalValidationState } from '../types/api';
+import type {
+  PortalValidation,
+  PortalValidationAccuracy,
+  PortalValidationPromptMetadata,
+  PortalValidationScenarioName,
+  PortalValidationState,
+} from '../types/api';
 
 const API_BASE = import.meta.env.DEV ? 'http://localhost:3333' : '';
 
 const validations = ref<PortalValidation[]>([]);
 const confirmedCount = ref(0);
 const resetConfirmVisible = ref(false);
-
-const scenarioPrompts: Record<PortalValidationScenarioName, string> = {
-  OOMKilled: 'Why is the meter-service pod failing? Check recent pod events, memory limits, and container restarts.',
-  MongoDBDown: 'Why are meter readings unavailable? Trace the symptom through service endpoints, MongoDB deployment state, and recent events.',
-  ServiceMismatch: 'Why is the meter-service unreachable despite running pods? Check service selectors, endpoint readiness, and pod labels.',
-};
-
-const scenarioDescriptions: Record<PortalValidationScenarioName, string> = {
-  OOMKilled: 'Meter service pods crashing — memory exhaustion',
-  MongoDBDown: 'Cascading failure — MongoDB dependency unavailable',
-  ServiceMismatch: 'Silent failure — service selector does not match pods',
-};
+const scenarioMetadata = ref<Partial<Record<PortalValidationScenarioName, PortalValidationPromptMetadata>>>({});
 
 const progressBadgeClass = computed(() => {
   if (confirmedCount.value === 3) return 'badge-online';
@@ -227,7 +223,7 @@ const progressBadgeClass = computed(() => {
 });
 
 const progressLabel = computed(() => {
-  if (confirmedCount.value === 3) return 'READY FOR DEMO ✓';
+  if (confirmedCount.value === 3) return 'EVIDENCE CONFIRMED ✓';
   return `${confirmedCount.value}/3 PENDING`;
 });
 
@@ -246,13 +242,47 @@ async function loadValidations() {
     const data: PortalValidationState = await response.json();
     validations.value = data.validations;
     confirmedCount.value = data.confirmedCount;
+    await loadScenarioMetadata(data.validations.map(validation => validation.scenarioName));
   } catch (err) {
     console.error('Failed to load portal validations:', err);
   }
 }
 
+async function loadScenarioMetadata(scenarioNames: PortalValidationScenarioName[]) {
+  const uniqueNames = [...new Set(scenarioNames)];
+  const results = await Promise.allSettled(uniqueNames.map(async (scenarioName) => {
+    const response = await fetch(`${API_BASE}/api/portal-validations/${scenarioName}/prompt`);
+    if (!response.ok) throw new Error(`Metadata request failed for ${scenarioName}: ${response.status}`);
+    return await response.json() as PortalValidationPromptMetadata;
+  }));
+
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      scenarioMetadata.value[result.value.scenarioName] = result.value;
+    } else {
+      console.error('Failed to load portal validation prompt metadata:', result.reason);
+    }
+  }
+}
+
+function promptFor(scenarioName: PortalValidationScenarioName): string {
+  return scenarioMetadata.value[scenarioName]?.prompt ?? 'Prompt metadata unavailable. Check the shared narration catalog.';
+}
+
+function descriptionFor(scenarioName: PortalValidationScenarioName): string {
+  return scenarioMetadata.value[scenarioName]?.description ?? 'Scenario metadata unavailable.';
+}
+
+function hasPrompt(scenarioName: PortalValidationScenarioName): boolean {
+  return Boolean(scenarioMetadata.value[scenarioName]?.prompt);
+}
+
 async function copyPrompt(scenarioName: PortalValidationScenarioName) {
-  const prompt = scenarioPrompts[scenarioName];
+  const prompt = scenarioMetadata.value[scenarioName]?.prompt;
+  if (!prompt) {
+    alert('Prompt metadata unavailable. Check the shared narration catalog.');
+    return;
+  }
   try {
     await navigator.clipboard.writeText(prompt);
     alert('Prompt copied to clipboard!');

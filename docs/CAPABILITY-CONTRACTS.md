@@ -1,7 +1,7 @@
 # Capability Contracts
 
 > **Version**: 0.2 · **Wave**: 0 — Contracts only, no runtime changes
-> **Status**: Azure SRE Agent is in **Public Preview**
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
 > **Repo**: [`johnstel/azure-sre-agent-energy-grid`](https://github.com/johnstel/azure-sre-agent-energy-grid)
 
 This document defines the shared contracts that every capability in the demo lab consumes. No implementation work should start for a wave until the contracts it depends on are locked here.
@@ -101,6 +101,8 @@ Every breakable scenario must have a metadata block (YAML front matter or struct
 | `missing-config` | 8 | Grid Zone Configuration Missing | warning | configuration | grid-zone-config |
 | `mongodb-down` | 9 | Meter Database Outage (Cascading) | critical | dependency | mongodb, meter-service, dispatch-service |
 | `service-mismatch` | 10 | Meter Service Routing Failure | critical | configuration | meter-service |
+
+> **Provisional bundle (outside locked Wave 0 registry):** `complete-failure-bundle` (`k8s/scenarios/complete-failure-bundle/scenario.yaml`) is intentionally excluded from the 1–10 schema and validated via explicit exclusion policy in `scripts/validate-scenario-metadata.ps1` and `docs/evidence/scenarios/scenario-manifest.yaml`.
 
 ---
 
@@ -264,7 +266,7 @@ The demo supports three access profiles. Each corresponds to a distinct configur
 | Profile | SRE Agent Mode | Access Level | Human Approval | Use Case |
 |---------|---------------|--------------|----------------|----------|
 | `review-readonly` | `Review` | `Low` | N/A (read ops only) | Diagnosis-only demos; safe for untrusted audiences |
-| `review-remediate` | `Review` | `High` | ✅ Required for writes | **Default demo profile** — agent recommends, operator executes unless a real Preview approval UI/API is captured |
+| `review-remediate` | `Review` | `High` | ✅ Required for writes | **Default demo profile** — agent recommends, operator executes unless a real approval UI/API is captured |
 | `auto-remediate` | `Auto` | `High` | ❌ Agent acts autonomously | Advanced demo only; document risk prominently |
 
 > **Current state**: The Bicep deployment uses `mode: 'Review'` and `accessLevel: 'High'` — this maps to `review-remediate`. See `infra/bicep/modules/sre-agent.bicep:92-96`.
@@ -341,9 +343,9 @@ These are placeholders. Do not implement burn-rate alerts until real data source
 
 ---
 
-## 8 · Preview Telemetry — `SCHEMA_TBD` Rule
+## 8 · API-Version Telemetry — `SCHEMA_TBD` Rule
 
-Azure SRE Agent is in **Public Preview**. App Insights telemetry emitted by the agent (custom dimensions, dependency names, trace formats) may change between preview versions.
+Azure SRE Agent is GA. App Insights telemetry emitted by the agent (custom dimensions, dependency names, trace formats) may still change across API versions.
 
 > **S0-4 Contract**: This section constitutes the formal SCHEMA_TBD contract required by the Security Wave 0 review. Known TBD scope: all App Insights telemetry emitted via `logConfiguration.applicationInsightsConfiguration` in `sre-agent.bicep`.
 
@@ -351,7 +353,7 @@ Azure SRE Agent is in **Public Preview**. App Insights telemetry emitted by the 
 
 1. Any KQL query or dashboard that references SRE Agent-specific App Insights fields must be tagged with a `// SCHEMA_TBD` comment.
 2. Do not build production-grade dashboards or alerts against `SCHEMA_TBD` fields.
-3. When the SRE Agent GA API is available, audit all `SCHEMA_TBD` references and update or remove the tag.
+3. When this subscription exposes `Microsoft.App/agents@2026-01-01` and `what-if` validates it, audit all `SCHEMA_TBD` references and update or remove the tag.
 4. Document observed field names in `docs/evidence/kql/README.md` with the preview API version where they were seen.
 
 ### Example
@@ -369,7 +371,7 @@ traces
 
 This demo proves **Review mode only**. Auto mode exists but is out of scope for this wave.
 
-No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'` and `accessLevel: 'High'`, which means the agent may recommend remediation but a human operator remains responsible for executing write actions. If the Azure SRE Agent Preview portal exposes a specific approval/denial UX in this environment, capture it as evidence before mentioning it; otherwise use “agent recommends, operator executes.”
+No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'` and `accessLevel: 'High'`, which means the agent may recommend remediation but a human operator remains responsible for executing write actions. If the Azure SRE Agent portal exposes a specific approval/denial UX in this environment, capture it as evidence before mentioning it; otherwise use “agent recommends, operator executes.”
 
 Any future Auto mode demo requires a separate security review with evidence of:
 
@@ -389,10 +391,10 @@ The current demo profile intentionally grants broad roles through `scripts/confi
 | AKS Cluster Admin | AKS | ⚠️ DEMO ONLY | ❌ Remove — use namespace-scoped RBAC | Over-privileged for diagnosis |
 | AKS RBAC Cluster Admin | AKS | ⚠️ DEMO ONLY | ❌ Remove — use namespace-scoped RBAC | Over-privileged |
 | AKS Contributor | AKS | ⚠️ DEMO ONLY | Azure Kubernetes Service Cluster User Role | Minimum for kubectl access |
-| Log Analytics Contributor | Resource Group | ⚠️ DEMO ONLY | Log Analytics Reader | Agent only queries logs |
+| Log Analytics Reader | Workspace | ✅ | ✅ Keep | Agent only queries logs |
 | Monitoring Reader | Resource Group | ✅ | ✅ Keep | Needed for metrics |
 | Key Vault Secrets Officer | Key Vault | ⚠️ DEMO ONLY | ❌ Remove or Key Vault Secrets User | Agent doesn't manage secrets |
-| AcrPush | ACR | ⚠️ DEMO ONLY | ❌ Remove or AcrPull | No scenario requires image push |
+| AcrPull | ACR | ✅ | ✅ Keep if image metadata/pull access is needed | No scenario requires image push |
 | Reader | Subscription | ⚠️ DEMO ONLY | Reader (Resource Group scope) | Limit enumeration surface |
 | Contributor | Resource Group | ⚠️ DEMO ONLY (`accessLevel: 'High'`) | ❌ Remove (`accessLevel: 'Low'`) | Use Low for read-only diagnosis |
 
@@ -408,7 +410,7 @@ The current demo profile intentionally grants broad roles through `scripts/confi
 | App Insights (SRE Agent telemetry) | 90 days | Yes | Wired to LA workspace | Sufficient |
 | Activity Log (ARM operations) | 90 days platform retention; export configured in Bicep | Yes after diagnostic setting deployment | `activity-log-diagnostics.bicep` | Verify export and ingestion during UAT |
 | Key Vault audit | 7 days soft-delete | No | No diagnostic setting | Enable diagnostic setting; extend soft-delete to 90 days |
-| SRE Agent conversations | Unknown (Preview service) | Unknown | Unknown | Track Microsoft Preview data handling docs |
+| SRE Agent conversations | Unknown (service-managed) | Unknown | Unknown | Track Microsoft data handling docs for current API version |
 
 > **Wave 1 implementation:** Log Analytics retention is configured to 90 days and Activity Log export is defined in Bicep. Do not claim complete 90-day audit evidence until live UAT verifies the deployed retention setting and Activity Log records arrive in Log Analytics.
 
@@ -442,7 +444,7 @@ Known TBD scope includes all fields emitted by the SRE Agent App Insights teleme
 
 | Shortcut | Location | Risk | Production Recommendation |
 |----------|----------|------|--------------------------|
-| ⚠️ DEMO ONLY — RabbitMQ `guest/guest` credentials | `k8s/base/application.yaml` lines 85-87, 286-288, 356-360 | Plaintext default credentials | Use Key Vault + Workload Identity for credentials |
+| ⚠️ DEMO ONLY — RabbitMQ static `guest/guest` credentials | `k8s/base/application.yaml` (`Secret/rabbitmq-credentials`) | Static credentials are stored in Git and not rotated | Use Key Vault + Workload Identity for credentials |
 | ⚠️ DEMO ONLY — MongoDB without authentication | `k8s/base/application.yaml` | Any pod can read/write all data | Enable `--auth`, create service accounts |
 | ⚠️ DEMO ONLY — No pod `securityContext` | All deployments in `application.yaml` | Containers run as root with full capabilities | Set `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, drop all capabilities |
 | ⚠️ DEMO ONLY — No default-deny NetworkPolicy | `energy` namespace | Any pod can reach any pod | Add default-deny policy, allow only required paths |

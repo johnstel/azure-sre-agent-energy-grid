@@ -1,0 +1,509 @@
+{
+  "schemaVersion": 1,
+  "contentContract": {
+    "purpose": "Read-only presenter guidance for Mission Control scenario narration.",
+    "agentResponseContent": "Forbidden. Capture real portal evidence in the Portal Validation workflow before making diagnosis claims.",
+    "safeLanguageSource": "docs/SAFE-LANGUAGE-GUARDRAILS.md",
+    "promptStageTaxonomy": {
+      "open-ended": "Symptom description only; lets Azure SRE Agent reason freely.",
+      "direct": "Names the failing component; asks for diagnosis.",
+      "specific": "Asks about a particular signal, such as endpoints, memory, events, probes, or resource usage.",
+      "remediation": "Asks how to fix the issue after diagnosis is shown."
+    },
+    "catalogRules": [
+      "Hooks use second-person presenter voice, describe only the failure condition, and stay under 140 characters.",
+      "Observe bullets start with a verb, name a Mission Control tile or kubectl output, and are limited to four per scenario.",
+      "Suggested prompts are copied exactly from docs/SRE-AGENT-PROMPTS.md when available; otherwise from docs/PROMPTS-GUIDE.md.",
+      "Restore labels use Operator Restore or Manual Restore wording; narration never says the agent fixes a scenario."
+    ],
+    "forbiddenPhrases": [
+      "SRE Agent will...",
+      "The agent detects...",
+      "Agent automatically...",
+      "Root cause is...",
+      "Expected output:",
+      "You should see the agent say...",
+      "quantified MTTR claims",
+      "Production-ready",
+      "GA",
+      "fully autonomous"
+    ]
+  },
+  "scenarios": [
+    {
+      "scenarioName": "oom-killed",
+      "title": "OOMKilled \u2014 Meter Service Memory Exhaustion",
+      "demoTier": "core",
+      "order": 1,
+      "hook": [
+        "You have a peak-demand smart meter spike overwhelming meter-service."
+      ],
+      "observe": [
+        "Check Mission Control Scenarios tile for one active fault.",
+        "Open Mission Control Inventory Matrix for meter-service degraded readiness or restarts.",
+        "Run kubectl get pods -n energy -w to watch meter-service restart counts.",
+        "Inspect kubectl describe pod -l app=meter-service -n energy for recent container state."
+      ],
+      "suggestedPrompt": {
+        "stage": "direct",
+        "text": "Why is the meter-service pod restarting repeatedly?",
+        "source": "docs/PROMPTS-GUIDE.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair Scenario. Manual Restore: reapply the healthy baseline.",
+        "command": "kubectl apply -f k8s/base/application.yaml",
+        "missionControlAction": "repair-scenario"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/oom-killed.yaml"
+        },
+        {
+          "label": "Demo narrative",
+          "path": "docs/DEMO-NARRATIVE.md",
+          "section": "Scenario 1 \u2014 The Opener: OOMKilled"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "OOMKilled"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "Pod-Level Diagnosis"
+        }
+      ],
+      "safetyNotes": [
+        "Azure SRE Agent is GA; this lab remains pinned to Microsoft.App/agents@2025-05-01-preview in the current subscription, and you should not describe a live diagnosis unless real portal evidence is captured.",
+        "Frame remediation as recommendation-first; the operator executes recovery in this demo."
+      ]
+    },
+    {
+      "scenarioName": "crash-loop",
+      "title": "CrashLoopBackOff \u2014 Asset Service Configuration Failure",
+      "demoTier": "extended",
+      "order": 2,
+      "hook": [
+        "You have an asset-service rollout exiting repeatedly after an invalid grid configuration."
+      ],
+      "observe": [
+        "Check Mission Control Scenarios tile for one active fault.",
+        "Open Mission Control Inventory Matrix for asset-service degraded readiness or restarts.",
+        "Run kubectl get pods -n energy | grep asset-service to see CrashLoopBackOff.",
+        "Inspect kubectl logs -l app=asset-service -n energy --previous for the prior container attempt."
+      ],
+      "suggestedPrompt": {
+        "stage": "direct",
+        "text": "Why is asset-service in CrashLoopBackOff?",
+        "source": "docs/PROMPTS-GUIDE.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair Scenario. Manual Restore: reapply the healthy baseline.",
+        "command": "kubectl apply -f k8s/base/application.yaml",
+        "missionControlAction": "repair-scenario"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/crash-loop.yaml"
+        },
+        {
+          "label": "Demo narrative",
+          "path": "docs/DEMO-NARRATIVE.md",
+          "section": "Extended Demo"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "CrashLoopBackOff"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "Pod-Level Diagnosis"
+        }
+      ],
+      "safetyNotes": [
+        "Use observable pod state and logs; do not invent portal wording.",
+        "Keep action language operator-controlled unless real approval evidence is available."
+      ]
+    },
+    {
+      "scenarioName": "image-pull-backoff",
+      "title": "ImagePullBackOff \u2014 Dispatch Image Release Issue",
+      "demoTier": "extended",
+      "order": 6,
+      "hook": [
+        "You have dispatch-service pods waiting because the release references an image the cluster cannot pull."
+      ],
+      "observe": [
+        "Check Mission Control Scenarios tile for one active fault.",
+        "Open Mission Control Inventory Matrix for dispatch-service unavailable pods.",
+        "Run kubectl get pods -n energy | grep dispatch to see ImagePullBackOff.",
+        "Inspect kubectl describe pod -l app=dispatch-service -n energy for image pull events."
+      ],
+      "suggestedPrompt": {
+        "stage": "direct",
+        "text": "Why is dispatch-service stuck in ImagePullBackOff?",
+        "source": "docs/PROMPTS-GUIDE.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair Scenario. Manual Restore: reapply the healthy baseline.",
+        "command": "kubectl apply -f k8s/base/application.yaml",
+        "missionControlAction": "repair-scenario"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/image-pull-backoff.yaml"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "ImagePullBackOff"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "Pod-Level Diagnosis"
+        }
+      ],
+      "safetyNotes": [
+        "Discuss image and event signals as investigation clues, not as guaranteed portal phrasing.",
+        "Keep the repair path separate from narration; use the existing scenario controls or terminal command."
+      ]
+    },
+    {
+      "scenarioName": "high-cpu",
+      "title": "High CPU \u2014 Grid Frequency Calculation Overload",
+      "demoTier": "extended",
+      "order": 7,
+      "hook": [
+        "You have frequency calculation pods consuming excess CPU during an extreme-weather grid event."
+      ],
+      "observe": [
+        "Check Mission Control Health heartbeat tile for degraded status.",
+        "Open Mission Control Inventory Matrix for workloads affected by contention.",
+        "Run kubectl top pods -n energy to compare pod CPU usage.",
+        "Run kubectl top nodes to check node pressure."
+      ],
+      "suggestedPrompt": {
+        "stage": "specific",
+        "text": "What's the current CPU and memory utilization for each pod in the energy namespace?",
+        "source": "docs/SRE-AGENT-PROMPTS.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair All if available. Manual Restore: delete the overload deployment.",
+        "command": "kubectl delete deployment frequency-calc-overload -n energy",
+        "missionControlAction": "repair-all"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/high-cpu.yaml"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "Application Metrics"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "High CPU"
+        }
+      ],
+      "safetyNotes": [
+        "Avoid measured time-to-recovery or performance-improvement claims; use live observable signals.",
+        "If metrics are unavailable, say the investigation path is prepared rather than claiming a result."
+      ]
+    },
+    {
+      "scenarioName": "pending-pods",
+      "title": "Pending Pods \u2014 Substation Monitor Scheduling Pressure",
+      "demoTier": "extended",
+      "order": 8,
+      "hook": [
+        "You have substation-monitor pods stuck Pending because their resource requests exceed cluster capacity."
+      ],
+      "observe": [
+        "Check Mission Control Scenarios tile for one active fault.",
+        "Open Mission Control Inventory Matrix for substation-monitor unavailable pods.",
+        "Run kubectl get pods -n energy | grep substation-monitor to see Pending pods.",
+        "Inspect kubectl describe pod -l app=substation-monitor -n energy for scheduling events."
+      ],
+      "suggestedPrompt": {
+        "stage": "direct",
+        "text": "Why are the substation-monitor pods stuck in Pending?",
+        "source": "docs/PROMPTS-GUIDE.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair All if available. Manual Restore: delete the unschedulable workload.",
+        "command": "kubectl delete deployment substation-monitor -n energy",
+        "missionControlAction": "repair-all"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/pending-pods.yaml"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "Pending Pods"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "Capacity Planning & Scaling"
+        }
+      ],
+      "safetyNotes": [
+        "Do not claim SLO-backed capacity guarantees; this demo tracks availability qualitatively.",
+        "Frame scale or right-sizing actions as options for operator review."
+      ]
+    },
+    {
+      "scenarioName": "probe-failure",
+      "title": "Probe Failure \u2014 Grid Health Monitor Misconfiguration",
+      "demoTier": "extended",
+      "order": 9,
+      "hook": [
+        "You have grid-health-monitor restarting because its liveness probe points at the wrong endpoint."
+      ],
+      "observe": [
+        "Check Mission Control Scenarios tile for one active fault.",
+        "Open Mission Control Inventory Matrix for grid-health-monitor restarts.",
+        "Run kubectl get pods -n energy -l app=grid-health-monitor -w to watch restarts.",
+        "Inspect kubectl describe pod -l app=grid-health-monitor -n energy for probe events."
+      ],
+      "suggestedPrompt": {
+        "stage": "specific",
+        "text": "What's wrong with the liveness probe on grid-health-monitor?",
+        "source": "docs/PROMPTS-GUIDE.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair All if available. Manual Restore: delete the probe-failure workload.",
+        "command": "kubectl delete deployment grid-health-monitor -n energy",
+        "missionControlAction": "repair-all"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/probe-failure.yaml"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "Probe Failure"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "Pod-Level Diagnosis"
+        }
+      ],
+      "safetyNotes": [
+        "Use the probe events as live evidence; do not pre-state portal wording.",
+        "Keep remediation framed as a recommended configuration review followed by operator action."
+      ]
+    },
+    {
+      "scenarioName": "network-block",
+      "title": "Network Block \u2014 Meter Service Isolated",
+      "demoTier": "extended",
+      "order": 3,
+      "hook": [
+        "You have meter-service isolated by a NetworkPolicy after a security policy update."
+      ],
+      "observe": [
+        "Check Mission Control Scenarios tile for one active fault.",
+        "Open Mission Control Active Incidents for dependent workload symptoms.",
+        "Run kubectl exec -n energy deploy/grid-dashboard -- curl -s meter-service:3000/health to test reachability.",
+        "Run kubectl get networkpolicy -n energy to inspect policy changes."
+      ],
+      "suggestedPrompt": {
+        "stage": "specific",
+        "text": "Are there any network policies blocking traffic in the energy namespace?",
+        "source": "docs/SRE-AGENT-PROMPTS.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair All if available. Manual Restore: delete the blocking NetworkPolicy.",
+        "command": "kubectl delete networkpolicy deny-meter-service -n energy",
+        "missionControlAction": "repair-all"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/network-block.yaml"
+        },
+        {
+          "label": "Demo narrative",
+          "path": "docs/DEMO-NARRATIVE.md",
+          "section": "Extended Demo"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "Networking Issues"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "Network Policy Block"
+        }
+      ],
+      "safetyNotes": [
+        "Say the agent diagnoses issues you point it to; do not claim autonomous incident detection.",
+        "Keep the network policy repair separate from narration content."
+      ]
+    },
+    {
+      "scenarioName": "missing-config",
+      "title": "Missing ConfigMap \u2014 Grid Zone Configuration Missing",
+      "demoTier": "extended",
+      "order": 10,
+      "hook": [
+        "You have grid-zone-config blocked at startup because its referenced ConfigMap is missing."
+      ],
+      "observe": [
+        "Check Mission Control Scenarios tile for one active fault.",
+        "Open Mission Control Inventory Matrix for grid-zone-config create errors.",
+        "Run kubectl get pods -n energy | grep grid-zone-config to see startup status.",
+        "Inspect kubectl describe pod -l app=grid-zone-config -n energy for ConfigMap reference events."
+      ],
+      "suggestedPrompt": {
+        "stage": "direct",
+        "text": "What configuration is missing for grid-zone-config?",
+        "source": "docs/PROMPTS-GUIDE.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair All if available. Manual Restore: delete the config scenario workload.",
+        "command": "kubectl delete deployment grid-zone-config -n energy",
+        "missionControlAction": "repair-all"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/missing-config.yaml"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "Missing ConfigMap"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "General Triage"
+        }
+      ],
+      "safetyNotes": [
+        "Use Kubernetes events as the evidence path; do not fabricate portal wording.",
+        "Reference GA status and this lab's API-version pin before discussing Azure SRE Agent behavior in a customer demo."
+      ]
+    },
+    {
+      "scenarioName": "mongodb-down",
+      "title": "MongoDB Down \u2014 Meter Database Outage",
+      "demoTier": "core",
+      "order": 4,
+      "hook": [
+        "You have the meter readings database offline while dispatch-service and downstream processing degrade."
+      ],
+      "observe": [
+        "Check Mission Control Inventory Matrix for MongoDB unavailable and dispatch-service degraded.",
+        "Open Mission Control Active Incidents for cascading workload symptoms.",
+        "Run kubectl get deployment mongodb -n energy to compare desired and ready replicas.",
+        "Run kubectl get endpoints mongodb -n energy to inspect database endpoint availability."
+      ],
+      "suggestedPrompt": {
+        "stage": "specific",
+        "text": "Trace the dependency chain \u2014 what broke first and what was impacted downstream?",
+        "source": "docs/SRE-AGENT-PROMPTS.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair Scenario. Manual Restore: reapply the healthy baseline.",
+        "command": "kubectl apply -f k8s/base/application.yaml",
+        "missionControlAction": "repair-scenario"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/mongodb-down.yaml"
+        },
+        {
+          "label": "Demo narrative",
+          "path": "docs/DEMO-NARRATIVE.md",
+          "section": "Scenario 2 \u2014 The Climax: MongoDB Down / Cascading Failure"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "Root Cause Analysis"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "MongoDB Down"
+        }
+      ],
+      "safetyNotes": [
+        "If the portal is unavailable, complete the manual diagnosis and do not claim a live agent result.",
+        "Before saying Azure SRE Agent diagnosed this scenario, record real evidence in Portal Validation."
+      ]
+    },
+    {
+      "scenarioName": "service-mismatch",
+      "title": "Service Mismatch \u2014 Meter Service Routing Failure",
+      "demoTier": "core",
+      "order": 5,
+      "hook": [
+        "You have healthy meter-service pods but a Service selector that no longer routes traffic to them."
+      ],
+      "observe": [
+        "Check Mission Control Pods tile for healthy pod counts.",
+        "Open Mission Control Inventory Matrix for meter-service endpoint symptoms.",
+        "Run kubectl get endpoints meter-service -n energy to inspect endpoint availability.",
+        "Compare kubectl get svc meter-service -n energy -o jsonpath='{.spec.selector}' with pod labels."
+      ],
+      "suggestedPrompt": {
+        "stage": "specific",
+        "text": "Why does the meter-service Service have zero endpoints?",
+        "source": "docs/SRE-AGENT-PROMPTS.md"
+      },
+      "restorePath": {
+        "label": "Operator Restore: use Mission Control Repair Scenario. Manual Restore: reapply the healthy baseline.",
+        "command": "kubectl apply -f k8s/base/application.yaml",
+        "missionControlAction": "repair-scenario"
+      },
+      "sourceRefs": [
+        {
+          "label": "Scenario manifest",
+          "path": "k8s/scenarios/service-mismatch.yaml"
+        },
+        {
+          "label": "Demo narrative",
+          "path": "docs/DEMO-NARRATIVE.md",
+          "section": "Scenario 3 \u2014 The Subtle One: Service Mismatch"
+        },
+        {
+          "label": "Prompt library",
+          "path": "docs/SRE-AGENT-PROMPTS.md",
+          "section": "Networking Issues"
+        },
+        {
+          "label": "Prompt guide",
+          "path": "docs/PROMPTS-GUIDE.md",
+          "section": "Service Selector Mismatch"
+        }
+      ],
+      "safetyNotes": [
+        "Do not claim the portal identified the selector mismatch until real portal evidence has been captured.",
+        "Keep recovery operator-controlled in this demo unless a real approval UI/API is captured."
+      ]
+    }
+  ]
+}

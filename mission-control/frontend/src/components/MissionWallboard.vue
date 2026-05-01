@@ -127,9 +127,21 @@
           <strong>Scenarios</strong>
           <span class="badge" :class="activeScenarios > 0 ? 'badge-warning' : 'badge-online'">{{ activeScenarios }} active</span>
         </div>
-        <button class="command-button command-button--success" type="button" :disabled="fixingAll" @click="repairAllScenarios">
-          {{ fixingAll ? 'Repairing…' : 'Repair All' }}
-        </button>
+        <div class="scenario-control-actions">
+          <button class="command-button command-button--success" type="button" :disabled="fixingAll" @click="repairAllScenarios">
+            {{ fixingAll ? 'Repairing…' : 'Repair All' }}
+          </button>
+          <button
+            ref="narrationShowButtonRef"
+            class="command-button command-button--neutral"
+            type="button"
+            aria-controls="scenario-narration-panel"
+            :aria-expanded="narrationPanelVisible"
+            @click="showNarrationPanel"
+          >
+            {{ narrationPanelVisible ? 'Narration Open' : 'Show Narration' }}
+          </button>
+        </div>
         <div class="scenario-buttons">
           <button
             v-for="scenario in scenarios"
@@ -144,6 +156,16 @@
           </button>
         </div>
       </div>
+
+      <ScenarioNarrationPanel
+        v-if="narrationPanelVisible"
+        :scenarios="scenarios"
+        :selected-scenario-name="selectedNarrationScenarioName"
+        :collapsed="narrationPanelCollapsed"
+        @hide="hideNarrationPanel"
+        @toggle-collapsed="toggleNarrationPanelCollapsed"
+        @select-scenario="selectNarrationScenario"
+      />
     </div>
 
     <PortalValidation v-if="controlPanelOpen" />
@@ -455,6 +477,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useApi } from '@/composables/useApi';
 import { useWebSocket } from '@/composables/useWebSocket';
 import PortalValidation from './PortalValidation.vue';
+import ScenarioNarrationPanel from './ScenarioNarrationPanel.vue';
 import type {
   Deployment,
   AssistantAskResponse,
@@ -490,6 +513,9 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   'analyst-open-change': [open: boolean];
 }>();
+
+const NARRATION_PANEL_VISIBLE_KEY = 'mission-control:narration-panel-visible';
+const NARRATION_PANEL_COLLAPSED_KEY = 'mission-control:narration-panel-collapsed';
 
 const {
   askAssistant,
@@ -550,6 +576,10 @@ const jobLines = ref<string[]>([]);
 
 const fixingAll = ref(false);
 const togglingScenario = ref<string | null>(null);
+const narrationPanelVisible = ref(readStoredBoolean(NARRATION_PANEL_VISIBLE_KEY, false));
+const narrationPanelCollapsed = ref(readStoredBoolean(NARRATION_PANEL_COLLAPSED_KEY, true));
+const selectedNarrationScenarioName = ref('');
+const narrationShowButtonRef = ref<HTMLButtonElement | null>(null);
 const analystOpen = ref(false);
 const analystQuestion = ref('');
 const analystTranscript = ref<AnalystMessage[]>([]);
@@ -860,6 +890,7 @@ function clearDestroyCountdown(reset = true) {
 
 async function toggleScenario(scenario: Scenario) {
   togglingScenario.value = scenario.name;
+  selectedNarrationScenarioName.value = scenario.name;
   try {
     if (scenario.enabled) await disableScenario(scenario.name);
     else await enableScenario(scenario.name);
@@ -867,6 +898,35 @@ async function toggleScenario(scenario: Scenario) {
   } finally {
     togglingScenario.value = null;
   }
+}
+
+function showNarrationPanel() {
+  ensureSelectedNarrationScenario();
+  narrationPanelVisible.value = true;
+}
+
+function hideNarrationPanel() {
+  narrationPanelVisible.value = false;
+  void nextTick(() => {
+    narrationShowButtonRef.value?.focus();
+  });
+}
+
+function toggleNarrationPanelCollapsed() {
+  narrationPanelCollapsed.value = !narrationPanelCollapsed.value;
+}
+
+function selectNarrationScenario(name: string) {
+  selectedNarrationScenarioName.value = name;
+}
+
+function ensureSelectedNarrationScenario() {
+  if (scenarios.value.some(scenario => scenario.name === selectedNarrationScenarioName.value)) return;
+  const ordered = [...scenarios.value].sort((a, b) => {
+    if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+    return (a.narration?.order ?? 999) - (b.narration?.order ?? 999) || a.name.localeCompare(b.name);
+  });
+  selectedNarrationScenarioName.value = ordered[0]?.name ?? '';
 }
 
 async function repairAllScenarios() {
@@ -1459,6 +1519,25 @@ function formatEventTime(timestamp: string): string {
   }
 }
 
+function readStoredBoolean(key: string, fallback: boolean): boolean {
+  try {
+    const value = window.localStorage.getItem(key);
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+  } catch {
+    // Presenter preference only; ignore storage failures.
+  }
+  return fallback;
+}
+
+function writeStoredBoolean(key: string, value: boolean) {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // Presenter preference only; ignore storage failures.
+  }
+}
+
 onMounted(() => {
   refreshAll();
   runPreflight();
@@ -1478,6 +1557,18 @@ watch(analystOpen, (open) => {
 
 watch(destroyCanArm, (canArm) => {
   if (!canArm && destroyConfirmOpen.value) closeDestroyConfirm();
+});
+
+watch(scenarios, () => {
+  ensureSelectedNarrationScenario();
+});
+
+watch(narrationPanelVisible, (visible) => {
+  writeStoredBoolean(NARRATION_PANEL_VISIBLE_KEY, visible);
+});
+
+watch(narrationPanelCollapsed, (collapsed) => {
+  writeStoredBoolean(NARRATION_PANEL_COLLAPSED_KEY, collapsed);
 });
 
 watch(() => props.analystOpenRequest, (request, previousRequest) => {
@@ -1621,6 +1712,13 @@ defineExpose({
   color: var(--text);
   padding: 0.45rem 0.55rem;
   font-size: 0.9rem;
+}
+
+.scenario-control-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
 }
 
 .compact-list,

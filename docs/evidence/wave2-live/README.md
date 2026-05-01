@@ -47,7 +47,7 @@ Wave 2 validates customer incident scenarios with automated evidence and preserv
 **SRE Agent Evidence** (Human-Only):
 - [ ] Diagnosis prompt file with exact text
 - [ ] Human portal interaction following HUMAN-ACTION-CHECKLIST.md
-- [ ] Full conversation response saved to `sre-agent/diagnosis-response.md`
+- [ ] Exact visible conversation response saved to `sre-agent/diagnosis-response.md` without paraphrasing
 - [ ] Screenshot of SRE Agent portal interaction
 - [ ] Accuracy assessment (PASS/FAIL/PARTIAL) with justification
 
@@ -80,7 +80,7 @@ Wave 2 validates customer incident scenarios with automated evidence and preserv
 - Alert firing evidence: ARG firing event captured OR explicit NO_ALERT_FIRED with command output
 - MTTR: < 900 seconds (15 minutes) OR documented blocker
 - Redaction: 0 UUIDs, 0 IPs, 0 node names in evidence files
-- SRE Agent: Identifies root cause OR documents misdiagnosis with details
+- SRE Agent: Real portal evidence captures a useful root-cause diagnosis OR documents misdiagnosis/blocker with details
 
 ---
 

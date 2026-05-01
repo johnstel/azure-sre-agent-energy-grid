@@ -124,7 +124,7 @@ For `node-capacity`, include the scope caveat:
 | Azure SRE Agent handoff | "For diagnosis and remediation recommendations, ask Azure SRE Agent in the portal and capture the transcript or screenshot as evidence." |
 | Read-only boundary | "Local Analyst is read-only and cannot deploy, destroy, patch, restart, or remediate resources." |
 | Missing data | "That data source is unavailable, so I cannot verify this from Local Analyst." |
-| Preview limitation | "Azure SRE Agent is in Public Preview; APIs and telemetry schemas may change." |
+| Service/API status | "Azure SRE Agent is GA. This lab remains pinned to `Microsoft.App/agents@2025-05-01-preview` in this subscription until `2026-01-01` is exposed and validated." |
 
 ### Prohibited phrases unless backed by Azure SRE Agent evidence
 
@@ -137,7 +137,7 @@ Do not use these phrases unless the current run includes verified Azure SRE Agen
 | "This will fix the issue." | Predicts remediation outcome without execution evidence. | "Azure SRE Agent or an operator can evaluate remediation options." |
 | "I remediated..." | Local Analyst cannot write or remediate. | "Local Analyst did not make changes." |
 | "Autonomous remediation is enabled." | Not demonstrated in this repo. | "The demo uses Review mode language; operator execution remains the safe default." |
-| "Full audit trail is available." | Existing safe-language guardrails mark exact conversation/action fields as unverified. | "Audit requirements are defined; exact fields must be verified in the deployed Preview service." |
+| "Full audit trail is available." | Existing safe-language guardrails mark exact conversation/action fields as unverified. | "Audit requirements are defined; exact fields must be verified in the deployed API version." |
 | "Production-grade least privilege is implemented." | Demo SRE Agent roles are broad for convenience. | "Local Analyst governance recommends least-privilege read-only scopes." |
 
 ## Deferring diagnosis and remediation to Azure SRE Agent
@@ -150,7 +150,7 @@ Approved handoff:
 
 If Azure SRE Agent evidence already exists:
 
-> Azure SRE Agent evidence at `{evidence_path}` states `{specific finding}`. Local Analyst can summarize that evidence, but remediation still requires operator approval unless a real Preview approval UI/API is captured and reviewed.
+> Azure SRE Agent evidence at `{evidence_path}` states `{specific finding}`. Local Analyst can summarize that evidence, but remediation still requires operator approval unless a real approval UI/API is captured and reviewed.
 
 If evidence does not exist:
 

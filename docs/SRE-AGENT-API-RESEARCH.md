@@ -1,9 +1,9 @@
-# Azure SRE Agent Preview REST API Research
+# Azure SRE Agent REST API Research
 
-> **Issue**: [#5 — Research SRE Agent preview REST API integration](https://github.com/johnstel/azure-sre-agent-energy-grid/issues/5)  
-> **Owner**: Parker, project SRE Dev  
-> **Date**: 2026-04-27  
-> **Status**: Azure SRE Agent is in Public Preview. Treat APIs, telemetry schemas, regions, and pricing as subject to change.
+> **Issue**: [#5 — Research SRE Agent REST API integration](https://github.com/johnstel/azure-sre-agent-energy-grid/issues/5)
+> **Owner**: Parker, project SRE Dev
+> **Date**: 2026-04-27
+> **Status**: Azure SRE Agent is GA. This lab remains pinned to `Microsoft.App/agents@2025-05-01-preview` because this subscription currently exposes only that API version.
 
 ## Executive verdict
 
@@ -77,7 +77,7 @@ Separate **agent execution auth** from **third-party API caller auth**:
 
 Audit docs also state that Azure resource-level operations such as creating, updating, or deleting the agent resource are captured by the Azure Activity Log.
 
-**Implication:** Mission Control can potentially add a future read-only evidence panel that queries the linked Application Insights resource for SRE Agent telemetry, but only after the deployed Preview service schema is validated against this tenant. This does not unlock direct conversation control.
+**Implication:** Mission Control can potentially add a future read-only evidence panel that queries the linked Application Insights resource for SRE Agent telemetry, but only after the deployed API-version schema is validated against this tenant. This does not unlock direct conversation control.
 
 ### 4. Do agent hooks help Mission Control integration?
 
@@ -119,15 +119,15 @@ Recommended demo language:
 
 > "Mission Control prepares the incident context and prompt. Azure SRE Agent remains the cloud diagnostic/remediation experience in the SRE Agent portal. Until Microsoft documents a supported chat/action API, the integration boundary is a guided portal handoff plus evidence capture."
 
-### 6. Preview limitations and breaking-change risks
+### 6. API-version limitations and breaking-change risks
 
 | Risk | Evidence | Demo impact | Mitigation |
 |---|---|---|---|
-| Public Preview behavior can change | Repo guardrails require Preview disclosure; Microsoft Learn docs show Preview concepts and evolving docs. | API, telemetry schema, portal UX, and regions may change before GA. | Keep safe language in all customer-facing docs and demos. |
+| Tenant/API-version behavior can change | Repo guardrails require GA status + API-pin disclosure; provider metadata in this subscription still exposes `2025-05-01-preview`. | API, telemetry schema, and portal UX can differ until `2026-01-01` is exposed and validated here. | Keep safe language in all customer-facing docs and demos. |
 | ARM API version drift | Repo setup references `Microsoft.App/agents@2025-05-01-preview`; current Microsoft Learn ARM template reference lists `Microsoft.App/agents@2026-01-01` as latest. | Infrastructure may need later review, but this spike must not modify Bicep. | Track separately with infra owner if deployment drift appears. |
-| Chat/action API gap | Official docs reviewed do not document a supported chat/conversation/action endpoint and auth model. | Direct Mission Control integration could overclaim unsupported Preview behavior. | Block direct API implementation until Microsoft publishes docs. |
+| Chat/action API gap | Official docs reviewed do not document a supported chat/conversation/action endpoint and auth model. | Direct Mission Control integration could overclaim unsupported behavior. | Block direct API implementation until Microsoft publishes docs. |
 | Hook API is narrow | Hook API manages custom-agent hooks via REST API v2; it is not a conversation API. | Misusing hook API as integration proof would be misleading. | Document hooks as governance/customization only. |
-| Telemetry schema may vary | Audit docs document `customEvents` event types and fields, but repo guardrails currently mark exact fields as `SCHEMA_TBD` until verified in the deployed Preview service. | Demo evidence queries could fail or fields may differ. | Validate KQL in the customer's deployed agent before claiming specific fields. |
+| Telemetry schema may vary | Audit docs document `customEvents` event types and fields, but repo guardrails currently mark exact fields as `SCHEMA_TBD` until verified in the deployed API version. | Demo evidence queries could fail or fields may differ. | Validate KQL in the customer's deployed agent before claiming specific fields. |
 | Data residency/model provider choices matter | Data/privacy docs state content and conversation history are stored in the agent's Azure region; Anthropic processing occurs in the United States, while Azure OpenAI is processed in the agent region. | Customer compliance questions may arise. | State provider-specific data handling accurately; select Azure OpenAI if EU Data Boundary is required. |
 | Network/proxy dependency | Network docs require `*.azuresre.ai`, `sre.azure.com`, `portal.azure.com`, and `api.applicationinsights.io`; WebSocket traffic must be allowed. | Customer demo may fail behind restrictive proxies. | Add pre-demo network check and keep screenshots/evidence fallback. |
 
@@ -138,7 +138,7 @@ Recommended demo language:
 - Keep Mission Control's Local Analyst as a local, read-only Copilot SDK explainer over Mission Control state snapshots.
 - Keep the portal validation workflow as the supported integration boundary.
 - Add any future UI copy as "Open SRE Agent portal" / "Copy prompt" / "Record evidence", not "Send to SRE Agent" or "Run SRE Agent API".
-- Use Application Insights `customEvents` only for read-only audit evidence after schema validation in the deployed Preview tenant.
+- Use Application Insights `customEvents` only for read-only audit evidence after schema validation in the deployed tenant/API version.
 
 ### Do not do yet
 

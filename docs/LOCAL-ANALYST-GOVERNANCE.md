@@ -208,7 +208,7 @@ When data is missing, do not infer it:
 | Tool timeout | State that the tool did not complete in time. | Suggest a narrower question or manual Mission Control refresh. |
 | Permission denied | State which permission boundary blocked access. | Use a read-only role or escalate to an operator with approved access. |
 | Unknown tool requested | Reject under fail-closed policy. | Offer the bounded snapshot or portal handoff. |
-| Unsupported Preview API | Do not guess behavior. | Use Azure Portal evidence or Microsoft-published product UI evidence once captured. |
+| Unsupported API behavior | Do not guess behavior. | Use Azure Portal evidence or Microsoft-published product UI evidence once captured. |
 | Data source stale | Include the snapshot timestamp and limitation. | Ask the operator to refresh data before making claims. |
 
 ## Separation of concerns
@@ -217,9 +217,9 @@ When data is missing, do not infer it:
 |------------|---------------|-----------------|
 | Local Mission Control explanation | Owns | Not required |
 | Read-only validation of current UI/backend snapshot | Owns | Not required |
-| Cloud-side diagnosis of Azure resources | Defers | Owns, subject to Preview limitations and captured evidence |
+| Cloud-side diagnosis of Azure resources | Defers | Owns, subject to service/API-version limitations and captured evidence |
 | Remediation recommendations | Defers | Owns recommendation flow when portal evidence supports it |
-| Remediation execution | Not allowed | Operator-approved only unless real Preview approval UI/API evidence is captured and separately reviewed |
+| Remediation execution | Not allowed | Operator-approved only unless real approval UI/API evidence is captured and separately reviewed |
 | Safe-language enforcement | Owns for analyst responses | Must still follow project safe-language guardrails |
 
 Use this boundary in reviews:

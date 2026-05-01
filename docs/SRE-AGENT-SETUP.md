@@ -4,7 +4,7 @@ This guide walks you through setting up Azure SRE Agent to work with the demo la
 
 ## What is Azure SRE Agent?
 
-Azure SRE Agent (Preview) is an AI-powered site reliability engineering automation tool that helps you:
+Azure SRE Agent (GA) is an AI-powered site reliability engineering automation tool that helps you:
 
 - **Diagnose issues** in Azure resources using natural language
 - **Investigate incidents** across AKS, App Service, Container Apps, and more
@@ -31,6 +31,8 @@ The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using th
 - Creates a user-assigned managed identity
 - Assigns Log Analytics Reader, Reader, and Contributor roles
 - Grants the deploying user the **SRE Agent Administrator** role
+
+> **API caveat for this lab**: Although Azure SRE Agent is GA, this subscription currently exposes only `Microsoft.App/agents@2025-05-01-preview` in provider metadata. Keep this API pin until `2026-01-01` is exposed and validated with `az deployment sub what-if`.
 
 To skip SRE Agent deployment, set `deploySreAgent = false` in `infra/bicep/main.bicepparam`.
 
@@ -84,15 +86,15 @@ The script assigns these roles to enable both **diagnosis AND remediation**:
 | **AKS Cluster** | AKS Cluster Admin Role | kubectl access to cluster |
 | **AKS Cluster** | AKS RBAC Cluster Admin | Full Kubernetes RBAC permissions |
 | **AKS Cluster** | AKS Contributor Role | Scale nodes, update cluster config |
-| **Log Analytics** | Log Analytics Contributor | Query and analyze logs |
+| **Log Analytics** | Log Analytics Reader | Query and analyze logs |
 | **Key Vault** | Key Vault Secrets Officer | Manage secrets |
-| **Container Registry** | AcrPush | Push/pull container images |
+| **Container Registry** | AcrPull | Pull container images |
 
-> **Note**: These are **write permissions** that allow SRE Agent to take actions like:
+> **Note**: This profile still includes broad **write permissions** through Contributor, AKS admin/contributor roles, and Key Vault Secrets Officer. Log Analytics and ACR are read/pull-only.
 > - Restart pods, scale deployments, delete stuck resources
 > - Query and analyze logs
 > - Access/update Key Vault secrets
-> - Push/pull container images
+> - Pull container images
 
 ### SRE Agent User Roles
 

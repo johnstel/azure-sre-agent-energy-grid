@@ -118,6 +118,18 @@ A comprehensive collection of prompts for Azure SRE Agent, organized by SRE disc
 | "Is this a complete outage or partial degradation?" | Severity classification |
 | "How many users are impacted based on the traffic patterns?" | User impact estimation |
 
+### Complete Application Failure Recovery
+
+Use this prompt chain for the `complete-failure-bundle` scenario.
+
+| Prompt | Why It Helps |
+|--------|--------------|
+| "Why is the entire energy grid platform down?" | Starts broad incident triage for multi-component failures |
+| "Separate root cause from downstream symptoms across services in the energy namespace" | Forces dependency-aware analysis instead of symptom chasing |
+| "Recommend a prioritized recovery plan with dependencies first" | Produces staged remediation sequence |
+| "After each recovery step, re-check health and tell me the next safest action" | Keeps remediation iterative and validated |
+| "Verify that meter-service endpoints, MongoDB availability, and network access are all healthy" | Confirms recovery across API path + data layer + connectivity |
+
 ### Root Cause Analysis
 
 | Prompt | When to Use |

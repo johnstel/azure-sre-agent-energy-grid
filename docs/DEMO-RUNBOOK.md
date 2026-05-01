@@ -17,6 +17,8 @@ This is the single sequential checklist for running the Energy Grid SRE Agent de
 - [ ] Review [docs/COSTS.md](COSTS.md) — budget ~$34-40/day with SRE Agent
 - [ ] Identify which scenarios you will demo (recommended: OOMKilled → MongoDBDown → ServiceMismatch)
 - [ ] Review [docs/SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for claims to avoid
+- [ ] Review the visual evidence convention in [docs/evidence/screenshots/README.md](evidence/screenshots/README.md)
+- [ ] If reusing screenshots from a prior run, confirm they are real captures, redacted, and not placeholders
 
 ---
 
@@ -55,7 +57,7 @@ kubectl exec -n energy deploy/grid-dashboard -- curl -s localhost:8080/health
 
 - [ ] Grid dashboard responds
 
-**Evidence capture:** Take a screenshot of healthy pod state → save to `docs/evidence/screenshots/baseline-healthy.png`
+**Evidence capture:** Take a screenshot of healthy pod state for each core scenario you will demo → save as `docs/evidence/screenshots/<scenario>_before.png`
 
 ---
 
@@ -99,7 +101,40 @@ kubectl get events -n energy --sort-by='.lastTimestamp' | head -20
 
 - [ ] Failure is visible in kubectl output
 
-### 4c. Ask SRE Agent to diagnose
+### 4c. MongoDBDown manual path (live contrast)
+
+Use this only for the MongoDBDown scenario before asking SRE Agent. The goal is to let the audience watch the manual investigation path, not to make a quantitative MTTR claim.
+
+**Presenter setup:** Say: "I'll do the manual triage first so you can see the breadcrumbs an operator normally follows. Then we'll ask SRE Agent the same diagnostic question."
+
+| Step | Command | Expected output snippet | Presenter note / timing guidance |
+|------|---------|-------------------------|----------------------------------|
+| 1 | `kubectl get pods -n energy` | `dispatch-service-...` rows are visible, while `mongodb` is absent from the pod list | Start broad. Point out that the visible symptom may be the dispatch layer, not the database itself. Keep this brisk. |
+| 2 | `kubectl get deploy mongodb dispatch-service meter-service -n energy` | `mongodb   0/0   0   0   0` | Move from pods to desired state. Emphasize that MongoDB is configured for zero desired replicas in the broken scenario. |
+| 3 | `kubectl get endpoints mongodb -n energy` | `mongodb   <none>   ...` | This is the key dependency clue: the Service exists, but no MongoDB pod backs it. Pause here so the audience sees the root-cause signal. |
+| 4 | `kubectl describe deploy mongodb -n energy` | `Replicas: 0 desired, 0 updated, 0 total, 0 available` | Confirm this is a deployment scale state, not a DNS or Service-name typo. |
+| 5 | `kubectl get deploy dispatch-service -n energy -o jsonpath='{range .spec.template.spec.containers[*].env[*]}{.name}={.value}{"\n"}{end}'` | `ORDER_DB_URI=mongodb://mongodb:27017` | Trace why dispatch is affected: it depends on the `mongodb` Service for meter-reading persistence. |
+| 6 | `kubectl logs -n energy deploy/dispatch-service --tail=80` | `Using MongoDB API`; longer runs may also show MongoDB connection errors | Use this as app-level corroboration that dispatch uses MongoDB. Exact application log wording can vary by image version; do not over-script it. |
+| 7 | `kubectl exec -n energy deploy/rabbitmq -- rabbitmqctl list_queues name messages --timeout 10` | `meter-events` with a message count | Close the loop with business impact: meter events can queue while persistence is blocked. Skip this if the first six commands already tell the story. |
+
+**Manual root-cause conclusion:** "MongoDB is scaled to zero replicas. The `mongodb` Service has no endpoints, and `dispatch-service` is configured to write to `mongodb://mongodb:27017`, so meter events can be accepted upstream but dispatch/persistence cannot complete until MongoDB is restored."
+
+**Manual fix if needed:**
+
+```bash
+kubectl apply -f k8s/base/application.yaml
+```
+
+After recovery, verify:
+
+```bash
+kubectl get deploy mongodb dispatch-service -n energy
+kubectl get endpoints mongodb -n energy
+```
+
+Expected snippets: `mongodb   1/1` and `mongodb   <pod-ip>:27017`.
+
+### 4d. Ask SRE Agent to diagnose
 
 Open the SRE Agent portal. Start with an open-ended prompt, then escalate to scenario-specific prompts:
 
@@ -117,14 +152,18 @@ Open the SRE Agent portal. Start with an open-ended prompt, then escalate to sce
 For the full prompt catalog, see [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) or per-scenario prompts in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md).
 
 **Evidence capture:**
-- [ ] Screenshot the SRE Agent diagnosis → `docs/evidence/screenshots/<scenario>_diagnosis.png`
+- [ ] Screenshot the visible failure state → `docs/evidence/screenshots/<scenario>_failure.png`
+- [ ] Screenshot the real SRE Agent diagnosis, if available → `docs/evidence/screenshots/<scenario>_sre-agent-diagnosis.png`
 - [ ] Copy any KQL queries shown → `docs/evidence/kql/<scenario>_diagnosis.kql`
+- [ ] If portal access is unavailable, write `PENDING PORTAL EVIDENCE — do not present as captured` in run notes instead of creating a fake screenshot
 
-### 4d. Remediate
+If you just ran the MongoDBDown manual path, say: "Now we'll ask SRE Agent the same question and compare the investigation path it recommends." Do not script or paraphrase a diagnosis as if it happened live; show the portal response or clearly label any prior screenshot as previous-run evidence.
+
+### 4e. Remediate
 
 If SRE Agent recommends a fix in Review mode:
 - [ ] Screenshot the recommendation/proposal exactly as shown → `docs/evidence/screenshots/<scenario>_proposal.png`
-- [ ] If the Preview portal exposes a real approval UI, capture it before use; otherwise use safe language: **agent recommends, operator executes**
+- [ ] If the portal exposes a real approval UI, capture it before use; otherwise use safe language: **agent recommends, operator executes**
 - [ ] Manually apply the fix from an authorized operator shell
 
 Or restore manually:
@@ -132,16 +171,16 @@ Or restore manually:
 kubectl apply -f k8s/base/application.yaml
 ```
 
-### 4e. Verify recovery
+### 4f. Verify recovery
 
 ```bash
 kubectl get pods -n energy
 ```
 
 - [ ] All pods back to Running/Ready
-- [ ] Screenshot recovery state → `docs/evidence/screenshots/<scenario>_recovered.png`
+- [ ] Screenshot recovery state → `docs/evidence/screenshots/<scenario>_after-fix.png`
 
-### 4f. Record timestamps
+### 4g. Record timestamps
 
 In `docs/evidence/scenarios/<scenario>/run-notes.md`, record:
 | Timestamp | Event |
@@ -191,7 +230,7 @@ All evidence artifacts go under `docs/evidence/`. See [docs/evidence/README.md](
 
 | Artifact Type | Path Pattern | Example |
 |---------------|-------------|---------|
-| Screenshots | `docs/evidence/screenshots/{scenario}_{step}.png` | `oom-killed_diagnosis.png` |
+| Screenshots | `docs/evidence/screenshots/{scenario}_{step}.png` | `oom-killed_sre-agent-diagnosis.png` |
 | KQL queries | `docs/evidence/kql/{query-purpose}.kql` | `pod-restart-trend.kql` |
 | Run notes | `docs/evidence/scenarios/{id}/run-notes.md` | `scenarios/oom-killed/run-notes.md` |
 | Diagrams | `docs/evidence/diagrams/{topic}.mmd` | `trust-tiers.mmd` |
@@ -200,14 +239,14 @@ All evidence artifacts go under `docs/evidence/`. See [docs/evidence/README.md](
 
 ## Fallback Plan: SRE Agent Unavailable
 
-Azure SRE Agent is in **Public Preview**. If the portal is unresponsive during a live demo:
+Azure SRE Agent is **GA**. If the portal is unresponsive during a live demo:
 
-1. **Acknowledge it**: "SRE Agent is in Preview — let me show you the diagnosis path manually while we wait."
-2. **Use kubectl diagnosis**: Walk through the `What to observe` commands in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md) for the active scenario.
-3. **Show the prompt library**: Open [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) and explain the prompt progression — "These are the prompts we'd use, and here's what SRE Agent typically returns."
+1. **Acknowledge it**: "SRE Agent is available, and this lab keeps operator control — let me show you the diagnosis path manually while we wait."
+2. **Use kubectl diagnosis**: Walk through the `What to observe` commands in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md) for the active scenario. For MongoDBDown, use the manual path in Step 4c above.
+3. **Show the prompt library**: Open [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) and explain the prompt progression — "These are the prompts we'd use when the portal is available." Do not describe a live SRE Agent result unless it is visible in the portal or captured as previous-run evidence.
 4. **Show prior evidence**: If you have screenshots from a previous run in `docs/evidence/screenshots/`, use those.
 5. **Pivot to architecture**: Use the trust model diagram in README to discuss Review vs. Auto mode and RBAC controls.
-6. **Resume when available**: Keep the portal tab open — Preview services often recover within minutes.
+6. **Resume when available**: Keep the portal tab open and continue once service responsiveness returns.
 
 **Do NOT**: claim the service is GA, promise specific uptime, or skip the scenario entirely.
 
@@ -218,8 +257,8 @@ Azure SRE Agent is in **Public Preview**. If the portal is unresponsive during a
 | Issue | Workaround |
 |-------|------------|
 | Port 3333 conflict with Mission Control | Change port in Mission Control config or stop conflicting process |
-| `managedResources: []` in SRE Agent | Preview limitation — add managed resources manually via Azure Portal after deployment |
-| Public AKS API server required | SRE Agent Preview requires public endpoint; do not enable private cluster |
+| `managedResources: []` in SRE Agent | Current API-version limitation in this subscription (`2025-05-01-preview`) — add managed resources manually via Azure Portal after deployment |
+| Public AKS API server required | Current SRE Agent deployment path in this lab requires a public endpoint; do not enable private cluster |
 | Deployment output scrolls past SRE Agent URL | Use Option B or C in Step 3 above |
 | RabbitMQ severity stickiness after recovery | Wallboard may show warning after fix-all; redeploy RabbitMQ if needed |
 | `menu` command only works in dev container | Outside dev container, refer to Commands Reference in README |

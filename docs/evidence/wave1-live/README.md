@@ -15,8 +15,8 @@ Wave 1 focuses on **live UAT validation** of the Energy Grid SRE Agent demo lab 
 2. **Observability stack** (Container Insights, 90-day retention, Activity Log export configured)
 3. **Alert configuration** (four production alerts: OOMKilled, CrashLoop, PodPending, HighCPU)
 4. **KQL execution** (all parameterised queries run successfully against live environment)
-5. **SRE Agent portal** (accessible, responds to test prompts, agent identity verified)
-6. **End-to-end scenario** (OOMKilled cycle: inject → alert → diagnose → remediate → recover)
+5. **SRE Agent portal** (accessible, test prompt result captured exactly as shown, agent identity verified)
+6. **End-to-end scenario** (OOMKilled cycle: inject → alert → ask for diagnosis → operator remediates → recover)
 
 ---
 
@@ -128,9 +128,9 @@ Run each query against Log Analytics workspace and verify:
 
 - [ ] **SRE Agent URL** — Record the agent portal URL (format: `https://<agent-id>.azuresre.ai` or Portal blade URL)
 - [ ] **Screenshot: SRE Agent portal** — showing conversation interface (save as `screenshots/sre-agent-portal.png`)
-- [ ] **Test prompt** — Submit a simple diagnostic prompt and capture response:
+- [ ] **Test prompt** — Submit a simple diagnostic prompt and capture the response exactly as shown:
   - Prompt: `"Show me the health status of my AKS cluster"`
-  - Expected: SRE Agent responds with cluster health summary
+  - Do not pre-script or paraphrase the response; record whether the portal returns a useful cluster-health summary.
   - **Screenshot: SRE Agent response** (save as `screenshots/sre-agent-test-prompt.png`)
 - [ ] **Agent identity verification** — Verify agent resource exists:
   ```bash
@@ -166,8 +166,8 @@ Run the full OOMKilled scenario from injection to recovery and capture complete 
 
 - [ ] **T2 — Operator submits prompt** — In SRE Agent portal, submit:
   - Prompt: `"Why is the meter-service pod crashing in the energy namespace?"`
-- [ ] **T3 — Diagnosis received** — SRE Agent responds with root cause (expected: memory limit too low, OOMKilled events)
-- [ ] **Screenshot: T3 diagnosis** — SRE Agent showing root cause (save as `screenshots/oom-killed-T3-diagnosis.png`)
+- [ ] **T3 — Diagnosis received** — Capture what SRE Agent returns. The scenario-under-test root cause is memory pressure/OOMKilled events; do not claim the agent found it unless the portal output shows that.
+- [ ] **Screenshot: T3 diagnosis** — Real SRE Agent portal output only (save as `screenshots/oom-killed-T3-diagnosis.png`)
 - [ ] **Save conversation transcript** (copy/paste into `scenario/oom-killed/sre-agent-conversation.txt`)
 
 #### 8e. Remediation

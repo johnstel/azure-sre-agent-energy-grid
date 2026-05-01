@@ -48,6 +48,13 @@ $expectedScenarioIds = @(
     "mongodb-down", "service-mismatch"
 )
 
+# Explicitly excluded from Wave 0 scenario registry validation.
+# Rationale: complete-failure-bundle is a composite scenario (built from existing
+# Wave 0 scenarios) and is intentionally tracked outside the locked 1-10 schema.
+$excludedK8sScenarioManifests = @(
+    "k8s/scenarios/complete-failure-bundle/scenario.yaml"
+)
+
 # Severity taxonomy from CAPABILITY-CONTRACTS.md §4
 $severityMapping = @{
     "critical" = @("Sev 0 (Critical)", "Sev 1 (Error)")
@@ -233,6 +240,10 @@ if ($missingNumbers) {
 Test-Check "All k8s_manifest paths point to existing files"
 
 $k8sFiles = Get-ChildItem "$k8sScenariosDir/*.yaml" | ForEach-Object { $_.Name -replace '\.yaml$', '' }
+$allK8sScenarioManifestPaths = Get-ChildItem $k8sScenariosDir -Recurse -Filter "*.yaml" -File | ForEach-Object {
+    $_.FullName.Replace($repoRoot, '').TrimStart('\', '/') -replace '\\', '/'
+}
+$manifestK8sPaths = @()
 
 foreach ($id in $manifestScenarios.Keys) {
     $scenario = $manifestScenarios[$id]
@@ -242,6 +253,7 @@ foreach ($id in $manifestScenarios.Keys) {
         if (-not (Test-Path $k8sPath)) {
             Add-Error "Scenario '$id' references non-existent K8s manifest: $($scenario.k8s_manifest)"
         }
+        $manifestK8sPaths += ($scenario.k8s_manifest -replace '\\', '/')
     }
 
     # Check that scenario ID matches a K8s file
@@ -250,8 +262,19 @@ foreach ($id in $manifestScenarios.Keys) {
     }
 }
 
-# Check for orphaned K8s files
-$orphanedFiles = $k8sFiles | Where-Object { $_ -notin $manifestScenarios.Keys }
+# Ensure excluded manifests exist
+foreach ($excludedPath in $excludedK8sScenarioManifests) {
+    $fullExcludedPath = Join-Path $repoRoot $excludedPath
+    if (-not (Test-Path $fullExcludedPath)) {
+        Add-Error "Explicitly excluded scenario manifest not found: $excludedPath"
+    }
+}
+
+# Check for orphaned K8s files (including nested scenario folders), excluding
+# explicitly documented paths.
+$orphanedFiles = $allK8sScenarioManifestPaths | Where-Object {
+    ($_ -notin $manifestK8sPaths) -and ($_ -notin $excludedK8sScenarioManifests)
+}
 if ($orphanedFiles) {
     Add-Warning "Orphaned K8s scenario files (not in manifest): $($orphanedFiles -join ', ')"
 }

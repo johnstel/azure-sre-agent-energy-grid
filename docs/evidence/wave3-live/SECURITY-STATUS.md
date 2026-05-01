@@ -57,7 +57,7 @@ Avoid as production defaults:
 - AKS Cluster Admin
 - AKS RBAC Cluster Admin
 - Key Vault Secrets Officer
-- ACR admin credentials or `AcrPush`
+- ACR admin credentials or image push permissions
 - Subscription-wide Reader unless the operational scope truly spans the subscription
 
 Kubernetes posture:
@@ -74,7 +74,7 @@ Demo-only permissions observed in repo/scripts:
 - Resource-group `Contributor`
 - AKS Cluster Admin / AKS RBAC Cluster Admin via `scripts/configure-rbac.ps1`
 - Key Vault Secrets Officer via `scripts/configure-rbac.ps1`
-- `AcrPush` via `scripts/configure-rbac.ps1`
+- `AcrPull` via `scripts/configure-rbac.ps1`
 - Subscription-wide Reader via `scripts/configure-rbac.ps1`
 
 Required safe-language qualifier:

@@ -1,6 +1,14 @@
 # Azure SRE Agent Energy Grid Demo Lab ⚡
 
-A fully automated Azure environment for demonstrating **Azure SRE Agent** capabilities using an **Energy Grid Operations Platform**. Deploy a breakable multi-service energy grid application on AKS and let SRE Agent diagnose issues and recommend fixes!
+> **Azure SRE Agent is generally available (GA).** This lab currently keeps Bicep pinned to `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata exposes only that API version today. We will move to `2026-01-01` after provider exposure and successful `what-if` validation. Remediation remains operator-controlled unless real approval UI/API evidence is captured.
+
+## Why This Demo Exists
+
+**Customer question:** Can AI help my SRE team diagnose faster without giving up control?
+
+This lab demonstrates a GA-language, evidence-oriented path for AI-assisted SRE triage: break a realistic AKS energy-grid application, ask SRE Agent to investigate, and keep remediation operator-controlled in Review mode. It is designed for buyer conversations about diagnosis quality, dependency reasoning, and trust boundaries — not autonomous production remediation. For customer follow-up, use the [customer leave-behind](docs/CUSTOMER-LEAVE-BEHIND.md); for the full speaker flow, see the [Demo Narrative](docs/DEMO-NARRATIVE.md).
+
+A fully automated Azure environment for demonstrating **Azure SRE Agent** capabilities using an **Energy Grid Operations Platform**.
 
 ## 🎯 What This Lab Provides
 
@@ -13,12 +21,12 @@ A fully automated Azure environment for demonstrating **Azure SRE Agent** capabi
 
 ## 🛡️ Trust & Safety Model
 
-> **Azure SRE Agent is in Public Preview.** This demo runs in **Review mode** — the agent recommends actions and the operator executes them unless a real Preview approval UI/API is captured during portal validation. Nothing should be presented as autonomous remediation.
+> **Azure SRE Agent is generally available (GA).** This demo runs in **Review mode** — the agent recommends actions and the operator executes them unless a real approval UI/API is captured during portal validation. Nothing should be presented as autonomous remediation.
 
 | Trust Tier | Configuration | What the Agent Can Do | Approval |
 |------------|--------------|----------------------|----------|
 | **Diagnosis Only** | `accessLevel: 'Low'` | Read logs, query metrics, analyze state | N/A — read-only |
-| **Recommend & Execute** | `accessLevel: 'High'`, `mode: 'Review'` | Diagnose + recommend remediation | ✅ Operator executes unless a real Preview approval UI/API is captured |
+| **Recommend & Execute** | `accessLevel: 'High'`, `mode: 'Review'` | Diagnose + recommend remediation | ✅ Operator executes unless a real approval UI/API is captured |
 | **Autonomous** | `accessLevel: 'High'`, `mode: 'Auto'` | Diagnose + execute autonomously | ❌ **Not demonstrated** |
 
 This lab deploys the **Recommend & Execute** tier. For the full RBAC matrix (demo vs. production), security guardrails, and safe language guidance, see:
@@ -81,6 +89,9 @@ break-crash
 
 # Dispatch service deployment failure — bad image release
 break-image
+
+# Complete application failure bundle (multi-component outage)
+break-complete
 
 # See all scenarios
 menu
@@ -147,6 +158,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 **Deploy script parameters:**
 - `-Location`: Azure region (`eastus2`, `swedencentral`, `australiaeast`) - Default: `eastus2`
 - `-WorkloadName`: Resource prefix - Default: `srelab`
+- `-AksApiServerAuthorizedIpRanges`: Optional AKS API server CIDR allowlist (for external demos). Example: `-AksApiServerAuthorizedIpRanges @('203.0.113.10/32')`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
 - `-SkipSreAgent`: Skip Azure SRE Agent deployment (useful for regions/subscriptions without Preview access)
 - `-WhatIf`: Preview deployment without making changes

@@ -14,6 +14,7 @@ How to decide who handles what.
 | Observability, monitoring | Parker | Grafana, Prometheus, alerting, App Insights config |
 | SRE Agent config | Dallas + Parker | Dallas decides scope, Parker implements |
 | DevContainer setup | Ripley | .devcontainer/ changes, tooling |
+| Product marketing, GTM framing, demo positioning | Vasquez + Dallas | Requirements positioning, personas, customer value, demo narrative, launch/readiness notes |
 | Contractor review | Dallas | Use `.squad/copilot-default-inventory.md` first; route to specialist bench agents/skills when triggers below match |
 | Session logging | Scribe | Automatic — never needs routing |
 

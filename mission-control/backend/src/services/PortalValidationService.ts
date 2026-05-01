@@ -2,22 +2,19 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { PortalValidation, PortalValidationScenarioName, PortalValidationState } from '../types/index.js';
+import { getScenarios } from './ScenarioService.js';
+import type { PortalValidation, PortalValidationScenarioName, PortalValidationState, Scenario, ScenarioNarration } from '../types/index.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STORAGE_DIR = join(__dirname, '..', '..', '.data');
 const VALIDATIONS_FILE = join(STORAGE_DIR, 'portal-validations.json');
 
-const SCENARIO_PROMPTS: Record<PortalValidationScenarioName, string> = {
-  OOMKilled: 'Why is the meter-service pod failing? Check recent pod events, memory limits, and container restarts.',
-  MongoDBDown: 'Why are meter readings unavailable? Trace the symptom through service endpoints, MongoDB deployment state, and recent events.',
-  ServiceMismatch: 'Why is the meter-service unreachable despite running pods? Check service selectors, endpoint readiness, and pod labels.',
-};
+export const PORTAL_VALIDATION_SCENARIOS = ['OOMKilled', 'MongoDBDown', 'ServiceMismatch'] as const satisfies readonly PortalValidationScenarioName[];
 
-const SCENARIO_DESCRIPTIONS: Record<PortalValidationScenarioName, string> = {
-  OOMKilled: 'Meter service pods crashing — memory exhaustion',
-  MongoDBDown: 'Cascading failure — MongoDB dependency unavailable',
-  ServiceMismatch: 'Silent failure — service selector does not match pods',
+const PORTAL_VALIDATION_NARRATION_SCENARIOS: Record<PortalValidationScenarioName, string> = {
+  OOMKilled: 'oom-killed',
+  MongoDBDown: 'mongodb-down',
+  ServiceMismatch: 'service-mismatch',
 };
 
 function getDefaultState(): PortalValidationState {
@@ -87,11 +84,20 @@ export async function getValidationState(): Promise<PortalValidationState> {
 }
 
 export function getScenarioPrompt(scenarioName: PortalValidationScenarioName): string {
-  return SCENARIO_PROMPTS[scenarioName];
+  return getSharedNarrationScenario(scenarioName).narration.suggestedPrompt.text;
 }
 
 export function getScenarioDescription(scenarioName: PortalValidationScenarioName): string {
-  return SCENARIO_DESCRIPTIONS[scenarioName];
+  return getSharedNarrationScenario(scenarioName).narration.title;
+}
+
+function getSharedNarrationScenario(scenarioName: PortalValidationScenarioName): Scenario & { narration: ScenarioNarration } {
+  const narrationScenarioName = PORTAL_VALIDATION_NARRATION_SCENARIOS[scenarioName];
+  const scenario = getScenarios().find((item) => item.name === narrationScenarioName);
+  if (!scenario?.narration) {
+    throw new Error(`Shared narration metadata missing for portal validation scenario: ${scenarioName}`);
+  }
+  return scenario as Scenario & { narration: ScenarioNarration };
 }
 
 export async function updateValidation(
