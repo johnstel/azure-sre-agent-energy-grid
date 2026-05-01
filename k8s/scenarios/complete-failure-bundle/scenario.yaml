@@ -8,8 +8,8 @@
 # kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml
 #
 # HOW TO FIX:
-# kubectl delete networkpolicy deny-meter-service -n energy
 # kubectl apply -f k8s/base/application.yaml
+# kubectl delete networkpolicy deny-meter-service -n energy
 # =============================================================================
 ---
 apiVersion: apps/v1

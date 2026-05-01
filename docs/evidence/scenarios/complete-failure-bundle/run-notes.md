@@ -129,16 +129,30 @@ kubectl get events -n energy --sort-by=.lastTimestamp | tail -30
 
 > Record what you actually ran, in order.
 
-**Step 1 — Remove network isolation**
+**Step 1 — Restore dependency and Service specs**
 ```bash
-kubectl delete networkpolicy deny-meter-service -n energy
+kubectl apply -f k8s/base/application.yaml
 # Paste output here
 ```
 **Timestamp:** `HH:MM UTC`
 
-**Step 2 — Restore healthy baseline**
+**Step 2 — Validate data layer and Service routing**
 ```bash
-kubectl apply -f k8s/base/application.yaml
+kubectl get deployment mongodb -n energy
+# Expected: READY 1/1
+# Paste output here
+```
+
+```bash
+kubectl get endpoints meter-service -n energy
+# Expected: populated
+# Paste output here
+```
+**Timestamp:** `HH:MM UTC`
+
+**Step 3 — Remove remaining network isolation**
+```bash
+kubectl delete networkpolicy deny-meter-service -n energy
 # Paste output here
 ```
 **Timestamp:** `HH:MM UTC`

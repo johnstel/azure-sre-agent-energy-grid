@@ -483,6 +483,16 @@ kubectl get pods,svc,endpoints -n energy
 kubectl get events -n energy --sort-by=.lastTimestamp | tail -30
 ```
 
+**Expected Kubernetes signals:**
+
+| Signal | Command | Expected degraded evidence |
+|--------|---------|----------------------------|
+| Data layer unavailable | `kubectl get deployment mongodb -n energy` | MongoDB desired/ready replicas are `0/0` |
+| Meter API Service unroutable | `kubectl get endpoints meter-service -n energy` | Endpoint list is empty (`<none>`) |
+| Traffic isolation present | `kubectl get networkpolicy deny-meter-service -n energy` | Deny policy exists for `app=meter-service` |
+| Blast radius visible | `kubectl get pods,svc,endpoints -n energy` | Dependencies, Services, and endpoints disagree |
+| Recent change/event timeline | `kubectl get events -n energy --sort-by=.lastTimestamp | tail -30` | Recent scenario application and rollout events are visible |
+
 **SRE Agent prompts:**
 - "Why is the entire energy grid platform down?"
 - "Separate root cause from downstream symptoms across the energy namespace"
@@ -497,16 +507,22 @@ kubectl get events -n energy --sort-by=.lastTimestamp | tail -30
 
 **Suggested operator execution order:**
 ```bash
-# 1) Remove network isolation
-kubectl delete networkpolicy deny-meter-service -n energy
-
-# 2) Restore baseline workloads/services
+# 1) Restore dependency and Service specs first
 kubectl apply -f k8s/base/application.yaml
 
-# 3) Verify platform recovery
-kubectl get pods -n energy
+# 2) Confirm data layer and routing specs recovered
+kubectl get deployment mongodb -n energy
 kubectl get endpoints meter-service -n energy
+
+# 3) Remove the extra NetworkPolicy that baseline apply does not delete
+kubectl delete networkpolicy deny-meter-service -n energy
+
+# 4) Verify platform recovery
+kubectl get pods -n energy
+kubectl get networkpolicy -n energy
 ```
+
+Expected recovery evidence: MongoDB returns to `READY 1/1`, `meter-service` endpoints are populated, `deny-meter-service` is absent, and application pods return to `Running` / `Ready`.
 
 **Pass/Fail Criteria:**
 - ✅ **PASS**: SRE Agent distinguishes upstream root cause(s) from downstream symptoms
