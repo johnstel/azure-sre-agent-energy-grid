@@ -457,6 +457,7 @@ kubectl apply -f k8s/base/application.yaml
 **What happens:**
 - Applies an orchestrated bundle of existing scenarios:
   - `mongodb-down.yaml` (data layer outage)
+  - event-bus outage (RabbitMQ scaled to 0 replicas)
   - `network-block.yaml` (meter-service traffic isolation)
   - `service-mismatch.yaml` (meter-service endpoints empty)
 - Simulates broad application failure where dependencies and request paths fail at once
@@ -470,7 +471,8 @@ kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml
 **What to observe:**
 ```bash
 # Dependency outage
-kubectl get deployment mongodb -n energy
+kubectl get deployment mongodb rabbitmq -n energy
+kubectl get endpoints mongodb rabbitmq -n energy
 
 # Silent routing failure (selector mismatch)
 kubectl get endpoints meter-service -n energy
@@ -488,6 +490,8 @@ kubectl get events -n energy --sort-by=.lastTimestamp | tail -30
 | Signal | Command | Expected degraded evidence |
 |--------|---------|----------------------------|
 | Data layer unavailable | `kubectl get deployment mongodb -n energy` | MongoDB desired/ready replicas are `0/0` |
+| Event bus unavailable | `kubectl get deployment rabbitmq -n energy` | RabbitMQ desired/ready replicas are `0/0` |
+| Dependency Services empty | `kubectl get endpoints mongodb rabbitmq -n energy` | MongoDB and RabbitMQ endpoints are empty (`<none>`) |
 | Meter API Service unroutable | `kubectl get endpoints meter-service -n energy` | Endpoint list is empty (`<none>`) |
 | Traffic isolation present | `kubectl get networkpolicy deny-meter-service -n energy` | Deny policy exists for `app=meter-service` |
 | Blast radius visible | `kubectl get pods,svc,endpoints -n energy` | Dependencies, Services, and endpoints disagree |
@@ -511,7 +515,8 @@ kubectl get events -n energy --sort-by=.lastTimestamp | tail -30
 kubectl apply -f k8s/base/application.yaml
 
 # 2) Confirm data layer and routing specs recovered
-kubectl get deployment mongodb -n energy
+kubectl get deployment mongodb rabbitmq -n energy
+kubectl get endpoints mongodb rabbitmq -n energy
 kubectl get endpoints meter-service -n energy
 
 # 3) Remove the extra NetworkPolicy that baseline apply does not delete
@@ -522,7 +527,7 @@ kubectl get pods -n energy
 kubectl get networkpolicy -n energy
 ```
 
-Expected recovery evidence: MongoDB returns to `READY 1/1`, `meter-service` endpoints are populated, `deny-meter-service` is absent, and application pods return to `Running` / `Ready`.
+Expected recovery evidence: MongoDB and RabbitMQ return to `READY 1/1`, dependency endpoints and `meter-service` endpoints are populated, `deny-meter-service` is absent, and application pods return to `Running` / `Ready`.
 
 **Pass/Fail Criteria:**
 - ✅ **PASS**: SRE Agent distinguishes upstream root cause(s) from downstream symptoms

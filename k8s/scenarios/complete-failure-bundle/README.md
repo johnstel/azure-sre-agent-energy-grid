@@ -13,6 +13,7 @@ kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml
 | Area | Command | Expected signal |
 |------|---------|-----------------|
 | Data layer | `kubectl get deployment mongodb -n energy` | MongoDB desired/ready replicas are `0/0` |
+| Event bus | `kubectl get deployment rabbitmq -n energy` | RabbitMQ desired/ready replicas are `0/0` |
 | Service routing | `kubectl get endpoints meter-service -n energy` | Endpoint list is empty |
 | Network policy | `kubectl get networkpolicy deny-meter-service -n energy` | Deny policy exists |
 | Blast radius | `kubectl get pods,svc,endpoints -n energy` | Pods, Services, and endpoints disagree |
@@ -29,7 +30,8 @@ kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml
 ```bash
 # Restore dependency and Service specs first.
 kubectl apply -f k8s/base/application.yaml
-kubectl get deployment mongodb -n energy
+kubectl get deployment mongodb rabbitmq -n energy
+kubectl get endpoints mongodb rabbitmq -n energy
 kubectl get endpoints meter-service -n energy
 
 # Remove the extra NetworkPolicy that baseline apply does not prune.
@@ -38,6 +40,6 @@ kubectl get pods -n energy
 kubectl get networkpolicy -n energy
 ```
 
-Expected recovery evidence: MongoDB is `READY 1/1`, `meter-service` endpoints are populated, `deny-meter-service` is absent, and application pods are `Running` / `Ready`.
+Expected recovery evidence: MongoDB and RabbitMQ are `READY 1/1`, dependency endpoints and `meter-service` endpoints are populated, `deny-meter-service` is absent, and application pods are `Running` / `Ready`.
 
 Record live portal output and screenshots in `docs/evidence/scenarios/complete-failure-bundle/run-notes.md`. If portal evidence is unavailable, mark the run as blocked instead of paraphrasing or fabricating SRE Agent output.

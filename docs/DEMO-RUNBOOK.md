@@ -213,7 +213,8 @@ For the full prompt catalog, see [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) or pe
 
 ```bash
 kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml
-kubectl get deployment mongodb -n energy
+kubectl get deployment mongodb rabbitmq -n energy
+kubectl get endpoints mongodb rabbitmq -n energy
 kubectl get endpoints meter-service -n energy
 kubectl get networkpolicy deny-meter-service -n energy
 ```
@@ -223,7 +224,8 @@ Ask SRE Agent for dependency-aware recovery guidance, then keep the operator in 
 ```bash
 # Restore dependency and Service specs first.
 kubectl apply -f k8s/base/application.yaml
-kubectl get deployment mongodb -n energy
+kubectl get deployment mongodb rabbitmq -n energy
+kubectl get endpoints mongodb rabbitmq -n energy
 kubectl get endpoints meter-service -n energy
 
 # Remove the extra NetworkPolicy because apply does not prune it.
