@@ -11,6 +11,7 @@ This guide covers the two Tier A findings and what a demo operator must verify o
 | Finding | Component | Status | Owner |
 |---------|-----------|--------|-------|
 | H-1: AKS API server has no `authorizedIPRanges` | `infra/bicep/modules/aks.bicep` | ⚠️ Ripley — awaiting CIDR input from operator | Ripley (Infra) |
+| H-3: SRE Agent Contributor at resource-group scope | `infra/bicep/main.bicep`, `scripts/configure-rbac.ps1` | ✅ `Low` is now the default (diagnosis-only). `High` must be set explicitly in `main.bicepparam` and `-SreAgentAccessLevel High` for internal remediation demos. | Ripley (Infra) |
 | H-4: RabbitMQ credentials in plaintext K8s manifests | `k8s/base/application.yaml` | ✅ All service env vars use `secretKeyRef`; demo-static values in Secret `stringData` are accepted per issue #52 | Parker (SRE Dev) |
 
 ---
@@ -45,6 +46,38 @@ Before any external/customer-facing demo:
 - [ ] **Confirm SRE Agent portal access still works** — the agent connects outbound from Azure, not through the API server IP allowlist. But verify that `*.azuresre.ai` firewall rule is in place if you're behind a corporate proxy.
 
 > ⚠️ **Until Ripley's change lands and CIDRs are provided, this lab is NOT suitable for external demos.** Document this explicitly in your demo pre-flight notes.
+
+---
+
+## H-3: SRE Agent Contributor at Resource-Group Scope
+
+### Risk
+
+The SRE Agent managed identity previously held Contributor at resource-group scope by default. This grants broad write access (create, delete, modify any resource) and is unacceptable for external or customer-facing demos.
+
+### Resolution (issue #57)
+
+`Low` is now the default access level across Bicep and scripts. Roles granted:
+
+| Scope | Role |
+|-------|------|
+| Resource Group | Reader |
+| Resource Group | Log Analytics Reader |
+| Key Vault | Key Vault Secrets User |
+| Container Registry | AcrPull |
+
+The `High` level (adds Contributor + AKS admin roles) must be explicitly requested:
+- In Bicep: `sreAgentAccessLevel = 'High'` in `infra/bicep/main.bicepparam` (set for internal lab runs only)
+- In scripts: `-SreAgentAccessLevel High` passed to `deploy.ps1` or `configure-rbac.ps1`
+
+### Operator pre-demo checklist (H-3)
+
+- [ ] Confirm the deployment used `Low` access level (default when using `deploy.ps1` without `-SreAgentAccessLevel High`)
+- [ ] Or verify that `main.bicepparam` was **not** used as-is for this external deploy (it sets `High` for internal lab)
+- [ ] Confirm the SRE Agent managed identity does **not** hold Contributor on the resource group:
+  ```bash
+  az role assignment list --assignee <sre-agent-principal-id> --output table
+  ```
 
 ---
 
@@ -107,6 +140,12 @@ Copy this checklist into your demo pre-flight notes before any customer-facing r
 - [ ] AKS API server is reachable from demo machine: kubectl get nodes
 - [ ] Azure SRE Agent portal access is confirmed: https://aka.ms/sreagent/portal
 - [ ] *.azuresre.ai firewall rule is in place if behind corporate proxy
+
+### H-3: SRE Agent Access Level
+- [ ] Deployment used Low access level (default; no -SreAgentAccessLevel High passed)
+- [ ] OR: main.bicepparam sreAgentAccessLevel was overridden to Low for this deploy
+- [ ] SRE Agent managed identity does NOT hold Contributor on the resource group:
+      az role assignment list --assignee <sre-agent-principal-id> --output table
 
 ### H-4: RabbitMQ Credentials
 - [ ] Accepted: guest/guest demo-static values are acknowledged

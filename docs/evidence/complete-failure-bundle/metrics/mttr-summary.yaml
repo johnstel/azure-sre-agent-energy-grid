@@ -1,0 +1,53 @@
+# MTTR Summary — Complete Failure Bundle
+# Status: PENDING_HUMAN_CAPTURE
+# Issue: #48 (supporting #37)
+# Operator: fill during or immediately after the live run
+# Scenario: complete-failure-bundle (mongodb-down + network-block + service-mismatch)
+#
+# Instructions: replace placeholder timestamps with real UTC values from your run-notes.md.
+# Do NOT invent or estimate timestamps. Leave blank (empty string) if a phase was not completed.
+
+scenario: complete-failure-bundle
+operator: ""                          # e.g. john-stelmaszek
+run_date: ""                          # e.g. 2026-06-15
+cluster: ""                           # cluster name (redact subscription/tenant)
+region: ""                            # eastus2 | swedencentral | australiaeast
+
+# ── Timestamps (UTC ISO-8601) ───────────────────────────────────────────────
+T0_healthy_baseline: ""               # kubectl get pods confirmed all Running/Ready
+T1_bundle_applied: ""                 # kubectl apply -f complete-failure-bundle/scenario.yaml
+T2_degraded_state_observed: ""        # kubectl output confirms failure signals visible
+T3_sre_agent_prompt_sent: ""          # first prompt submitted to portal
+T3_sre_agent_response_complete: ""    # full portal response received
+T4_operator_recovery_started: ""      # kubectl delete networkpolicy / apply baseline
+T5_recovery_verified: ""              # all pods Running/Ready, endpoints populated
+
+# ── Derived metrics (seconds) ───────────────────────────────────────────────
+# Fill manually from timestamps above, or leave 0 if phase not completed.
+detection_time_seconds: 0             # T2 - T1: time from bundle inject to degradation confirmed
+sre_agent_response_time_seconds: 0    # T3_response - T3_prompt: time for portal to return diagnosis
+operator_decision_to_recovery_seconds: 0  # T4 - T3_response: decision + command execution
+recovery_time_seconds: 0             # T5 - T4: time from fix applied to healthy baseline
+total_incident_time_seconds: 0       # T5 - T1: full incident duration
+mttr_seconds: 0                       # T5 - T2: mean time to recovery from first observed failure
+
+# ── Pass criteria ──────────────────────────────────────────────────────────
+mttr_threshold_seconds: 900           # 15 minutes — baseline pass bar for demo quality
+pass_criteria_met: null               # true | false — fill after run
+
+# ── SRE Agent portal status ────────────────────────────────────────────────
+sre_agent_portal_available: null      # true | false
+sre_agent_response_quality: ""        # PASS | PARTIAL | FAIL | UNAVAILABLE
+sre_agent_identified_root_causes:
+  mongodb_scaled_to_zero: null        # true | false
+  network_policy_deny_meter: null     # true | false
+  service_selector_mismatch: null     # true | false
+
+# ── Observations ────────────────────────────────────────────────────────────
+observations: |
+  [Fill with factual observations from the run. Examples:]
+  - Bundle applied and three simultaneous failures manifested within Ns of injection.
+  - SRE Agent response time was Ns.
+  - Agent correctly identified N of 3 root causes.
+  - Recovery sequence executed in N steps.
+  - No residual failures observed at T5.

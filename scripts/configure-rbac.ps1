@@ -8,7 +8,7 @@
     
     Includes:
     - SRE Agent roles (when SRE Agent is created)
-    - Contributor access for managed identities
+    - Contributor access for managed identities (High access level only)
     - Key Vault access roles
 
 .PARAMETER ResourceGroupName
@@ -20,8 +20,19 @@
 .PARAMETER CurrentUserPrincipalId
     Object ID of the current user for admin access
 
+.PARAMETER SreAgentAccessLevel
+    Access level for SRE Agent role assignments.
+    'Low'  (default) — Reader + Log Analytics Reader only. Diagnosis-only; safe for external/customer-facing demos.
+    'High' — adds Contributor at RG scope + AKS admin roles. Required for remediation demos.
+    Must match the accessLevel used in Bicep (main.bicepparam: sreAgentAccessLevel).
+
 .EXAMPLE
-    .\configure-rbac.ps1 -ResourceGroupName "rg-srelab-eastus2"
+    # External/diagnosis-only demo (default):
+    .\configure-rbac.ps1 -ResourceGroupName "rg-srelab-eastus2" -SreAgentPrincipalId "<id>"
+
+.EXAMPLE
+    # Internal remediation demo:
+    .\configure-rbac.ps1 -ResourceGroupName "rg-srelab-eastus2" -SreAgentPrincipalId "<id>" -SreAgentAccessLevel High
 
 .NOTES
     This script is idempotent - safe to run multiple times.
@@ -36,7 +47,11 @@ param(
     [string]$SreAgentPrincipalId,
 
     [Parameter()]
-    [string]$CurrentUserPrincipalId
+    [string]$CurrentUserPrincipalId,
+
+    [Parameter()]
+    [ValidateSet('High', 'Low')]
+    [string]$SreAgentAccessLevel = 'Low'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -174,17 +189,20 @@ if ($SreAgentPrincipalId) {
     Write-Host "`n  📌 SRE Agent Access:" -ForegroundColor Cyan
     
     # SRE Agent needs Contributor on the resource group to diagnose AND remediate issues.
-    # H-3 / deferred: Contributor at RG scope is intentional for the High-access demo profile
-    # so that SRE Agent can perform remediation actions (restart pods, patch resources, etc.).
-    # Scope-down to a narrower custom role or Low-access (Reader-only) diagnosis mode is tracked
-    # in issue #53 and should be evaluated before production use or customer-facing demos
-    # where write access would be unacceptable.
-    Set-RoleAssignment `
-        -Scope "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName" `
-        -RoleDefinition "Contributor" `
-        -PrincipalId $SreAgentPrincipalId `
-        -PrincipalType "ServicePrincipal" `
-        -Description "Contributor for SRE Agent (read/write access to resources)"
+    # H-3 (issue #57): Contributor at RG scope is gated behind SreAgentAccessLevel = 'High'.
+    # For diagnosis-only / external demos, use SreAgentAccessLevel = 'Low' — the Bicep module
+    # will assign Reader + Log Analytics Reader only, and this script skips all write grants.
+    if ($SreAgentAccessLevel -eq 'High') {
+        Set-RoleAssignment `
+            -Scope "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName" `
+            -RoleDefinition "Contributor" `
+            -PrincipalId $SreAgentPrincipalId `
+            -PrincipalType "ServicePrincipal" `
+            -Description "Contributor for SRE Agent (High access: read/write for remediation demos)"
+    }
+    else {
+        Write-Host "    ℹ️  Contributor grant skipped (SreAgentAccessLevel = Low; diagnosis-only profile)" -ForegroundColor Gray
+    }
     
     # Reader on subscription for broader context
     Set-RoleAssignment `
@@ -196,31 +214,38 @@ if ($SreAgentPrincipalId) {
     
     # AKS-specific roles for Kubernetes operations (restart pods, scale, etc.)
     if ($aksCluster) {
-        Write-Host "`n  📌 SRE Agent AKS Access:" -ForegroundColor Cyan
-        
-        # Azure Kubernetes Service Cluster Admin - allows kubectl access
-        Set-RoleAssignment `
-            -Scope $aksCluster.id `
-            -RoleDefinition "Azure Kubernetes Service Cluster Admin Role" `
-            -PrincipalId $SreAgentPrincipalId `
-            -PrincipalType "ServicePrincipal" `
-            -Description "AKS Cluster Admin for SRE Agent (kubectl access)"
-        
-        # Azure Kubernetes Service RBAC Cluster Admin - full K8s RBAC permissions
-        Set-RoleAssignment `
-            -Scope $aksCluster.id `
-            -RoleDefinition "Azure Kubernetes Service RBAC Cluster Admin" `
-            -PrincipalId $SreAgentPrincipalId `
-            -PrincipalType "ServicePrincipal" `
-            -Description "AKS RBAC Cluster Admin for SRE Agent (full K8s permissions)"
-        
-        # Azure Kubernetes Service Contributor - manage AKS resource itself
-        Set-RoleAssignment `
-            -Scope $aksCluster.id `
-            -RoleDefinition "Azure Kubernetes Service Contributor Role" `
-            -PrincipalId $SreAgentPrincipalId `
-            -PrincipalType "ServicePrincipal" `
-            -Description "AKS Contributor for SRE Agent (scale nodes, update config)"
+        if ($SreAgentAccessLevel -eq 'High') {
+            Write-Host "`n  📌 SRE Agent AKS Access (High):" -ForegroundColor Cyan
+            
+            # Azure Kubernetes Service Cluster Admin - allows kubectl access
+            Set-RoleAssignment `
+                -Scope $aksCluster.id `
+                -RoleDefinition "Azure Kubernetes Service Cluster Admin Role" `
+                -PrincipalId $SreAgentPrincipalId `
+                -PrincipalType "ServicePrincipal" `
+                -Description "AKS Cluster Admin for SRE Agent (kubectl access)"
+            
+            # Azure Kubernetes Service RBAC Cluster Admin - full K8s RBAC permissions
+            Set-RoleAssignment `
+                -Scope $aksCluster.id `
+                -RoleDefinition "Azure Kubernetes Service RBAC Cluster Admin" `
+                -PrincipalId $SreAgentPrincipalId `
+                -PrincipalType "ServicePrincipal" `
+                -Description "AKS RBAC Cluster Admin for SRE Agent (full K8s permissions)"
+            
+            # Azure Kubernetes Service Contributor - manage AKS resource itself
+            Set-RoleAssignment `
+                -Scope $aksCluster.id `
+                -RoleDefinition "Azure Kubernetes Service Contributor Role" `
+                -PrincipalId $SreAgentPrincipalId `
+                -PrincipalType "ServicePrincipal" `
+                -Description "AKS Contributor for SRE Agent (scale nodes, update config)"
+        }
+        else {
+            Write-Host "`n  📌 SRE Agent AKS Access (Low — read-only):" -ForegroundColor Cyan
+            Write-Host "    ℹ️  AKS write roles skipped (SreAgentAccessLevel = Low; diagnosis-only profile)" -ForegroundColor Gray
+            Write-Host "    ℹ️  SRE Agent can still query cluster metadata via Reader role from Bicep." -ForegroundColor Gray
+        }
     }
     
     # Log Analytics access for querying logs

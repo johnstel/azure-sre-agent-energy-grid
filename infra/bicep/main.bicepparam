@@ -43,6 +43,13 @@ param aksApiServerAuthorizedIpRanges = []
 // ACR admin account is disabled by default; use role-based auth for pull/push.
 param acrAdminUserEnabled = false
 
+// SRE Agent access level for internal remediation demos.
+// 'High' = Reader + Log Analytics Reader + Contributor at RG scope (write access for remediation).
+// 'Low'  = Reader + Log Analytics Reader only (diagnosis-only; default for external/unknown contexts).
+// H-3: 'High' is intentional for the internal demo to allow SRE Agent remediation actions.
+// For external/customer-facing demos, omit this parameter or set to 'Low'.
+param sreAgentAccessLevel = 'High'
+
 // Tags
 param tags = {
   workload: 'energy-grid-demo'
