@@ -1,6 +1,6 @@
 # Azure SRE Agent Energy Grid Demo Lab ⚡
 
-> **Azure SRE Agent is generally available (GA).** This lab currently keeps Bicep pinned to `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata exposes only that API version today. We will move to `2026-01-01` after provider exposure and successful `what-if` validation. Remediation remains operator-controlled unless real approval UI/API evidence is captured.
+> **Azure SRE Agent is generally available (GA).** This lab currently keeps Bicep pinned to `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata exposes only that API version today. We will move to `2026-01-01` after provider exposure and successful `what-if` validation; track the gate in [SRE Agent API Rollout](docs/SRE-AGENT-API-ROLLOUT.md). Remediation remains operator-controlled unless real approval UI/API evidence is captured.
 
 ## Why This Demo Exists
 
@@ -152,6 +152,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 |---------|-------------|
 | `.\scripts\deploy.ps1 -Location eastus2` | Deploy all infrastructure to Azure |
 | `.\scripts\deploy.ps1 -WhatIf` | Preview what would be deployed |
+| `.\scripts\check-sre-agent-api-rollout.ps1 -ResourceGroupName <rg>` | Check whether `Microsoft.App/agents@2026-01-01` can be safely adopted |
 | `.\scripts\validate-deployment.ps1 -ResourceGroupName <rg>` | Verify resources and app are healthy |
 | `.\scripts\destroy.ps1 -ResourceGroupName <rg>` | Tear down all infrastructure |
 
