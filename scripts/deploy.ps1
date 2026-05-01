@@ -25,6 +25,11 @@
 .PARAMETER SkipSreAgent
     Skip Azure SRE Agent deployment and deploy only the core lab infrastructure
 
+.PARAMETER SreAgentAccessLevel
+    Access level for the SRE Agent managed identity. Default: Low (diagnosis-only; safe for external demos).
+    Use 'High' for internal remediation demos (adds Contributor at RG scope + AKS admin roles).
+    Passed to Bicep (overrides main.bicepparam value) and forwarded to configure-rbac.ps1.
+
 .PARAMETER WhatIf
     Show what would be deployed without making changes
 
@@ -57,6 +62,10 @@ param(
 
     [Parameter()]
     [switch]$SkipSreAgent,
+
+    [Parameter()]
+    [ValidateSet('High', 'Low')]
+    [string]$SreAgentAccessLevel = 'Low',
 
     [Parameter()]
     [switch]$WhatIf,
@@ -632,6 +641,7 @@ Write-Host "  • Workload Name:   $WorkloadName" -ForegroundColor White
 Write-Host "  • Resource Group:  $resourceGroupName" -ForegroundColor White
 Write-Host "  • Deployment Name: $deploymentName" -ForegroundColor White
 Write-Host "  • SRE Agent:       $(if ($deploySreAgent) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • Agent Access:    $SreAgentAccessLevel$(if ($SreAgentAccessLevel -eq 'High') { ' ⚠️  (remediation; internal use only)' } else { ' ✅ (diagnosis-only)' })" -ForegroundColor White
 Write-Host "  • AKS API CIDRs:   $(if ($AksApiServerAuthorizedIpRanges.Count -gt 0) { $AksApiServerAuthorizedIpRanges -join ', ' } else { '(none - unrestricted public API endpoint)' })" -ForegroundColor White
 if ($sreAgentSkipReason) {
     Write-Host "  • SRE Agent Note:  $sreAgentSkipReason" -ForegroundColor Gray
@@ -648,6 +658,7 @@ if ($WhatIf) {
         "location=$Location"
         "workloadName=$WorkloadName"
         "deploySreAgent=$deploySreAgentValue"
+        "sreAgentAccessLevel=$SreAgentAccessLevel"
     )
     if ($kubernetesVersionParam) {
         $whatIfParameterArgs += "kubernetesVersion=$kubernetesVersionParam"
@@ -701,6 +712,7 @@ try {
         "location=$Location"
         "workloadName=$WorkloadName"
         "deploySreAgent=$deploySreAgentValue"
+        "sreAgentAccessLevel=$SreAgentAccessLevel"
     )
     if ($kubernetesVersionParam) {
         $deployParameterArgs += "kubernetesVersion=$kubernetesVersionParam"
@@ -874,7 +886,8 @@ if (-not $SkipRbac) {
     $rbacScript = Join-Path $PSScriptRoot "configure-rbac.ps1"
     if (Test-Path $rbacScript) {
         $rbacParams = @{
-            ResourceGroupName = $resourceGroupName
+            ResourceGroupName   = $resourceGroupName
+            SreAgentAccessLevel = $SreAgentAccessLevel
         }
 
         if ($sreAgentManagedIdentityPrincipalId) {
