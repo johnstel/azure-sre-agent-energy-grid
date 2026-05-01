@@ -1,0 +1,2 @@
+The meter database appears to be offline and dispatch-service can't process readings.
+What's wrong with MongoDB in the energy namespace?
