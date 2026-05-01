@@ -173,7 +173,12 @@ if ($keyVault -and $CurrentUserPrincipalId) {
 if ($SreAgentPrincipalId) {
     Write-Host "`n  📌 SRE Agent Access:" -ForegroundColor Cyan
     
-    # SRE Agent needs Contributor on the resource group to diagnose AND remediate issues
+    # SRE Agent needs Contributor on the resource group to diagnose AND remediate issues.
+    # H-3 / deferred: Contributor at RG scope is intentional for the High-access demo profile
+    # so that SRE Agent can perform remediation actions (restart pods, patch resources, etc.).
+    # Scope-down to a narrower custom role or Low-access (Reader-only) diagnosis mode is tracked
+    # in issue #53 and should be evaluated before production use or customer-facing demos
+    # where write access would be unacceptable.
     Set-RoleAssignment `
         -Scope "/subscriptions/$subscriptionId/resourceGroups/$ResourceGroupName" `
         -RoleDefinition "Contributor" `
@@ -252,13 +257,18 @@ if ($SreAgentPrincipalId) {
     }
     
     # Key Vault access for secrets management
+    # M-8: Downgraded from Key Vault Secrets Officer to Key Vault Secrets User.
+    # Secrets User (read-only: get/list) is sufficient for SRE Agent to surface
+    # configuration issues during diagnosis. If a demo flow requires SRE Agent to
+    # rotate or set secrets as part of a remediation action, temporarily grant
+    # Key Vault Secrets Officer manually for that session and revoke afterwards.
     if ($keyVault) {
         Set-RoleAssignment `
             -Scope $keyVault.id `
-            -RoleDefinition "Key Vault Secrets Officer" `
+            -RoleDefinition "Key Vault Secrets User" `
             -PrincipalId $SreAgentPrincipalId `
             -PrincipalType "ServicePrincipal" `
-            -Description "Key Vault Secrets Officer for SRE Agent (manage secrets)"
+            -Description "Key Vault Secrets User for SRE Agent (read secrets; least-privilege)"
     }
     
     # Container Registry access
