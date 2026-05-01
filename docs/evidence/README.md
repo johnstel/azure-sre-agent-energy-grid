@@ -105,7 +105,7 @@ For UAT gating, each scenario folder must contain at minimum:
 - Naming: `{scenario-id}_{step}.png` (e.g., `oom-killed_sre-agent-diagnosis.png`)
 - **Redaction**: Blur or mask subscription IDs, tenant IDs, and any real customer data
 - **Annotation**: Annotate with red boxes/arrows to highlight key findings (optional but recommended)
-- **No fabricated output**: Do not create placeholder screenshots for customer use. If a portal capture is missing, mark it `PENDING PORTAL EVIDENCE — do not present as captured` in run notes.
+- **No fabricated output**: Do not simulate portal output or SRE Agent responses. If a portal capture is missing, use run-note blocker text or a visibly watermarked blocker card marked `PENDING PORTAL EVIDENCE — do not present as captured`; never present blocker cards as captured evidence.
 
 ### KQL File Standards
 

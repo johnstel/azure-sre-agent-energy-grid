@@ -106,15 +106,15 @@ kubectl exec -n energy deploy/grid-dashboard -- curl -s localhost:8080/health
 
 | Scenario | Target file | Status on first run |
 |----------|-------------|---------------------|
-| OOMKilled | `docs/evidence/screenshots/oom-killed_before.png` | See `docs/evidence/screenshots/oom-killed/BLOCKER-NOTE.md` |
-| MongoDBDown | `docs/evidence/screenshots/mongodb-down_before.png` | See `docs/evidence/screenshots/mongodb-down/BLOCKER-NOTE.md` |
-| ServiceMismatch | `docs/evidence/screenshots/service-mismatch_before.png` | See `docs/evidence/screenshots/service-mismatch/BLOCKER-NOTE.md` |
+| OOMKilled | `docs/evidence/screenshots/oom-killed_before.png` | Reference PNG committed from live kubectl evidence |
+| MongoDBDown | `docs/evidence/screenshots/mongodb-down_before.png` | Reference PNG committed from live kubectl evidence |
+| ServiceMismatch | `docs/evidence/screenshots/service-mismatch_before.png` | Reference PNG committed from live kubectl evidence |
 
 - [ ] Capture `oom-killed_before.png` — all pods `Running/Ready`, no restarts
 - [ ] Capture `mongodb-down_before.png` — MongoDB deployment `1/1`, endpoints active
 - [ ] Capture `service-mismatch_before.png` — meter-service endpoints populated
 
-If a screenshot is not yet available, record the blocker in the scenario's `BLOCKER-NOTE.md`.
+If replacing a reference PNG with a fresh live capture, redact it and update the scenario's `BLOCKER-NOTE.md`.
 
 ---
 
@@ -216,10 +216,10 @@ For the full prompt catalog, see [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) or pe
 | MongoDBDown | `mongodb-down_failure.png` | `mongodb-down_sre-agent-diagnosis.png` | `mongodb-down_after-fix.png` |
 | ServiceMismatch | `service-mismatch_failure.png` | `service-mismatch_sre-agent-diagnosis.png` | `service-mismatch_after-fix.png` |
 
-- [ ] Screenshot the visible failure state → `docs/evidence/screenshots/<scenario>_failure.png`
+- [ ] Screenshot the visible failure state or use the committed redacted reference PNG → `docs/evidence/screenshots/<scenario>_failure.png`
 - [ ] Screenshot the real SRE Agent diagnosis, if available → `docs/evidence/screenshots/<scenario>_sre-agent-diagnosis.png`
 - [ ] Copy any KQL queries shown → `docs/evidence/kql/<scenario>_diagnosis.kql`
-- [ ] If portal access is unavailable, write `PENDING PORTAL EVIDENCE — do not present as captured` in the scenario's `BLOCKER-NOTE.md` instead of creating a fake screenshot
+- [ ] If portal access is unavailable, keep the watermarked `PENDING PORTAL EVIDENCE — do not present as captured` blocker card and do not present it as a real portal screenshot
 
 For the SRE Agent portal capture steps, see the per-scenario checklists:
 - OOMKilled: `docs/evidence/wave1-live/oom-killed/sre-agent/HUMAN-ACTION-CHECKLIST.md`
