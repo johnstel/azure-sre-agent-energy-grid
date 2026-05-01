@@ -103,6 +103,10 @@ param aksApiServerAuthorizedIpRanges array = []
 @description('Enable ACR admin user account (not required for default deploy path)')
 param acrAdminUserEnabled bool = false
 
+@description('SRE Agent access level. Low = Reader + Log Analytics Reader (diagnosis only, default for external/unknown contexts). High = adds Contributor at resource-group scope (required for remediation demos). Set explicitly in main.bicepparam for internal demo runs.')
+@allowed(['High', 'Low'])
+param sreAgentAccessLevel string = 'Low'
+
 @description('Tags to apply to all resources')
 param tags object = {
   workload: 'energy-grid-demo'
@@ -248,7 +252,7 @@ module sreAgent 'modules/sre-agent.bicep' = if (deploySreAgent) {
     agentName: names.sreAgent
     location: location
     tags: tags
-    accessLevel: 'High'
+    accessLevel: sreAgentAccessLevel
     appInsightsAppId: appInsights.outputs.appId
     appInsightsConnectionString: appInsights.outputs.connectionString
     uniqueSuffix: uniqueSuffix
