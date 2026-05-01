@@ -19,6 +19,51 @@ This is the single sequential checklist for running the Energy Grid SRE Agent de
 - [ ] Review [docs/SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for claims to avoid
 - [ ] Review the visual evidence convention in [docs/evidence/screenshots/README.md](evidence/screenshots/README.md)
 - [ ] If reusing screenshots from a prior run, confirm they are real captures, redacted, and not placeholders
+- [ ] **External demo only**: complete the [External Demo Security Checklist](#external-demo-security-checklist) below
+
+---
+
+## External Demo Security Checklist
+
+> **Required before any demo where the AKS cluster is exposed to networks outside your office/VPN.**
+> Internal sandbox demos (closed network, single-person laptop) may skip this section with the assumption that access is already constrained by network topology.
+
+### H-1 — AKS API Server IP Allowlist
+
+The AKS API server is publicly reachable by default (required for SRE Agent access). For external demos, restrict it to known CIDRs before the session and restore open access afterwards if needed.
+
+**Step 1**: Determine your egress CIDR(s):
+- Your laptop public IP: `curl -s https://api.ipify.org`
+- Office/VPN egress CIDR (ask your network team)
+- SRE Agent service CIDR: confirm current range at [aka.ms/sreagent/network](https://learn.microsoft.com/en-us/azure/sre-agent/network-requirements) and include it or the cluster will lose SRE Agent connectivity
+
+**Step 2**: Edit `infra/bicep/main.bicepparam` — uncomment and populate the allowlist:
+```bicep
+param aksApiServerAuthorizedIpRanges = [
+  '203.0.113.10/32'   // your public egress IP
+  '198.51.100.0/24'   // office/VPN CIDR
+  // add SRE Agent service CIDRs if required by current network docs
+]
+```
+
+**Step 3**: Redeploy (idempotent, AKS control-plane update only, ~5 min):
+```powershell
+.\scripts\deploy.ps1 -Location eastus2 -Yes
+```
+
+**Step 4**: After the demo, revert `aksApiServerAuthorizedIpRanges = []` and redeploy, or destroy the environment.
+
+> ⚠️ **SRE Agent access**: if SRE Agent cannot reach the API server after applying allowlist, its service IPs are not in your list. Check Microsoft's published egress ranges for `*.azuresre.ai` and add them.
+
+### H-4 — RabbitMQ Credentials
+
+RabbitMQ credentials have been changed from the factory default `guest/guest` to `energy-grid-mq` / `energy-grid-mq-demo` (static demo values, stored as a Kubernetes Secret). The management UI (port 15672) is not exposed outside the cluster. No further rotation is required for internal demos.
+
+For external demos where the cluster LoadBalancer IP is shared with attendees, confirm that port `15672` is **not** in any exposed Service spec before the session:
+```bash
+kubectl get svc -n energy | grep 15672
+```
+No output means the management port is not externally reachable.
 
 ---
 
@@ -57,7 +102,19 @@ kubectl exec -n energy deploy/grid-dashboard -- curl -s localhost:8080/health
 
 - [ ] Grid dashboard responds
 
-**Evidence capture:** Take a screenshot of healthy pod state for each core scenario you will demo → save as `docs/evidence/screenshots/<scenario>_before.png`
+**Evidence capture — per scenario baseline screenshots** (use as pre-demo study material and for the visual evidence pack, #38):
+
+| Scenario | Target file | Status on first run |
+|----------|-------------|---------------------|
+| OOMKilled | `docs/evidence/screenshots/oom-killed_before.png` | See `docs/evidence/screenshots/oom-killed/BLOCKER-NOTE.md` |
+| MongoDBDown | `docs/evidence/screenshots/mongodb-down_before.png` | See `docs/evidence/screenshots/mongodb-down/BLOCKER-NOTE.md` |
+| ServiceMismatch | `docs/evidence/screenshots/service-mismatch_before.png` | See `docs/evidence/screenshots/service-mismatch/BLOCKER-NOTE.md` |
+
+- [ ] Capture `oom-killed_before.png` — all pods `Running/Ready`, no restarts
+- [ ] Capture `mongodb-down_before.png` — MongoDB deployment `1/1`, endpoints active
+- [ ] Capture `service-mismatch_before.png` — meter-service endpoints populated
+
+If a screenshot is not yet available, record the blocker in the scenario's `BLOCKER-NOTE.md`.
 
 ---
 
@@ -151,11 +208,23 @@ Open the SRE Agent portal. Start with an open-ended prompt, then escalate to sce
 
 For the full prompt catalog, see [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) or per-scenario prompts in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md).
 
-**Evidence capture:**
+**Evidence capture — per scenario failure + recovery screenshots** (visual evidence pack, #38 / #45):
+
+| Scenario | Failure file | Diagnosis file | Recovery file |
+|----------|-------------|----------------|---------------|
+| OOMKilled | `oom-killed_failure.png` | `oom-killed_sre-agent-diagnosis.png` | `oom-killed_after-fix.png` |
+| MongoDBDown | `mongodb-down_failure.png` | `mongodb-down_sre-agent-diagnosis.png` | `mongodb-down_after-fix.png` |
+| ServiceMismatch | `service-mismatch_failure.png` | `service-mismatch_sre-agent-diagnosis.png` | `service-mismatch_after-fix.png` |
+
 - [ ] Screenshot the visible failure state → `docs/evidence/screenshots/<scenario>_failure.png`
 - [ ] Screenshot the real SRE Agent diagnosis, if available → `docs/evidence/screenshots/<scenario>_sre-agent-diagnosis.png`
 - [ ] Copy any KQL queries shown → `docs/evidence/kql/<scenario>_diagnosis.kql`
-- [ ] If portal access is unavailable, write `PENDING PORTAL EVIDENCE — do not present as captured` in run notes instead of creating a fake screenshot
+- [ ] If portal access is unavailable, write `PENDING PORTAL EVIDENCE — do not present as captured` in the scenario's `BLOCKER-NOTE.md` instead of creating a fake screenshot
+
+For the SRE Agent portal capture steps, see the per-scenario checklists:
+- OOMKilled: `docs/evidence/wave1-live/oom-killed/sre-agent/HUMAN-ACTION-CHECKLIST.md`
+- MongoDBDown: `docs/evidence/wave2-live/mongodb-down/sre-agent/HUMAN-ACTION-CHECKLIST.md`
+- ServiceMismatch: `docs/evidence/wave2-live/service-mismatch/sre-agent/HUMAN-ACTION-CHECKLIST.md`
 
 If you just ran the MongoDBDown manual path, say: "Now we'll ask SRE Agent the same question and compare the investigation path it recommends." Do not script or paraphrase a diagnosis as if it happened live; show the portal response or clearly label any prior screenshot as previous-run evidence.
 

@@ -44,6 +44,9 @@ data:
   enabled_plugins: "[rabbitmq_management,rabbitmq_prometheus,rabbitmq_amqp1_0]."
 
 ---
+# SECURITY (Issue #52 / H-4): Demo-static credentials stored as a K8s Secret.
+# All service deployments consume these via secretKeyRef — no plaintext in env.value.
+# Values are accepted for dev-lab use; for external demos see docs/EXTERNAL-DEMO-HARDENING.md.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -54,9 +57,9 @@ metadata:
     sre-demo: breakable
 type: Opaque
 stringData:
-  rabbitmq-username: "guest"
-  rabbitmq-password: "guest"
-  rabbitmq-amqp-uri: "amqp://guest:guest@rabbitmq:5672/"
+  rabbitmq-username: "energy-grid-mq"
+  rabbitmq-password: "energy-grid-mq-demo"
+  rabbitmq-amqp-uri: "amqp://energy-grid-mq:energy-grid-mq-demo@rabbitmq:5672/"
 
 ---
 apiVersion: apps/v1

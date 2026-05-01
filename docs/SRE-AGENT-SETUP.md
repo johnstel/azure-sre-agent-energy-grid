@@ -32,7 +32,11 @@ The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using th
 - Assigns Log Analytics Reader, Reader, and Contributor roles
 - Grants the deploying user the **SRE Agent Administrator** role
 
-> **API caveat for this lab**: Although Azure SRE Agent is GA, this subscription currently exposes only `Microsoft.App/agents@2025-05-01-preview` in provider metadata. Keep this API pin until `2026-01-01` is exposed and validated with `az deployment sub what-if`.
+> **API version pin (issue #51)**: This lab uses `Microsoft.App/agents@2025-05-01-preview`. The `2026-01-01` GA version exists in ARM schema but has **not** been validated against this subscription. Do **not** change the API version until all three gates in issue #51 pass:
+> 1. `az provider show -n Microsoft.App --query "resourceTypes[?resourceType=='agents'].apiVersions"` lists `2026-01-01` for this subscription.
+> 2. `az deployment group validate` passes with the updated Bicep.
+> 3. `az deployment group what-if` shows **no replacement or delete** of the existing SRE Agent resource.
+> Once gates pass, update the `resource sreAgent` declaration in `infra/bicep/modules/sre-agent.bicep` and remove the `#disable-next-line BCP081` suppression.
 
 To skip SRE Agent deployment, set `deploySreAgent = false` in `infra/bicep/main.bicepparam`.
 
@@ -87,10 +91,12 @@ The script assigns these roles to enable both **diagnosis AND remediation**:
 | **AKS Cluster** | AKS RBAC Cluster Admin | Full Kubernetes RBAC permissions |
 | **AKS Cluster** | AKS Contributor Role | Scale nodes, update cluster config |
 | **Log Analytics** | Log Analytics Reader | Query and analyze logs |
-| **Key Vault** | Key Vault Secrets Officer | Manage secrets |
+| **Key Vault** | Key Vault Secrets User | Read secrets (get/list only) |
 | **Container Registry** | AcrPull | Pull container images |
 
-> **Note**: This profile still includes broad **write permissions** through Contributor, AKS admin/contributor roles, and Key Vault Secrets Officer. Log Analytics and ACR are read/pull-only.
+> **Note**: This profile still includes broad **write permissions** through Contributor, AKS admin/contributor roles. Log Analytics, Key Vault, and ACR are read-only.
+> - H-3 (deferred, issue #53): Contributor at RG scope is required for remediation-capable demos. For read-only diagnosis, set `accessLevel = 'Low'` in Bicep and skip the Contributor grant in `configure-rbac.ps1`.
+> - M-8 (fixed): Key Vault Secrets Officer downgraded to Secrets User. If a demo flow requires secret rotation via SRE Agent, grant Secrets Officer manually for that session only.
 > - Restart pods, scale deployments, delete stuck resources
 > - Query and analyze logs
 > - Access/update Key Vault secrets

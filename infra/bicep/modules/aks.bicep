@@ -181,10 +181,15 @@ resource aks 'Microsoft.ContainerService/managedClusters@2024-02-01' = {
   }
 }
 
-// Grant AKS access to ACR for image pulls
+// Reference the ACR resource so AcrPull is scoped to the specific registry (M-2 fix: was resourceGroup()).
+resource existingAcr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
+  name: last(split(acrId, '/'))
+}
+
+// Grant AKS kubelet identity AcrPull on the specific ACR resource, not the whole resource group.
 resource acrPullRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(aks.id, acrId, 'acrpull')
-  scope: resourceGroup()
+  scope: existingAcr
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d') // AcrPull
     principalId: aks.properties.identityProfile.kubeletidentity.objectId

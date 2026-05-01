@@ -1,0 +1,2 @@
+The grid dashboard loads fine but submitting meter readings fails silently.
+Meter-service pods are Running. What's wrong with the meter-service in the energy namespace?

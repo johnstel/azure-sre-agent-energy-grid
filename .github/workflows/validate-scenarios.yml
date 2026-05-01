@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   validate:
@@ -34,13 +35,162 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run scenario metadata validation
+        id: validation
         shell: pwsh
         run: |
           Write-Host "Running scenario metadata validation in strict mode..."
-          ./scripts/validate-scenario-metadata.ps1 -Strict
 
-      - name: Validation summary
+          # Run validation and capture to temp file
+          $tempFile = Join-Path $env:RUNNER_TEMP "validation_output.txt"
+          & ./scripts/validate-scenario-metadata.ps1 -Strict > $tempFile 2>&1
+          $exitCode = $LASTEXITCODE
+
+          # Read output
+          $output = Get-Content $tempFile -Raw
+
+          # Extract counts from output
+          $errorCount = 0
+          $warningCount = 0
+          $checksCount = 0
+
+          if ($output -match 'Checks performed:\s*(\d+)') {
+            $checksCount = [int]$matches[1]
+          }
+          if ($output -match 'Errors:\s*(\d+)') {
+            $errorCount = [int]$matches[1]
+          }
+          if ($output -match 'Warnings:\s*(\d+)') {
+            $warningCount = [int]$matches[1]
+          }
+
+          # Write to step summary
+          $statusEmoji = if ($exitCode -eq 0) { '✅' } else { '❌' }
+          $statusText = if ($exitCode -eq 0) { 'PASS' } else { 'FAIL' }
+
+          $summary = @"
+          ## Scenario Metadata Validation Results
+
+          **Status**: $statusEmoji $statusText
+          **Checks performed**: $checksCount
+          **Errors**: $errorCount
+          **Warnings**: $warningCount
+
+          ### Validation Output
+          ``````
+          $output
+          ``````
+
+          ### Key Files
+          - 📄 [scenario-manifest.yaml](docs/evidence/scenarios/scenario-manifest.yaml)
+          - 📄 [CAPABILITY-CONTRACTS.md](docs/CAPABILITY-CONTRACTS.md)
+          - 📂 [k8s/scenarios/](k8s/scenarios/)
+          - 🔧 [validation script](scripts/validate-scenario-metadata.ps1)
+          "@
+
+          $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+          # Set outputs for downstream steps
+          "error_count=$errorCount" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "warning_count=$warningCount" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "checks_count=$checksCount" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          "exit_code=$exitCode" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+          # Parse and create annotations for errors and warnings
+          $lines = $output -split "`n"
+
+          $errorLines = $lines | Where-Object { $_ -match '❌ ERROR:' }
+          foreach ($errorLine in $errorLines) {
+            $message = $errorLine -replace '.*❌ ERROR:\s*', ''
+
+            $file = "docs/evidence/scenarios/scenario-manifest.yaml"
+            $title = "Scenario Validation Error"
+
+            if ($message -match "Scenario '([\w-]+)'") {
+              $scenarioId = $matches[1]
+              $title = "Error in scenario: $scenarioId"
+            }
+
+            if ($message -match 'CAPABILITY-CONTRACTS.md') {
+              $file = "docs/CAPABILITY-CONTRACTS.md"
+            } elseif ($message -match 'k8s_manifest' -or $message -match 'K8s') {
+              $file = "k8s/scenarios/"
+            }
+
+            Write-Host "::error file=$file,title=$title::$message"
+          }
+
+          $warningLines = $lines | Where-Object { $_ -match '⚠️\s*WARNING:' }
+          foreach ($warningLine in $warningLines) {
+            $message = $warningLine -replace '.*⚠️\s*WARNING:\s*', ''
+
+            $file = "docs/evidence/scenarios/scenario-manifest.yaml"
+            $title = "Scenario Validation Warning"
+
+            if ($message -match "Scenario '([\w-]+)'") {
+              $scenarioId = $matches[1]
+              $title = "Warning in scenario: $scenarioId"
+            }
+
+            if ($message -match 'CAPABILITY-CONTRACTS.md') {
+              $file = "docs/CAPABILITY-CONTRACTS.md"
+            } elseif ($message -match 'k8s_manifest' -or $message -match 'K8s' -or $message -match 'Orphaned') {
+              $file = "k8s/scenarios/"
+            }
+
+            Write-Host "::warning file=$file,title=$title::$message"
+          }
+
+          # Exit with validation result
+          exit $exitCode
+
+      - name: Post PR comment on failure
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const errorCount = '${{ steps.validation.outputs.error_count }}';
+            const warningCount = '${{ steps.validation.outputs.warning_count }}';
+
+            const body = `## ❌ Scenario Metadata Validation Failed
+
+            **Errors**: ${errorCount}
+            **Warnings**: ${warningCount}
+
+            ### What to check:
+            1. **scenario-manifest.yaml**: Ensure all 10 scenarios have complete metadata
+            2. **CAPABILITY-CONTRACTS.md**: Verify scenario registry matches manifest
+            3. **k8s/scenarios/**: Confirm all K8s manifest files exist and are referenced
+
+            ### Common issues:
+            - ❌ Missing required fields (number, severity, root_cause_category, etc.)
+            - ❌ Severity mismatch between \`severity\` and \`alert_severity\` fields
+            - ❌ root_cause_category differs between manifest and contracts
+            - ❌ k8s_manifest path points to non-existent file
+            - ⚠️  Orphaned K8s files not listed in manifest
+
+            ### How to fix:
+            \`\`\`bash
+            # Run validation locally to see detailed output
+            pwsh ./scripts/validate-scenario-metadata.ps1 -Strict
+            \`\`\`
+
+            See the [workflow run](${context.payload.pull_request.html_url}/checks) for detailed error annotations.
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body
+            });
+
+      - name: Validation passed
         if: success()
         run: |
           echo "✅ Scenario metadata validation passed"
           echo "All 10 scenarios validated successfully"
+          echo ""
+          echo "Validated files:"
+          echo "  - docs/evidence/scenarios/scenario-manifest.yaml"
+          echo "  - docs/CAPABILITY-CONTRACTS.md"
+          echo "  - k8s/scenarios/*.yaml (10 files)"
