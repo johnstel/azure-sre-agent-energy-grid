@@ -13,10 +13,14 @@ recovery screenshots, then request Lambert/Vasquez review and Dallas external-us
 
 | File | Status | Notes |
 |------|--------|-------|
-| `oom-killed_before.png` | ⏳ PENDING | Healthy pod state before scenario injection |
-| `oom-killed_failure.png` | ⏳ PENDING | OOMKilled event visible in kubectl / portal |
-| `oom-killed_sre-agent-diagnosis.png` | ⏳ PENDING | Real SRE Agent portal response only |
-| `oom-killed_after-fix.png` | ⏳ PENDING | Pods restored to Running/Ready |
+| `oom-killed_before.png` | 🟡 PLACEHOLDER | Watermarked reference image — replace with real capture |
+| `oom-killed_failure.png` | 🟡 PLACEHOLDER | Watermarked reference image — replace with real capture |
+| `oom-killed_sre-agent-diagnosis.png` | ⏳ PENDING PORTAL EVIDENCE | Real SRE Agent portal response only; current file is watermarked placeholder |
+| `oom-killed_after-fix.png` | 🟡 PLACEHOLDER | Watermarked reference image — replace with real capture |
+
+Placeholder PNGs (1280×720) committed in `docs/evidence/screenshots/` as reference style
+examples. Each file carries a visible **PLACEHOLDER** or **PENDING PORTAL EVIDENCE** watermark
+and must be replaced before external/customer presentation.
 
 Automated kubectl evidence for this scenario is complete in
 `docs/evidence/wave1-live/oom-killed/kubectl-output/` and can be referenced

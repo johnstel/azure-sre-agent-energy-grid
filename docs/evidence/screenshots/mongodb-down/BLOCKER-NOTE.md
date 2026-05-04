@@ -13,10 +13,14 @@ recovery screenshots, then request Lambert/Vasquez review and Dallas external-us
 
 | File | Status | Notes |
 |------|--------|-------|
-| `mongodb-down_before.png` | ⏳ PENDING | Healthy pod state before scenario injection |
-| `mongodb-down_failure.png` | ⏳ PENDING | MongoDB scaled to 0 replicas, cascading dispatch failure visible |
-| `mongodb-down_sre-agent-diagnosis.png` | ⏳ PENDING | Real SRE Agent portal response only |
-| `mongodb-down_after-fix.png` | ⏳ PENDING | Pods restored to Running/Ready, MongoDB endpoint active |
+| `mongodb-down_before.png` | 🟡 PLACEHOLDER | Watermarked reference image — replace with real capture |
+| `mongodb-down_failure.png` | 🟡 PLACEHOLDER | Watermarked reference image — replace with real capture |
+| `mongodb-down_sre-agent-diagnosis.png` | ⏳ PENDING PORTAL EVIDENCE | Real SRE Agent portal response only; current file is watermarked placeholder |
+| `mongodb-down_after-fix.png` | 🟡 PLACEHOLDER | Watermarked reference image — replace with real capture |
+
+Placeholder PNGs (1280×720) committed in `docs/evidence/screenshots/` as reference style
+examples. Each file carries a visible **PLACEHOLDER** or **PENDING PORTAL EVIDENCE** watermark
+and must be replaced before external/customer presentation.
 
 Automated kubectl evidence for this scenario is complete in
 `docs/evidence/wave2-live/mongodb-down/kubectl-output/` and can be referenced

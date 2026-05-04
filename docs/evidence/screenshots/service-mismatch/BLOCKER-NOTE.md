@@ -13,18 +13,22 @@ recovery screenshots, then request Lambert/Vasquez review and Dallas external-us
 
 | File | Status | Notes |
 |------|--------|-------|
-| `service-mismatch_before.png` | ⏳ PENDING | Healthy pod state, service endpoints populated |
-| `service-mismatch_failure.png` | ⏳ PENDING | Pods Running/Ready, service endpoints show `<none>` (silent failure) |
-| `service-mismatch_sre-agent-diagnosis.png` | ⏳ PENDING | Real SRE Agent portal response only |
-| `service-mismatch_after-fix.png` | ⏳ PENDING | Pods restored, service endpoints active |
+| `service-mismatch_before.png` | 🟡 PLACEHOLDER | Watermarked reference image — replace with real capture |
+| `service-mismatch_failure.png` | 🟡 PLACEHOLDER | Watermarked reference image — replace with real capture |
+| `service-mismatch_sre-agent-diagnosis.png` | ⏳ PENDING PORTAL EVIDENCE | Real SRE Agent portal response only; current file is watermarked placeholder |
+| `service-mismatch_after-fix.png` | 🟡 PLACEHOLDER | Watermarked reference image — replace with real capture |
 
-Automated kubectl evidence for this scenario is complete in
-`docs/evidence/wave2-live/service-mismatch/kubectl-output/` and can be referenced
-to frame what the screenshots must corroborate.
+Placeholder PNGs (1280×720) committed in `docs/evidence/screenshots/` as reference style
+examples. Each file carries a visible **PLACEHOLDER** or **PENDING PORTAL EVIDENCE** watermark
+and must be replaced before external/customer presentation.
 
 **Note**: This is a silent failure — `failure.png` should show pods in `Running/Ready` state
 while `kubectl get endpoints meter-service -n energy` shows `<none>`. This is the key visual
 proof of the traditional-monitoring blind spot.
+
+Automated kubectl evidence for this scenario is complete in
+`docs/evidence/wave2-live/service-mismatch/kubectl-output/` and can be referenced
+to frame what the screenshots must corroborate.
 
 ## Capture checklist
 
