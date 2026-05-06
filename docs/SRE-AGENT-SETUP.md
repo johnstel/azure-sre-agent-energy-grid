@@ -34,11 +34,12 @@ The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using th
 
 > **Access level**: `main.bicepparam` sets `sreAgentAccessLevel = 'High'` for the internal remediation demo. This is intentional — see `docs/SRE-AGENT-SETUP.md` for the access-level guide. For external demos, pass `-SreAgentAccessLevel Low` (the parameter default) to `deploy.ps1`.
 
-> **API version pin (issue #51)**: This lab uses `Microsoft.App/agents@2025-05-01-preview`. The `2026-01-01` GA version exists in ARM schema but has **not** been validated against this subscription. Do **not** change the API version until all three gates in issue #51 pass:
+> **API version pin (issue #51)**: This lab uses `Microsoft.App/agents@2025-05-01-preview`. The `2026-01-01` GA version exists in ARM schema but has **not** been validated against this subscription. Track rollout in [SRE Agent API Rollout](SRE-AGENT-API-ROLLOUT.md), and do **not** change the API version until all three gates in issue #51 pass:
 > 1. `az provider show -n Microsoft.App --query "resourceTypes[?resourceType=='agents'].apiVersions"` lists `2026-01-01` for this subscription.
-> 2. `az deployment group validate` passes with the updated Bicep.
+> 2. `az deployment group validate` passes with a temporary `2026-01-01` candidate module.
 > 3. `az deployment group what-if` shows **no replacement or delete** of the existing SRE Agent resource.
 > Once gates pass, update the `resource sreAgent` declaration in `infra/bicep/modules/sre-agent.bicep` and remove the `#disable-next-line BCP081` suppression.
+> Use `.\scripts\check-sre-agent-api-rollout.ps1 -ResourceGroupName rg-srelab-eastus2` to run the repeatable gate check.
 
 To skip SRE Agent deployment, set `deploySreAgent = false` in `infra/bicep/main.bicepparam`.
 
