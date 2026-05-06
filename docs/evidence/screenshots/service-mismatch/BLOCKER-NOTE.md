@@ -13,10 +13,10 @@ recovery screenshots, then request Lambert/Vasquez review and Dallas external-us
 
 | File | Status | Notes |
 |------|--------|-------|
-| `service-mismatch_before.png` | ⏳ PENDING | Healthy pod state, service endpoints populated |
-| `service-mismatch_failure.png` | ⏳ PENDING | Pods Running/Ready, service endpoints show `<none>` (silent failure) |
-| `service-mismatch_sre-agent-diagnosis.png` | ⏳ PENDING | Real SRE Agent portal response only |
-| `service-mismatch_after-fix.png` | ⏳ PENDING | Pods restored, service endpoints active |
+| `service-mismatch_before.png` | ✅ REFERENCE PNG COMMITTED | Rendered from committed live kubectl baseline evidence |
+| `service-mismatch_failure.png` | ✅ REFERENCE PNG COMMITTED | Rendered from committed live kubectl empty-endpoints evidence |
+| `service-mismatch_sre-agent-diagnosis.png` | ⚠️ BLOCKER CARD COMMITTED | Watermarked placeholder; replace with real SRE Agent portal response only |
+| `service-mismatch_after-fix.png` | ✅ REFERENCE PNG COMMITTED | Rendered from committed live kubectl recovery evidence |
 
 Automated kubectl evidence for this scenario is complete in
 `docs/evidence/wave2-live/service-mismatch/kubectl-output/` and can be referenced
@@ -33,10 +33,10 @@ Follow `docs/evidence/screenshots/README.md` and
 
 - [ ] Lab deployed in supported SRE Agent Preview region
 - [ ] John has https://aka.ms/sreagent/portal access
-- [ ] `service-mismatch_before.png` captured and redacted
-- [ ] `service-mismatch_failure.png` captured and redacted (shows pods healthy, endpoints empty)
+- [x] `service-mismatch_before.png` reference visual committed from redacted kubectl evidence
+- [x] `service-mismatch_failure.png` reference visual committed from redacted kubectl evidence (shows pods healthy, endpoints empty)
 - [ ] `service-mismatch_sre-agent-diagnosis.png` captured — real portal response only
-- [ ] `service-mismatch_after-fix.png` captured and redacted
+- [x] `service-mismatch_after-fix.png` reference visual committed from redacted kubectl evidence
 - [ ] Run notes updated in `docs/evidence/wave2-live/service-mismatch/checklist.md`
 - [ ] Lambert reviewed screenshots for safe-language compliance
 - [ ] Vasquez reviewed for demo framing

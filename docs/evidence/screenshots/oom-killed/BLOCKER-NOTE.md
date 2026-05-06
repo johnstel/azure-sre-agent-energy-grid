@@ -13,10 +13,10 @@ recovery screenshots, then request Lambert/Vasquez review and Dallas external-us
 
 | File | Status | Notes |
 |------|--------|-------|
-| `oom-killed_before.png` | ⏳ PENDING | Healthy pod state before scenario injection |
-| `oom-killed_failure.png` | ⏳ PENDING | OOMKilled event visible in kubectl / portal |
-| `oom-killed_sre-agent-diagnosis.png` | ⏳ PENDING | Real SRE Agent portal response only |
-| `oom-killed_after-fix.png` | ⏳ PENDING | Pods restored to Running/Ready |
+| `oom-killed_before.png` | ✅ REFERENCE PNG COMMITTED | Rendered from committed live kubectl baseline evidence |
+| `oom-killed_failure.png` | ✅ REFERENCE PNG COMMITTED | Rendered from committed live kubectl OOMKilled evidence |
+| `oom-killed_sre-agent-diagnosis.png` | ⚠️ BLOCKER CARD COMMITTED | Watermarked placeholder; replace with real SRE Agent portal response only |
+| `oom-killed_after-fix.png` | ✅ REFERENCE PNG COMMITTED | Rendered from committed live kubectl recovery evidence |
 
 Automated kubectl evidence for this scenario is complete in
 `docs/evidence/wave1-live/oom-killed/kubectl-output/` and can be referenced
@@ -29,10 +29,10 @@ Follow `docs/evidence/screenshots/README.md` and
 
 - [ ] Lab deployed in supported SRE Agent Preview region
 - [ ] John has https://aka.ms/sreagent/portal access
-- [ ] `oom-killed_before.png` captured and redacted
-- [ ] `oom-killed_failure.png` captured and redacted
+- [x] `oom-killed_before.png` reference visual committed from redacted kubectl evidence
+- [x] `oom-killed_failure.png` reference visual committed from redacted kubectl evidence
 - [ ] `oom-killed_sre-agent-diagnosis.png` captured — real portal response only
-- [ ] `oom-killed_after-fix.png` captured and redacted
+- [x] `oom-killed_after-fix.png` reference visual committed from redacted kubectl evidence
 - [ ] Run notes updated in `docs/evidence/scenarios/oom-killed/run-notes.md`
 - [ ] Lambert reviewed screenshots for safe-language compliance
 - [ ] Vasquez reviewed for demo framing

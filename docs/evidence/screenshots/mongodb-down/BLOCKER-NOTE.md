@@ -13,10 +13,10 @@ recovery screenshots, then request Lambert/Vasquez review and Dallas external-us
 
 | File | Status | Notes |
 |------|--------|-------|
-| `mongodb-down_before.png` | ⏳ PENDING | Healthy pod state before scenario injection |
-| `mongodb-down_failure.png` | ⏳ PENDING | MongoDB scaled to 0 replicas, cascading dispatch failure visible |
-| `mongodb-down_sre-agent-diagnosis.png` | ⏳ PENDING | Real SRE Agent portal response only |
-| `mongodb-down_after-fix.png` | ⏳ PENDING | Pods restored to Running/Ready, MongoDB endpoint active |
+| `mongodb-down_before.png` | ✅ REFERENCE PNG COMMITTED | Rendered from committed live kubectl baseline evidence |
+| `mongodb-down_failure.png` | ✅ REFERENCE PNG COMMITTED | Rendered from committed live kubectl MongoDB outage evidence |
+| `mongodb-down_sre-agent-diagnosis.png` | ⚠️ BLOCKER CARD COMMITTED | Watermarked placeholder; replace with real SRE Agent portal response only |
+| `mongodb-down_after-fix.png` | ✅ REFERENCE PNG COMMITTED | Rendered from committed live kubectl recovery evidence |
 
 Automated kubectl evidence for this scenario is complete in
 `docs/evidence/wave2-live/mongodb-down/kubectl-output/` and can be referenced
@@ -29,10 +29,10 @@ Follow `docs/evidence/screenshots/README.md` and
 
 - [ ] Lab deployed in supported SRE Agent Preview region
 - [ ] John has https://aka.ms/sreagent/portal access
-- [ ] `mongodb-down_before.png` captured and redacted
-- [ ] `mongodb-down_failure.png` captured and redacted (shows MongoDB 0/0 replicas and cascading failure)
+- [x] `mongodb-down_before.png` reference visual committed from redacted kubectl evidence
+- [x] `mongodb-down_failure.png` reference visual committed from redacted kubectl evidence (shows MongoDB 0/0 replicas and cascading failure)
 - [ ] `mongodb-down_sre-agent-diagnosis.png` captured — real portal response only
-- [ ] `mongodb-down_after-fix.png` captured and redacted
+- [x] `mongodb-down_after-fix.png` reference visual committed from redacted kubectl evidence
 - [ ] Run notes updated in `docs/evidence/wave2-live/mongodb-down/checklist.md`
 - [ ] Lambert reviewed screenshots for safe-language compliance
 - [ ] Vasquez reviewed for demo framing
