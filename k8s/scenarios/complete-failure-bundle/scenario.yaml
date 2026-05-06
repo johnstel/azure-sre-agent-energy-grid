@@ -2,15 +2,111 @@
 # SCENARIO BUNDLE: Complete Application Failure (Cascading Outage)
 # =============================================================================
 # Simulates broad platform unavailability by combining dependency outage,
-# network isolation, and service selector mismatch in one injection.
+# event-bus outage, network isolation, and service selector mismatch in one
+# injection.
 #
 # HOW TO BREAK:
 # kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml
 #
 # HOW TO FIX:
-# kubectl delete networkpolicy deny-meter-service -n energy
 # kubectl apply -f k8s/base/application.yaml
+# kubectl delete networkpolicy deny-meter-service -n energy
 # =============================================================================
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: energy
+  labels:
+    app: rabbitmq
+    scenario: complete-failure-bundle
+    sre-demo: breakable
+  annotations:
+    sre.scenario: complete-failure-bundle
+    sre.service: rabbitmq
+    sre.namespace: energy
+    sre.component: rabbitmq
+    sre.runbook_id: RB-011-complete-failure-bundle
+    sre.root_cause_category: dependency
+    sre.change_source: scenario-bundle
+    sre.version: "2026-05-01"
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+        scenario: complete-failure-bundle
+      annotations:
+        sre.scenario: complete-failure-bundle
+        sre.service: rabbitmq
+        sre.namespace: energy
+        sre.component: rabbitmq
+        sre.runbook_id: RB-011-complete-failure-bundle
+        sre.root_cause_category: dependency
+        sre.change_source: scenario-bundle
+        sre.version: "2026-05-01"
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3.11-management-alpine
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
+          volumeMounts:
+            - name: rabbitmq-enabled-plugins
+              mountPath: /etc/rabbitmq/enabled_plugins
+              subPath: enabled_plugins
+              readOnly: true
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "check_port_connectivity"]
+            initialDelaySeconds: 90
+            periodSeconds: 30
+            timeoutSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "check_port_connectivity"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 6
+          env:
+            - name: RABBITMQ_PLUGINS
+              value: "rabbitmq_management rabbitmq_prometheus rabbitmq_amqp1_0"
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: rabbitmq-username
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: rabbitmq-password
+      volumes:
+        - name: rabbitmq-enabled-plugins
+          configMap:
+            name: rabbitmq-enabled-plugins
+            items:
+              - key: enabled_plugins
+                path: enabled_plugins
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,7 +125,7 @@ metadata:
     sre.runbook_id: RB-011-complete-failure-bundle
     sre.root_cause_category: dependency
     sre.change_source: scenario-bundle
-    sre.version: "2026-04-30"
+    sre.version: "2026-05-01"
 spec:
   replicas: 0
   strategy:
@@ -81,7 +177,7 @@ metadata:
     sre.runbook_id: RB-011-complete-failure-bundle
     sre.root_cause_category: networking
     sre.change_source: scenario-bundle
-    sre.version: "2026-04-30"
+    sre.version: "2026-05-01"
 spec:
   podSelector:
     matchLabels:
@@ -108,7 +204,7 @@ metadata:
     sre.runbook_id: RB-011-complete-failure-bundle
     sre.root_cause_category: configuration
     sre.change_source: scenario-bundle
-    sre.version: "2026-04-30"
+    sre.version: "2026-05-01"
 spec:
   selector:
     app: meter-service-v2

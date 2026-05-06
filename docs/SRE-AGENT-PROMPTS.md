@@ -128,7 +128,7 @@ Use this prompt chain for the `complete-failure-bundle` scenario.
 | "Separate root cause from downstream symptoms across services in the energy namespace" | Forces dependency-aware analysis instead of symptom chasing |
 | "Recommend a prioritized recovery plan with dependencies first" | Produces staged remediation sequence |
 | "After each recovery step, re-check health and tell me the next safest action" | Keeps remediation iterative and validated |
-| "Verify that meter-service endpoints, MongoDB availability, and network access are all healthy" | Confirms recovery across API path + data layer + connectivity |
+| "Verify that meter-service endpoints, MongoDB availability, RabbitMQ availability, and network access are all healthy" | Confirms recovery across API path + data layer + event bus + connectivity |
 
 ### Root Cause Analysis
 

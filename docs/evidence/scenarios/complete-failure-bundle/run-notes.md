@@ -43,6 +43,18 @@ kubectl get deployment mongodb -n energy
 # Paste output here
 ```
 
+```bash
+kubectl get deployment rabbitmq -n energy
+# Expected: READY 1/1
+# Paste output here
+```
+
+```bash
+kubectl get endpoints mongodb rabbitmq -n energy
+# Expected: populated with pod IPs
+# Paste output here
+```
+
 **Baseline timestamp:** `HH:MM UTC`
 
 ---
@@ -87,6 +99,7 @@ kubectl get events -n energy --sort-by=.lastTimestamp | tail -30
 
 **Agent identified root causes:**
 - [ ] MongoDB scaled to replicas: 0
+- [ ] RabbitMQ scaled to replicas: 0
 - [ ] NetworkPolicy deny-meter-service
 - [ ] Service selector mismatch (meter-service-v2)
 - [ ] Other: ___
@@ -116,7 +129,7 @@ kubectl get events -n energy --sort-by=.lastTimestamp | tail -30
 ---
 
 ### Prompt 4: Post-recovery verification
-**Prompt sent:** `"Verify that meter-service endpoints, MongoDB availability, and network access are all healthy"`
+**Prompt sent:** `"Verify that meter-service endpoints, MongoDB availability, RabbitMQ availability, and network access are all healthy"`
 
 **Agent response:**
 ```
@@ -129,16 +142,36 @@ kubectl get events -n energy --sort-by=.lastTimestamp | tail -30
 
 > Record what you actually ran, in order.
 
-**Step 1 — Remove network isolation**
+**Step 1 — Restore dependency and Service specs**
 ```bash
-kubectl delete networkpolicy deny-meter-service -n energy
+kubectl apply -f k8s/base/application.yaml
 # Paste output here
 ```
 **Timestamp:** `HH:MM UTC`
 
-**Step 2 — Restore healthy baseline**
+**Step 2 — Validate data layer and Service routing**
 ```bash
-kubectl apply -f k8s/base/application.yaml
+kubectl get deployment mongodb rabbitmq -n energy
+# Expected: READY 1/1 for both
+# Paste output here
+```
+
+```bash
+kubectl get endpoints mongodb rabbitmq -n energy
+# Expected: populated
+# Paste output here
+```
+
+```bash
+kubectl get endpoints meter-service -n energy
+# Expected: populated
+# Paste output here
+```
+**Timestamp:** `HH:MM UTC`
+
+**Step 3 — Remove remaining network isolation**
+```bash
+kubectl delete networkpolicy deny-meter-service -n energy
 # Paste output here
 ```
 **Timestamp:** `HH:MM UTC`
@@ -159,8 +192,14 @@ kubectl get endpoints meter-service -n energy
 ```
 
 ```bash
-kubectl get deployment mongodb -n energy
-# Expected: READY 1/1
+kubectl get deployment mongodb rabbitmq -n energy
+# Expected: READY 1/1 for both
+# Paste output here
+```
+
+```bash
+kubectl get endpoints mongodb rabbitmq -n energy
+# Expected: populated
 # Paste output here
 ```
 
@@ -185,6 +224,7 @@ kubectl get networkpolicy -n energy
 | meter-service endpoints populated after recovery | ☐ PASS / ☐ FAIL |
 | deny-meter-service NetworkPolicy absent after recovery | ☐ PASS / ☐ FAIL |
 | MongoDB READY 1/1 after recovery | ☐ PASS / ☐ FAIL |
+| RabbitMQ READY 1/1 after recovery | ☐ PASS / ☐ FAIL |
 
 **Overall result:** ☐ PASS / ☐ FAIL / ☐ BLOCKED
 

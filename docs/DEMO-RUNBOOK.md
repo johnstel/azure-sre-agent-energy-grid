@@ -139,7 +139,7 @@ az resource list --resource-group <rg-name> --resource-type Microsoft.App/agents
 
 ## Step 4: Run Scenario — Break, Diagnose, Fix
 
-For each scenario you plan to demo, follow this loop:
+For each scenario you plan to demo, follow this loop. Use the complete-failure bundle only after the core scenarios are understood, because it combines dependency outage, service routing failure, and network isolation in one incident.
 
 ### 4a. Inject the failure
 
@@ -205,8 +205,36 @@ Open the SRE Agent portal. Start with an open-ended prompt, then escalate to sce
 | **OOMKilled** | "Why is the meter-service pod restarting repeatedly?" |
 | **MongoDBDown** | "Smart meter data isn't being processed — what's wrong?" |
 | **ServiceMismatch** | "Grid dashboard loads but meter readings fail — what's broken?" |
+| **CompleteFailureBundle** | "Why is the entire energy grid platform down?" |
 
 For the full prompt catalog, see [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) or per-scenario prompts in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md).
+
+**Complete-failure bundle operator path (optional advanced demo):**
+
+```bash
+kubectl apply -f k8s/scenarios/complete-failure-bundle/scenario.yaml
+kubectl get deployment mongodb rabbitmq -n energy
+kubectl get endpoints mongodb rabbitmq -n energy
+kubectl get endpoints meter-service -n energy
+kubectl get networkpolicy deny-meter-service -n energy
+```
+
+Ask SRE Agent for dependency-aware recovery guidance, then keep the operator in control:
+
+```bash
+# Restore dependency and Service specs first.
+kubectl apply -f k8s/base/application.yaml
+kubectl get deployment mongodb rabbitmq -n energy
+kubectl get endpoints mongodb rabbitmq -n energy
+kubectl get endpoints meter-service -n energy
+
+# Remove the extra NetworkPolicy because apply does not prune it.
+kubectl delete networkpolicy deny-meter-service -n energy
+kubectl get pods -n energy
+kubectl get networkpolicy -n energy
+```
+
+Capture evidence in `docs/evidence/scenarios/complete-failure-bundle/run-notes.md`. Do not claim SRE Agent guided recovery unless the real portal conversation is captured or visible live.
 
 **Evidence capture — per scenario failure + recovery screenshots** (visual evidence pack, #38 / #45):
 
