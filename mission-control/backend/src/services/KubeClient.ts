@@ -83,8 +83,7 @@ export class KubeClient {
     const deploymentItems = deployments.map((deployment) => {
       const deploymentPods = pods.filter((pod) => selectorMatches(pod.labels ?? {}, deployment.selectorLabels ?? {}));
       const deploymentPodNames = new Set(deploymentPods.map((pod) => pod.name));
-      const deploymentServices = services.filter((service) => selectorMatches(deployment.labels ?? {}, service.selector ?? {})
-        || deploymentPods.some((pod) => selectorMatches(pod.labels ?? {}, service.selector ?? {})));
+      const deploymentServices = services.filter((service) => isServiceRelatedToDeployment(service, deployment, deploymentPods));
       const endpointReadiness = deploymentServices.map((service) => endpointByService.get(service.name) ?? emptyEndpointSummary(service.name));
       const recentEvents = events
         .filter((event) => eventMatchesDeployment(event, deployment.name, deploymentPodNames))
@@ -311,6 +310,7 @@ function toDeployment(item: any): Deployment {
     updatedReplicas: item.status?.updatedReplicas ?? 0,
     availableReplicas: item.status?.availableReplicas ?? 0,
     labels: item.metadata.labels ?? {},
+    annotations: item.metadata.annotations ?? {},
     selectorLabels: item.spec?.selector?.matchLabels ?? {},
     age: item.metadata.creationTimestamp ?? '',
     updatedAt: latestDeploymentUpdate(item),
@@ -466,6 +466,7 @@ function toInventoryItem(
     age: deployment.age ?? '',
     updatedAt: deployment.updatedAt ?? deployment.age ?? '',
     labels: deployment.labels ?? {},
+    annotations: deployment.annotations ?? {},
     selectorLabels: deployment.selectorLabels ?? {},
     pods: podSummaries,
     services,
@@ -514,7 +515,7 @@ function isDeploymentCurrentlyHealthy(
   );
 }
 
-function classifyDeployment(
+export function classifyDeployment(
   deployment: Deployment,
   pods: InventoryPodSummary[],
   endpointReadiness: ServiceEndpointSummary[],
@@ -527,9 +528,15 @@ function classifyDeployment(
   const podReason = pods.map((pod) => pod.reason).find((reason) => reason && reason !== 'Running' && reason !== 'Succeeded');
   const criticalReason = pods.map((pod) => pod.reason).find((reason) => reason && isCriticalReason(reason));
   const warningReason = pods.map((pod) => pod.reason).find((reason) => reason && isWarningReason(reason));
-  const emptyService = endpointReadiness.find((endpoint) => desired > 0 && endpoint.total === 0);
+  const scenarioName = getBreakableScenarioName(deployment);
+  const emptyService = endpointReadiness.find((endpoint) => (desired > 0 || scenarioName) && endpoint.total === 0);
   const notReadyService = endpointReadiness.find((endpoint) => endpoint.notReady > 0);
   const warningEvent = events.find((event) => event.type === 'Warning');
+
+  if (desired === 0 && scenarioName) {
+    const endpointReason = emptyService ? `; service ${emptyService.serviceName} has no endpoints` : '';
+    return { severity: 'critical', reason: `Scenario ${scenarioName} scaled deployment to zero${endpointReason}` };
+  }
 
   if (desired > 0 && pods.length === 0) {
     return { severity: 'critical', reason: 'No pods found for deployment selector' };
@@ -568,6 +575,19 @@ function classifyDeployment(
   }
 
   return { severity: 'healthy', reason: 'All desired replicas ready' };
+}
+
+function getBreakableScenarioName(deployment: Deployment): string | undefined {
+  const labels = deployment.labels ?? {};
+  const annotations = deployment.annotations ?? {};
+  const scenarioName = labels.scenario
+    ?? annotations['sre.scenario']
+    ?? annotations.scenario
+    ?? annotations['sre-agent/scenario'];
+
+  if (scenarioName) return scenarioName;
+  if (labels['sre-demo'] === 'breakable' || annotations['sre-demo'] === 'breakable') return 'breakable';
+  return undefined;
 }
 
 function getPodStatus(item: any, containers: any[]): string {
@@ -613,6 +633,12 @@ function eventMatchesDeployment(event: KubeEvent, deploymentName: string, podNam
   if (object.kind === 'ReplicaSet' && object.name.startsWith(`${deploymentName}-`)) return true;
   if (object.kind === 'Pod' && podNames.has(object.name)) return true;
   return false;
+}
+
+export function isServiceRelatedToDeployment(service: Service, deployment: Deployment, pods: Pod[]): boolean {
+  return service.name === deployment.name
+    || selectorMatches(deployment.labels ?? {}, service.selector ?? {})
+    || pods.some((pod) => selectorMatches(pod.labels ?? {}, service.selector ?? {}));
 }
 
 function selectorMatches(labels: Record<string, string>, selector: Record<string, string>): boolean {

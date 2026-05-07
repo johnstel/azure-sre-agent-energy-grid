@@ -134,9 +134,9 @@ kubectl apply -f k8s/base/application.yaml
 
 ## Cost Considerations
 
-- **Full deployment**: ~$22-28/day (~$650-850/month)
-- **With SRE Agent**: ~$32-38/day (~$950-1,150/month)
-- **See**: `docs/COSTS.md` for detailed breakdown
+- **Core lab / SRE Agent skipped**: ~$24-30/day (~$660-870/month)
+- **Full demo lab / SRE Agent enabled**: ~$34-40/day (~$970-1,170/month)
+- **Canonical source**: `docs/COSTS.md` for detailed breakdown, assumptions, and caveats
 
 ## When Helping with This Project
 

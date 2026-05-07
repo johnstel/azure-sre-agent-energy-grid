@@ -207,3 +207,23 @@ Layout constraints inherited from parent systems (grid, container queries, viewp
 - #45: Live portal redacted screenshots for visual evidence (requires lab/portal access + Dallas approval for external use)
 
 **Status:** ✅ Logged. Next items wave captured with models and blocker tracking. Ready for team execution.
+
+---
+
+## 2026-05-04T15:58:36Z — Mission Control Deploy Output Display Fix (COMPLETE)
+
+**Context**: User reported missing console output when deploying from Mission Control.
+**Root Cause**: Wallboard control dock received jobLines data but never rendered them to UI.
+
+**Fix Applied**: Modified `mission-control/frontend/src/components/MissionWallboard.vue` to:
+- Import and render Terminal component
+- Display control-output-dock when controls open + jobLines exist
+- Add jobStreamKind tracking (deploy vs destroy)
+- Compute jobStreamTitle for dynamic output labeling
+- Scope terminal CSS (max-height, overflow)
+
+**Validation**: Lint ✅ | Build ✅ | Tests ✅ | Frontend 200 ✅ | Backend /health 200 ✅
+
+**Log File**: `.squad/orchestration-log/2026-05-04T15-58-36Z-mission-control-deploy-output-fix.md`
+
+**Status**: Ready for production deployment. No unresolved blockers.

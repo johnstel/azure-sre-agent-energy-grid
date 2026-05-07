@@ -82,6 +82,7 @@ export interface Deployment {
   updatedReplicas: number;
   availableReplicas: number;
   labels?: Record<string, string>;
+  annotations?: Record<string, string>;
   selectorLabels?: Record<string, string>;
   age?: string;
   updatedAt?: string;
@@ -141,6 +142,7 @@ export interface DeploymentInventoryItem {
   age: string;
   updatedAt: string;
   labels: Record<string, string>;
+  annotations: Record<string, string>;
   selectorLabels: Record<string, string>;
   pods: InventoryPodSummary[];
   services: Service[];

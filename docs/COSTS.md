@@ -1,25 +1,45 @@
 # Cost Estimation Guide
 
-This document provides estimated costs for running the Azure SRE Agent Energy Grid Demo Lab.
+This document is the canonical cost model for running the Azure SRE Agent Energy Grid Demo Lab.
 
-> **Note:** Costs are estimates based on US East 2 region pricing as of 2024. Actual costs may vary based on region, usage patterns, and Azure pricing changes.
+> **Note:** Costs are estimates based on the repository defaults for East US 2 and Azure retail price samples. Actual charges vary by region, telemetry volume, autoscaling, SRE Agent usage, discounts, and Azure pricing changes. Verify live spend in Azure Cost Management before leaving the lab running.
+
+## Scope and Assumptions
+
+The baseline estimate assumes the default `scripts/deploy.ps1 -Location eastus2` / `infra/bicep/main.bicepparam` shape unless stated otherwise:
+
+| Setting | Default |
+|---------|---------|
+| Region | `eastus2` |
+| Resource group | `rg-srelab-eastus2` |
+| AKS tier | Standard |
+| System node pool | 2 initial `Standard_D2s_v6` nodes, autoscale 1-5 |
+| Workload node pool | 3 initial `Standard_D2s_v6` nodes, autoscale 1-10 |
+| ACR | Basic SKU, admin disabled |
+| Observability | `deployObservability=true` for Managed Grafana + Azure Monitor managed Prometheus |
+| Alerts | `deployAlerts=true` for four scheduled query alert rules |
+| Log retention | Log Analytics and Application Insights aligned to 90 days |
+| SRE Agent | `deploySreAgent=true` unless `-SkipSreAgent` is used |
+
+`deploy.ps1` defaults the SRE Agent access level to `Low` for diagnosis-only demos. `main.bicepparam` sets `High` for internal remediation demos. Access level affects permissions and demo risk more than the fixed infrastructure cost; SRE Agent usage/execution remains variable in either mode.
 
 ## Quick Cost Summary
 
 | Component | Daily Cost | Monthly Cost | Notes |
 |-----------|------------|--------------|-------|
-| **AKS Control Plane** | ~$2.40 | $73 | Standard tier with SLA |
-| **AKS Nodes (System)** | ~$4.70 | ~$140 | 2x Standard_D2s_v5 |
-| **AKS Nodes (User)** | ~$7.00 | ~$210 | 3x Standard_D2s_v5 |
+| **AKS Control Plane** | ~$2.40 | ~$73 | Standard tier with SLA |
+| **AKS Nodes (System)** | ~$4.85 | ~$147 | 2x Standard_D2s_v6 |
+| **AKS Nodes (User)** | ~$7.30 | ~$221 | 3x Standard_D2s_v6 |
 | **Container Registry** | ~$0.17 | ~$5 | Basic tier |
 | **Log Analytics** | ~$1.50-2.50 | ~$40-60 | 90-day retention (Wave 1) + Activity Log |
 | **Application Insights** | ~$0.30-0.70 | ~$10-20 | Based on data volume |
 | **Managed Grafana** | ~$2.50 | ~$75 | Standard tier |
 | **Azure Monitor (Prometheus)** | ~$0.50 | ~$15 | Based on metrics volume |
 | **Key Vault** | ~$0.10 | ~$3 | Minimal operations |
+| **Disks, Load Balancer, Public IPs, Alerts** | ~$0.50-1.00 | ~$15-30 | AKS node OS disks, MongoDB PVC, Standard LB/IPs, scheduled query rules |
 | **SRE Agent** | ~$10-13 | ~$292-400 | Base + execution costs |
-| **Total (without SRE Agent)** | **~$24-30** | **~$660-870** | Wave 1 config |
-| **Total (with SRE Agent)** | **~$34-40** | **~$970-1,170** | Wave 1 config |
+| **Core lab / SRE Agent skipped** | **~$24-30** | **~$660-870** | Use `-SkipSreAgent` |
+| **Full demo lab / SRE Agent enabled** | **~$34-40** | **~$970-1,170** | Default deploy path when provider/API is available |
 
 > **Wave 1 Changes:** 90-day Log Analytics retention and Activity Log export add ~$10-15/month vs. Wave 0 minimal config. This supports ARM-level audit correlation for demo evidence once live UAT verifies Activity Log export and Log Analytics retention.
 
@@ -38,24 +58,37 @@ This document provides estimated costs for running the Azure SRE Agent Energy Gr
 
 | Node Pool | VM Size | Count | Unit Cost | Monthly Cost |
 |-----------|---------|-------|-----------|--------------|
-| System | Standard_D2s_v5 | 2 | $70.08/month | $140.16 |
-| User | Standard_D2s_v5 | 3 | $70.08/month | $210.24 |
+| System | Standard_D2s_v6 | 2 | $73.73/month | $147.46 |
+| User | Standard_D2s_v6 | 3 | $73.73/month | $221.19 |
+
+The initial deployment creates five nodes. Cluster autoscaler can reduce to two nodes at idle (`system` min 1 + `workload` min 1) or scale up to fifteen nodes (`system` max 5 + `workload` max 10). Node costs therefore move materially if demos, break/fix scenarios, or background workloads trigger scale-out.
 
 **Cost-Saving Options:**
-- Use `Standard_D2as_v5` (AMD) for ~10% savings
+- Use `Standard_D2as_v6` (AMD) for ~10% savings where available
 - Reduce node count during non-demo hours
 - Use Reserved Instances for 30-55% savings (if running long-term)
 - Use Spot instances for non-critical workloads
 
+#### AKS-Related Platform Charges
+
+AKS also creates supporting resources outside the Bicep modules:
+
+| Resource | Cost impact |
+|----------|-------------|
+| Node OS disks | Included in the AKS node resource group; scales with node count |
+| MongoDB PVC | 8 GiB `managed-csi` Azure Managed Disk for in-cluster MongoDB |
+| Standard Load Balancer / Public IPs | Created by Kubernetes `LoadBalancer` services such as the dashboards |
+| Network egress | Usually low for demos, but charged if traffic leaves Azure or crosses billing boundaries |
+
 #### Maintenance-Window Node Pool Recreation Cost
 
-When executing the blue/green `maxPods=30` drift fix (see [AKS-MAXPODS-MAINTENANCE-RUNBOOK.md](./AKS-MAXPODS-MAINTENANCE-RUNBOOK.md)), temporary `sys50` and `work50` pools run alongside the old pools before the originals are deleted. The estimate below assumes the current issue #4 maintenance shape: one temporary system node and four temporary workload nodes on `Standard_D2s_v5`. Recalculate if live node counts, VM sizes, or temporary autoscaling differ.
+When executing the blue/green `maxPods=30` drift fix (see [AKS-MAXPODS-MAINTENANCE-RUNBOOK.md](./AKS-MAXPODS-MAINTENANCE-RUNBOOK.md)), temporary `sys50` and `work50` pools run alongside the old pools before the originals are deleted. The estimate below assumes the current issue #4 maintenance shape: one temporary system node and four temporary workload nodes on `Standard_D2s_v6`. Recalculate if live node counts, VM sizes, or temporary autoscaling differ.
 
 | Temporary Pool | VM Size | Extra Nodes | Cost/hour |
 |----------------|---------|-------------|-----------|
-| `sys50` | Standard_D2s_v5 | 1 | ~$0.096 |
-| `work50` | Standard_D2s_v5 | 4 | ~$0.384 |
-| **Total overlap** | | **5** | **~$0.48** |
+| `sys50` | Standard_D2s_v6 | 1 | ~$0.101 |
+| `work50` | Standard_D2s_v6 | 4 | ~$0.404 |
+| **Total overlap** | | **5** | **~$0.51** |
 
 A typical 2-4 hour maintenance window adds **~$1-2 per run** - negligible relative to the ~$30-40/day baseline. Once the old pools are deleted, node count returns to its pre-maintenance level with **no net cost increase**.
 
@@ -79,6 +112,8 @@ Cost is based on data ingestion:
 
 **Wave 1 retention:** 90 days (aligned with App Insights for evidence consistency)
 
+The workspace has no daily ingestion cap in the default deployment. Container Insights, AKS diagnostics, Activity Log export, alert queries, and scenario churn can increase ingestion above the expected demo range.
+
 **Retention cost impact:**
 - 90 days vs. 30 days adds ~$8-12/month in retained data costs
 - Supports ARM-level audit correlation per capability contracts after live retention/export validation
@@ -96,6 +131,8 @@ Cost is based on data ingestion:
 | First 5 GB/month | Free |
 
 **Expected usage for demo:** ~$10-20/month
+
+Application Insights is workspace-based in this lab. Its ingestion and retention contribute to the same evidence-retention posture as Log Analytics.
 
 ### Activity Log Export (Wave 1)
 
@@ -128,6 +165,8 @@ Cost is based on data ingestion:
 
 **Expected usage for demo:** ~$10-20/month
 
+Prometheus costs are sample-volume dependent. High-cardinality labels, aggressive scrape intervals, and long-running scenarios can increase Azure Monitor workspace charges.
+
 ### Key Vault
 
 | Operation | Price |
@@ -137,6 +176,17 @@ Cost is based on data ingestion:
 | Storage | Included |
 
 **Expected usage for demo:** ~$3/month
+
+### Alert Rules
+
+The default deployment enables four Azure Monitor scheduled query rules when `deployAlerts=true`:
+
+- Pod restart spike
+- HTTP 5xx spike
+- Failed or pending pods
+- CrashLoop/OOM detected
+
+Alert-rule charges are small compared with AKS nodes and SRE Agent, but they are recurring while the resource group exists. If action groups are enabled, notification channels may add separate charges depending on configuration.
 
 ### Azure SRE Agent
 
@@ -149,25 +199,31 @@ SRE Agent uses Azure AI Units (AAU) billing:
 
 **Total SRE Agent cost:** ~$322-400/month
 
+Use `-SkipSreAgent` for the lower core-lab estimate. SRE Agent is a Preview resource type in this repository (`Microsoft.App/agents@2025-05-01-preview`); pricing, availability, and execution costs may change. Treat the SRE Agent line as a planning estimate and confirm actual charges in Azure Cost Management.
+
 ## Cost Optimization Strategies
 
 ### For Development/Testing
 
 1. **Delete when not in use**
-   ```powershell
-   .\scripts\destroy.ps1
-   ```
+    ```powershell
+    .\scripts\destroy.ps1 -ResourceGroupName "rg-srelab-eastus2"
+    ```
+   Confirm the resource group deletion completes in Azure Portal or Azure Cost Management. This stops most recurring charges for the lab.
 
 2. **Scale down nodes**
-   ```bash
-   az aks nodepool scale --resource-group rg-srelab-eastus2 \
-       --cluster-name aks-srelab-dev --name workload --node-count 1
-   ```
+    ```bash
+    az aks nodepool scale --resource-group rg-srelab-eastus2 \
+        --cluster-name aks-srelab --name workload --node-count 1
+    ```
+   Autoscaler settings may scale the pool back out during active demos.
 
 3. **Use spot instances** for user node pool
 
 4. **Disable optional components**
-   - Set `deployObservability = false` to skip Grafana/Prometheus
+    - Set `deployObservability = false` to skip Grafana/Prometheus
+    - Use `.\scripts\deploy.ps1 -SkipSreAgent` to skip SRE Agent
+    - Set `deployAlerts = false` if alert rules are not needed
 
 ### For Sustained Usage
 
@@ -251,8 +307,10 @@ Take advantage of Azure Free Tier:
 | Scenario | Monthly Cost |
 |----------|--------------|
 | Run demo for 1 hour | ~$2-3 |
-| Run demo for 1 day | ~$30-40 |
-| Always-on development | ~$750-1,100 |
+| Run core lab for 1 day | ~$24-30 |
+| Run full demo lab for 1 day | ~$34-40 |
+| Always-on core lab | ~$660-870 |
+| Always-on full demo lab | ~$970-1,170 |
 | With all optimizations | ~$400-500 |
 
 **Recommended approach:** Deploy when needed, destroy after demos, use minimal config for testing.

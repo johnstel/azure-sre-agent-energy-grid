@@ -49,7 +49,7 @@ param incidentWebhookServiceUri string = ''
 param alertActionGroupIds array = []
 
 @description('AKS Kubernetes version')
-param kubernetesVersion string = '1.32'
+param kubernetesVersion string = '1.34'
 
 @description('AKS system node pool VM size')
 @allowed([
@@ -61,8 +61,12 @@ param kubernetesVersion string = '1.32'
   'Standard_D4s_v5'
   'Standard_D2as_v5'
   'Standard_D4as_v5'
+  'Standard_D2s_v6'
+  'Standard_D4s_v6'
+  'Standard_D2as_v6'
+  'Standard_D4as_v6'
 ])
-param systemNodeVmSize string = 'Standard_D2s_v5'
+param systemNodeVmSize string = 'Standard_D2s_v6'
 
 @description('AKS user node pool VM size for workloads')
 @allowed([
@@ -74,8 +78,12 @@ param systemNodeVmSize string = 'Standard_D2s_v5'
   'Standard_D4s_v5'
   'Standard_D2as_v5'
   'Standard_D4as_v5'
+  'Standard_D2s_v6'
+  'Standard_D4s_v6'
+  'Standard_D2as_v6'
+  'Standard_D4as_v6'
 ])
-param userNodeVmSize string = 'Standard_D2s_v5'
+param userNodeVmSize string = 'Standard_D2s_v6'
 
 @description('System node pool node count')
 @minValue(1)

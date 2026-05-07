@@ -122,10 +122,10 @@ See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions
 
 | Configuration | Daily Cost | Monthly Cost |
 |--------------|------------|--------------|
-| Default deployment | ~$24-30 | ~$660-870 |
-| + SRE Agent | ~$34-40 | ~$970-1,170 |
+| Core lab / SRE Agent skipped | ~$24-30 | ~$660-870 |
+| Full demo lab / SRE Agent enabled | ~$34-40 | ~$970-1,170 |
 
-See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
+The full demo lab is the default when SRE Agent deployment is available; use `.\scripts\deploy.ps1 -SkipSreAgent` for the lower core-lab estimate. Destroy the resource group after demos to stop most recurring charges. See [docs/COSTS.md](docs/COSTS.md) for the canonical breakdown, assumptions, and optimization tips.
 
 ## 🔧 Available Scenarios
 
@@ -161,7 +161,7 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - `-WorkloadName`: Resource prefix - Default: `srelab`
 - `-AksApiServerAuthorizedIpRanges`: Optional AKS API server CIDR allowlist (for external demos). Example: `-AksApiServerAuthorizedIpRanges @('203.0.113.10/32')`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
-- `-SkipSreAgent`: Skip Azure SRE Agent deployment (useful for regions/subscriptions without Preview access)
+- `-SkipSreAgent`: Skip Azure SRE Agent deployment (useful when provider metadata, policy, or regional constraints block the lab's pinned API version)
 - `-WhatIf`: Preview deployment without making changes
 - `-Yes`: Skip confirmation prompts (non-interactive mode)
 
@@ -176,6 +176,8 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 
 ## 📚 Documentation
 
+- **[Supportability Guide](docs/SUPPORTABILITY.md)** — what's supported, health checks, escalation, restore procedures
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) — symptom-first diagnosis and fix procedures
 - [Demo Runbook](docs/DEMO-RUNBOOK.md) — operator checklist for running the demo
 - [Demo Narrative](docs/DEMO-NARRATIVE.md) — 20-minute customer story arc
 - [Safe Language Guardrails](docs/SAFE-LANGUAGE-GUARDRAILS.md) — claims to avoid during demos
@@ -185,8 +187,6 @@ See [docs/COSTS.md](docs/COSTS.md) for detailed breakdown and optimization tips.
 - [SRE Agent Setup Guide](docs/SRE-AGENT-SETUP.md)
 - [Prompts Guide](docs/PROMPTS-GUIDE.md)
 - [Breakable Scenarios Guide](docs/BREAKABLE-SCENARIOS.md)
-- [Kubernetes Service Troubleshooting](docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md)
-- [Azure Networking Troubleshooting](docs/TROUBLESHOOTING.md)
 - [Cost Estimation](docs/COSTS.md)
 - [Interactive Grid Map Spec](docs/INTERACTIVE-GRID-MAP-SPEC.md) — approved cloud-demo topology map specification
 - [Cloud Grid Map Data Contract](docs/CLOUD-GRID-MAP-DATA-CONTRACT.md) — selected cloud host, V1 health sources, and reusable topology config for the grid map
@@ -204,7 +204,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **⚠️ Important Notes:**
 
-- SRE Agent is currently in **Preview**
-- Only available in **East US 2**, **Sweden Central**, and **Australia East**
+- SRE Agent docs use GA-language; this lab still pins the ARM API to `Microsoft.App/agents@2025-05-01-preview` until issue #51 validation gates pass.
+- SRE Agent is available for this lab in **East US 2**, **Sweden Central**, and **Australia East**
 - AKS cluster must **NOT** be a private cluster for SRE Agent to access
 - Firewall must allow `*.azuresre.ai`

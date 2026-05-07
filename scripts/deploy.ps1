@@ -143,6 +143,220 @@ function Invoke-AzCliJsonArgs {
     }
 }
 
+function Get-KubernetesMinorVersion {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [string]$Version
+    )
+
+    if ($Version -match '^(\d+\.\d+)(?:\.|$)') {
+        return $Matches[1]
+    }
+
+    return $null
+}
+
+function Get-AksKubernetesVersionEntries {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        $Node
+    )
+
+    $entries = [System.Collections.Generic.List[object]]::new()
+
+    function Add-VersionEntries {
+        param(
+            [Parameter()]
+            $Current
+        )
+
+        if ($null -eq $Current) {
+            return
+        }
+
+        if ($Current -is [System.Collections.IEnumerable] -and -not ($Current -is [string])) {
+            foreach ($Item in $Current) {
+                Add-VersionEntries -Current $Item
+            }
+            return
+        }
+
+        $propertyNames = @($Current.PSObject.Properties.Name)
+        $version = $null
+
+        foreach ($propertyName in @('orchestratorVersion', 'kubernetesVersion', 'version')) {
+            if ($propertyNames -contains $propertyName -and -not [string]::IsNullOrWhiteSpace($Current.$propertyName)) {
+                $version = [string]$Current.$propertyName
+                break
+            }
+        }
+
+        if (-not $version -and $propertyNames -contains 'properties' -and $null -ne $Current.properties) {
+            $propertiesNames = @($Current.properties.PSObject.Properties.Name)
+            if ($propertiesNames -contains 'version' -and -not [string]::IsNullOrWhiteSpace($Current.properties.version)) {
+                $version = [string]$Current.properties.version
+            }
+        }
+
+        if ($version -match '^\d+\.\d+(?:\.\d+)?$') {
+            [void]$entries.Add([pscustomobject]@{
+                    Version = $version
+                    Node    = $Current
+                })
+        }
+
+        foreach ($propertyName in $propertyNames) {
+            Add-VersionEntries -Current $Current.$propertyName
+        }
+    }
+
+    Add-VersionEntries -Current $Node
+    return @($entries)
+}
+
+function Get-AksSupportPlanValues {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        $Node
+    )
+
+    $values = [System.Collections.Generic.List[string]]::new()
+
+    function Add-SupportPlanValue {
+        param(
+            [Parameter()]
+            $Value
+        )
+
+        if ($null -eq $Value) {
+            return
+        }
+
+        if ($Value -is [string]) {
+            if (-not [string]::IsNullOrWhiteSpace($Value)) {
+                [void]$values.Add($Value.Trim())
+            }
+            return
+        }
+
+        if ($Value -is [System.Collections.IEnumerable] -and -not ($Value -is [string])) {
+            foreach ($Item in $Value) {
+                Add-SupportPlanValue -Value $Item
+            }
+            return
+        }
+
+        $propertyNames = @($Value.PSObject.Properties.Name)
+        if ($propertyNames.Count -eq 0) {
+            [void]$values.Add(([string]$Value).Trim())
+            return
+        }
+
+        foreach ($propertyName in $propertyNames) {
+            Add-SupportPlanValue -Value $Value.$propertyName
+        }
+    }
+
+    function Search-SupportPlanProperties {
+        param(
+            [Parameter()]
+            $Current,
+
+            [Parameter()]
+            [string]$PropertyName = ''
+        )
+
+        if ($null -eq $Current) {
+            return
+        }
+
+        if ($PropertyName -match '(?i)support.*plan') {
+            Add-SupportPlanValue -Value $Current
+        }
+
+        if ($Current -is [string] -or $Current.GetType().IsPrimitive) {
+            return
+        }
+
+        if ($Current -is [System.Collections.IEnumerable] -and -not ($Current -is [string])) {
+            foreach ($Item in $Current) {
+                Search-SupportPlanProperties -Current $Item
+            }
+            return
+        }
+
+        foreach ($childProperty in @($Current.PSObject.Properties)) {
+            Search-SupportPlanProperties -Current $childProperty.Value -PropertyName $childProperty.Name
+        }
+    }
+
+    Search-SupportPlanProperties -Current $Node
+    return @($values | Select-Object -Unique)
+}
+
+function Test-AksKubernetesMinorNormalSupported {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Location,
+
+        [Parameter(Mandatory)]
+        [string]$KubernetesMinor
+    )
+
+    $versions = Invoke-AzCliJsonArgs -Arguments @(
+        'aks'
+        'get-versions'
+        '--location'
+        $Location
+        '--output'
+        'json'
+    )
+
+    if ($versions.ExitCode -ne 0) {
+        return [pscustomobject]@{
+            IsNormalSupported = $false
+            Reason            = "az aks get-versions failed for $Location (exit code $($versions.ExitCode))."
+        }
+    }
+
+    if (-not $versions.Json) {
+        return [pscustomobject]@{
+            IsNormalSupported = $false
+            Reason            = "az aks get-versions did not return parseable JSON for $Location."
+        }
+    }
+
+    $matchingEntries = @(Get-AksKubernetesVersionEntries -Node $versions.Json | Where-Object {
+            (Get-KubernetesMinorVersion -Version $_.Version) -eq $KubernetesMinor
+        })
+
+    if ($matchingEntries.Count -eq 0) {
+        return [pscustomobject]@{
+            IsNormalSupported = $false
+            Reason            = "minor $KubernetesMinor was not listed by az aks get-versions for $Location."
+        }
+    }
+
+    foreach ($entry in $matchingEntries) {
+        $supportPlans = @(Get-AksSupportPlanValues -Node $entry.Node)
+        if ($supportPlans | Where-Object { $_ -match '(?i)\b(KubernetesOfficial|Default|Normal|Standard)\b' }) {
+            return [pscustomobject]@{
+                IsNormalSupported = $true
+                Reason            = "minor $KubernetesMinor is listed with KubernetesOfficial/default support."
+            }
+        }
+    }
+
+    return [pscustomobject]@{
+        IsNormalSupported = $false
+        Reason            = "minor $KubernetesMinor appears LTS-only or cannot be confidently verified as KubernetesOfficial/default support."
+    }
+}
+
 function Get-ArmErrorMessages {
     [CmdletBinding()]
     param(
@@ -605,8 +819,24 @@ $userMaxPodsParam = $null
 if ($existingAksCluster) {
     Write-Host "  ℹ️  Found existing AKS cluster: $aksClusterName" -ForegroundColor Cyan
     if ($existingAksCluster.kubernetesVersion) {
-        $kubernetesVersionParam = $existingAksCluster.kubernetesVersion
-        Write-Host "  • Kubernetes version:  $kubernetesVersionParam (preserved)" -ForegroundColor White
+        $existingKubernetesVersion = [string]$existingAksCluster.kubernetesVersion
+        $existingKubernetesMinor = Get-KubernetesMinorVersion -Version $existingKubernetesVersion
+        Write-Host "  • Kubernetes version:  $existingKubernetesVersion (current)" -ForegroundColor White
+
+        if ($existingKubernetesMinor) {
+            $versionSupport = Test-AksKubernetesMinorNormalSupported -Location $Location -KubernetesMinor $existingKubernetesMinor
+            if ($versionSupport.IsNormalSupported) {
+                $kubernetesVersionParam = $existingKubernetesVersion
+                Write-Host "    Normal AKS support verified for minor $existingKubernetesMinor; preserving current version." -ForegroundColor Gray
+            }
+            else {
+                Write-Host "  ⚠️  Existing Kubernetes version will not be preserved for Standard tier: $($versionSupport.Reason)" -ForegroundColor Yellow
+                Write-Host "     Deployment will use the repo default Kubernetes version instead." -ForegroundColor Gray
+            }
+        }
+        else {
+            Write-Host "  ⚠️  Existing Kubernetes version '$existingKubernetesVersion' could not be parsed for Standard tier verification; deployment will use the repo default Kubernetes version instead." -ForegroundColor Yellow
+        }
     }
 
     # Extract VM sizes from existing node pools
@@ -628,7 +858,12 @@ if ($existingAksCluster) {
     }
 
     Write-Host "`n  ⚠️  AKS node pool VM sizes and maxPods are immutable. Using existing values to prevent deployment failure." -ForegroundColor Yellow
-    Write-Host "     Existing Kubernetes version is also preserved to avoid unsupported downgrade attempts." -ForegroundColor Gray
+    if ($kubernetesVersionParam) {
+        Write-Host "     Existing Kubernetes version is preserved only after verifying normal AKS support." -ForegroundColor Gray
+    }
+    else {
+        Write-Host "     Existing Kubernetes version is not preserved unless normal AKS support can be verified." -ForegroundColor Gray
+    }
     Write-Host "     To change VM sizes/maxPods or recreate from defaults, destroy the cluster or use a different WorkloadName." -ForegroundColor Gray
 }
 else {

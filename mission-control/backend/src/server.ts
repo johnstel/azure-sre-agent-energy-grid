@@ -15,6 +15,7 @@ import { registerScenarioRoutes } from './routes/scenarios.js';
 import { registerAssistantRoutes } from './routes/assistant.js';
 import { registerPortalValidationRoutes } from './routes/portal-validations.js';
 import { registerAnalystRoutes } from './routes/analyst.js';
+import { addScenarioJsonBodyCompatibility } from './utils/jsonBodyCompatibility.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = 3333;
@@ -27,6 +28,8 @@ async function start() {
     },
   });
   const jobManager = new JobManager();
+
+  addScenarioJsonBodyCompatibility(app);
 
   // CORS — allow localhost origins in dev
   await app.register(fastifyCors, {

@@ -168,6 +168,10 @@
       />
     </div>
 
+    <div v-if="controlPanelOpen && (jobLines.length > 0 || deployRunning || destroyRunning)" class="control-output-dock">
+      <Terminal :lines="jobLines" :title="jobStreamTitle" :tone="jobStreamKind === 'destroy' ? 'danger' : 'default'" />
+    </div>
+
     <PortalValidation v-if="controlPanelOpen" />
 
     <div class="wallboard__main">
@@ -478,6 +482,7 @@ import { useApi } from '@/composables/useApi';
 import { useWebSocket } from '@/composables/useWebSocket';
 import PortalValidation from './PortalValidation.vue';
 import ScenarioNarrationPanel from './ScenarioNarrationPanel.vue';
+import Terminal from './Terminal.vue';
 import type {
   Deployment,
   AssistantAskResponse,
@@ -573,6 +578,7 @@ const destroyConfirmOpen = ref(false);
 const destroyFinalConfirmed = ref(false);
 const destroyCountdown = ref(0);
 const jobLines = ref<string[]>([]);
+const jobStreamKind = ref<'deploy' | 'destroy' | null>(null);
 
 const fixingAll = ref(false);
 const togglingScenario = ref<string | null>(null);
@@ -678,6 +684,7 @@ const destroyCanArm = computed(() => destroyConfirmation.value === 'DELETE' && !
 const destroyCanConfirm = computed(() => destroyCanArm.value && destroyFinalConfirmed.value && destroyCountdown.value === 0);
 const deployJobStatusLabel = computed(() => deployRunning.value ? 'running' : deployJobStatus.value ?? 'ready');
 const deployJobBadgeClass = computed(() => badgeForJob(deployJobStatusLabel.value));
+const jobStreamTitle = computed(() => jobStreamKind.value === 'destroy' ? 'Destroy Output' : 'Deploy Output');
 const preflightLabel = computed(() => {
   if (preflightLoading.value) return 'checking';
   if (preflightChecks.value.length === 0) return 'not run';
@@ -814,6 +821,7 @@ async function startDeploy() {
   deployRunning.value = true;
   deployJobStatus.value = 'pending';
   deployRequestId.value = null;
+  jobStreamKind.value = 'deploy';
   jobLines.value = [`[Mission Control] Deploy requested for ${deployWorkload.value || 'srelab'} in ${deployLocation.value}.`];
   try {
     const response = await deploy({
@@ -839,6 +847,7 @@ async function startDestroy() {
   destroyRunning.value = true;
   destroyJobStatus.value = 'pending';
   destroyRequestId.value = null;
+  jobStreamKind.value = 'destroy';
   jobLines.value = [`[Mission Control] Destroy requested for ${destroyResourceGroup.value}.`];
   try {
     const response = await destroy({
@@ -1674,6 +1683,15 @@ defineExpose({
 
 .control-dock__card {
   padding: 0.8rem;
+}
+
+.control-output-dock {
+  min-height: 0;
+}
+
+.control-output-dock :deep(.terminal-body) {
+  max-height: min(32vh, 360px);
+  overflow: auto;
 }
 
 .control-dock__card--danger {

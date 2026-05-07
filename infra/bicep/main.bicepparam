@@ -21,9 +21,9 @@ param deploySreAgent = true
 param deployActionGroup = false
 
 // AKS Configuration - cost-optimized for demo
-param kubernetesVersion = '1.32'
-param systemNodeVmSize = 'Standard_D2s_v5'
-param userNodeVmSize = 'Standard_D2s_v5'
+param kubernetesVersion = '1.34'
+param systemNodeVmSize = 'Standard_D2s_v6'
+param userNodeVmSize = 'Standard_D2s_v6'
 param systemNodeCount = 2
 param userNodeCount = 3
 // New clusters use higher maxPods than AKS's Azure CNI default (30) to leave room for Defender/Retina/monitoring DaemonSets.

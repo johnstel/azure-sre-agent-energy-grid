@@ -19,8 +19,8 @@ import type {
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: buildHeaders(options),
   });
 
   if (!response.ok) {
@@ -36,6 +36,18 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+function buildHeaders(options?: RequestInit): HeadersInit | undefined {
+  const hasBody = options?.body !== undefined && options.body !== null;
+  const hasHeaders = options?.headers !== undefined;
+  if (!hasBody && !hasHeaders) return undefined;
+
+  const headers = new Headers(options?.headers);
+  if (hasBody && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  return headers;
 }
 
 export function useApi() {

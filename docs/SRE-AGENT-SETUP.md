@@ -8,9 +8,8 @@ Azure SRE Agent (GA) is an AI-powered site reliability engineering automation to
 
 - **Diagnose issues** in Azure resources using natural language
 - **Investigate incidents** across AKS, App Service, Container Apps, and more
-- **Run remediation actions** to fix common problems
-- **Create scheduled tasks** for proactive monitoring
-- **Integrate with external tools** like Grafana, PagerDuty, and ServiceNow
+- **Prepare operator-controlled remediation** in Review mode for supported flows
+- **Keep diagnosis evidence-oriented** using connected resource context and approved demo signals
 
 ## Prerequisites
 
@@ -67,7 +66,7 @@ When you create an SRE Agent, Azure automatically provisions:
 
 ## Step 2: Configure Agent Permissions
 
-The SRE Agent needs access to your Azure resources to diagnose issues — and optionally to remediate them.
+The SRE Agent needs access to your Azure resources to diagnose issues — and, for internal demos only, prepare operator-controlled Review-mode remediation.
 
 > **Note**: When deployed via Bicep (default), the agent's managed identity receives roles determined by `sreAgentAccessLevel` (default `Low`). The script below can grant additional roles and aligns to the same access-level gate.
 
@@ -102,7 +101,7 @@ SRE Agent can diagnose issues, query logs, surface hypotheses, and recommend rem
 
 #### High access — remediation demos (internal only)
 
-Required for demo flows where SRE Agent performs or proposes write-level remediation. Set via `sreAgentAccessLevel = 'High'` in `main.bicepparam` and `-SreAgentAccessLevel High` in scripts.
+Required for internal demo flows where SRE Agent prepares or proposes operator-controlled Review-mode remediation. Set via `sreAgentAccessLevel = 'High'` in `main.bicepparam` and `-SreAgentAccessLevel High` in scripts.
 
 > ⚠️ **Do not use High access for external or customer-facing demos.**
 
@@ -127,7 +126,7 @@ Required for demo flows where SRE Agent performs or proposes write-level remedia
 |---------|-----|
 | External / customer-facing demo | `Low` |
 | Internal lab — diagnosis walkthrough | `Low` |
-| Internal lab — full remediation demo | `High` |
+| Internal lab — Review-mode remediation demo | `High` |
 | Production / security review | `Low` (or omit SRE Agent entirely) |
 
 To deploy with explicit access level control:
@@ -157,7 +156,7 @@ Assign these roles to **users** who will interact with SRE Agent:
 | Role | Description |
 |------|-------------|
 | **SRE Agent Admin** | Full access - create agents, manage settings, assign roles |
-| **SRE Agent Standard User** | Chat with agent, run diagnostics and remediation |
+| **SRE Agent Standard User** | Chat with agent, run diagnostics, and run operator-approved Review-mode remediation |
 | **SRE Agent Reader** | View-only access to agent and chat history |
 
 Assign roles to users via Azure Portal:
@@ -219,7 +218,7 @@ Once connected, you can interact with SRE Agent using natural language:
 4. **Expected Response:**
    - SRE Agent will identify OOMKilled events
    - Recommend increasing memory limits
-   - May offer to create a remediation action
+   - May offer to prepare a Review-mode remediation action for operator approval
 
 5. **Fix the issue:**
    ```bash
@@ -243,7 +242,7 @@ Once connected, you can interact with SRE Agent using natural language:
 
 ### Troubleshooting: Public LoadBalancer Not Responding
 
-If you break a scenario and the public LoadBalancer stops responding, it's **not** the scenario — it's an Azure networking issue. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#-public-loadbalancer-not-responding) for a complete diagnostic guide.
+If you break a scenario and the public LoadBalancer stops responding, it's **not** the scenario — it's an Azure networking issue. See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#public-loadbalancer-not-responding) for a complete diagnostic guide.
 
 **Quick check:**
 ```bash
@@ -259,79 +258,19 @@ kubectl run -n energy test --image=curlimages/curl --rm -it -- \
 # For detailed K8s service diagnostics, see [KUBERNETES-SERVICE-TROUBLESHOOTING.md](KUBERNETES-SERVICE-TROUBLESHOOTING.md)
 ```
 
-## Advanced Features
+## Supportability and troubleshooting summary
 
-### Scheduled Tasks
+The current lab supportability path is operator-led: deploy or connect SRE Agent, grant the selected RBAC level, ask diagnosis prompts, review cited evidence, and apply any fix deliberately in Review mode. Scheduled tasks, incident-triggered automatic diagnosis, and external tool integrations are not wired or validated in this repository, so they are not part of the current supportability path.
 
-Create automated diagnosis tasks:
+For symptom-first diagnosis and setup validation, use these links:
 
-1. Go to **Subagent builder** in SRE Agent
-2. Click **Create scheduled task**
-3. Configure:
-   - **Name**: "Daily AKS Health Check"
-   - **Schedule**: "Every day at 9 AM" (or use cron: `0 9 * * *`)
-   - **Prompt**: "Check the health of my AKS cluster and report any issues"
-
-### Incident Triggers
-
-Configure automatic diagnosis when incidents are created:
-
-1. Go to **Subagent builder** > **Incident triggers**
-2. Connect to your incident management system (PagerDuty, ServiceNow)
-3. Define trigger conditions and diagnosis prompts
-
-### MCP Integrations
-
-Connect external tools via Model Context Protocol (MCP):
-
-- **Grafana**: Query dashboards and metrics
-- **Prometheus**: Access custom metrics
-- **GitHub/Azure DevOps**: Correlate with code changes
-- **ServiceNow/PagerDuty**: Bi-directional incident management
-
-## Troubleshooting SRE Agent
-
-### Agent Can't Access AKS Resources
-
-**Symptom:** SRE Agent says it can't read namespaces or pods
-
-**Cause:** AKS cluster has restricted inbound network access
-
-**Solution:** Ensure the cluster is not a fully private cluster. SRE Agent needs network access to query Kubernetes objects.
-
-### Public LoadBalancer Not Responding
-
-**Symptom:** Public IPs for grid-dashboard or ops-console don't respond to curl from outside Azure, but internal access works
-
-**Cause:** VNet subnet NSG blocking Internet traffic (NOT Azure Load Balancer misconfiguration)
-
-**Solution:** See [TROUBLESHOOTING.md](TROUBLESHOOTING.md#-public-loadbalancer-not-responding) for detailed diagnostic steps and fixes. TL;DR: Add an NSG rule allowing inbound TCP 80 from Internet to the AKS subnet.
-
-### Permission Errors
-
-**Symptom:** "Insufficient permissions" errors
-
-**Solution:**
-1. Verify the SRE Agent's managed identity has Contributor role on the resource group
-2. Ensure you have `Microsoft.Authorization/roleAssignments/write` permission
-3. Run the RBAC configuration script again
-
-### Firewall Blocking
-
-**Symptom:** Agent can't connect or times out
-
-**Solution:** Ensure `*.azuresre.ai` is allowed through your firewall/proxy
-
-## Cost Information
-
-SRE Agent billing is based on Azure AI Units (AAU):
-
-| Component | Cost |
-|-----------|------|
-| Fixed agent cost | ~$292/month (4 AAU × 730 hours × $0.10) |
-| Execution costs | Variable based on usage |
-
-See [docs/COSTS.md](COSTS.md) for full cost breakdown including AKS and other resources.
+| Need | Link |
+|------|------|
+| Full troubleshooting guide | [Troubleshooting Guide](TROUBLESHOOTING.md) |
+| SRE Agent setup issues | [Troubleshooting → SRE Agent Issues](TROUBLESHOOTING.md#sre-agent-issues) |
+| Public LoadBalancer not responding | [Troubleshooting → Public LoadBalancer](TROUBLESHOOTING.md#public-loadbalancer-not-responding) |
+| Kubernetes service diagnostics | [Kubernetes Service Troubleshooting](KUBERNETES-SERVICE-TROUBLESHOOTING.md) |
+| Cost planning | [Cost Breakdown](COSTS.md) |
 
 ## Additional Resources
 
