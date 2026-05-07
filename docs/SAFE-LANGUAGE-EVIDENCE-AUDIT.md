@@ -22,7 +22,7 @@ Audited surfaces:
 
 | Check | Result | Notes |
 |-------|--------|-------|
-| GA + API-pin disclosure appears in customer-facing docs | Pass | README, narrative, leave-behind, and runbook disclose GA status plus the `2025-05-01-preview` subscription API pin caveat. |
+| GA + API-pin disclosure appears in customer-facing docs | Pass | README, narrative, leave-behind, and runbook disclose GA status plus the `Microsoft.App/agents@2026-01-01` Stable-channel pin and no-preview-fallback behavior. |
 | No MTTR percentage claims in audited customer-facing docs | Pass | Existing MTTR timestamp/model references remain measurement scaffolding, not improvement percentages. |
 | No autonomous-remediation claim | Pass | Wording consistently says Review mode, recommendations, and operator execution unless real approval evidence exists. |
 | No fabricated portal output or deterministic agent transcript | Pass after updates | Scenario highlights and Wave 1 evidence instructions now require real portal output rather than expected agent wording. |

@@ -199,7 +199,7 @@ SRE Agent uses Azure AI Units (AAU) billing:
 
 **Total SRE Agent cost:** ~$322-400/month
 
-Use `-SkipSreAgent` for the lower core-lab estimate. SRE Agent is a Preview resource type in this repository (`Microsoft.App/agents@2025-05-01-preview`); pricing, availability, and execution costs may change. Treat the SRE Agent line as a planning estimate and confirm actual charges in Azure Cost Management.
+Use `-SkipSreAgent` for the lower core-lab estimate. This repository pins the SRE Agent resource to `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`; pricing, regional availability, and execution costs may change. Treat the SRE Agent line as a planning estimate and confirm actual charges in Azure Cost Management.
 
 ## Cost Optimization Strategies
 

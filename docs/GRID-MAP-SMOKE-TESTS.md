@@ -1,8 +1,9 @@
 # Cloud Demo Grid Map — Scenario Smoke Tests
 
-> **Azure SRE Agent is generally available (GA).** This demo currently uses
-> `Microsoft.App/agents@2025-05-01-preview` because this subscription provider metadata exposes only that API
-> version. Move to `2026-01-01` after provider exposure and successful `what-if` validation.
+> **Azure SRE Agent is generally available (GA).** This demo pins
+> `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`. If a
+> subscription exposes only older preview provider metadata, deployment skips
+> SRE Agent rather than falling back.
 
 > **Safety Disclaimer** — This checklist covers the Interactive Grid Map in the deployed cloud demo
 > (`ops-console`). The grid map visualizes Kubernetes service/application health for the Azure SRE

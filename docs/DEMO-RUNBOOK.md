@@ -354,7 +354,7 @@ Azure SRE Agent is **GA**. If the portal is unresponsive during a live demo:
 | Issue | Workaround |
 |-------|------------|
 | Port 3333 conflict with Mission Control | Change port in Mission Control config or stop conflicting process |
-| `managedResources: []` in SRE Agent | Current API-version limitation in this subscription (`2025-05-01-preview`) — add managed resources manually via Azure Portal after deployment |
+| `managedResources: []` in SRE Agent | Current lab configuration keeps managed resources explicit; add managed resources manually via Azure Portal after deployment if required for the scenario |
 | Public AKS API server required | Current SRE Agent deployment path in this lab requires a public endpoint; do not enable private cluster |
 | Deployment output scrolls past SRE Agent URL | Use Option B or C in Step 3 above |
 | RabbitMQ severity stickiness after recovery | Wallboard may show warning after fix-all; redeploy RabbitMQ if needed |
@@ -481,7 +481,7 @@ Verify SRE Agent App Insights telemetry schema and document observed fields:
   | take 10
   ```
 - [ ] **Document observed field names** in `docs/evidence/kql/README.md` under "Observed SRE Agent Telemetry Fields (SCHEMA_TBD)"
-  - Record: API version (`2025-05-01-preview`), date observed, field name, type, purpose
+  - Record: deployed API version, date observed, field name, type, purpose
   - Example: `customDimensions["sre.agent.conversationId"]`, string, "Unique conversation session ID"
 - [ ] Update `sre-agent-telemetry.kql` if field names differ from expected
 - [ ] Keep `// SCHEMA_TBD` comments in place until GA schema is confirmed

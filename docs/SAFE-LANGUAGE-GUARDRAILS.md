@@ -1,7 +1,7 @@
 # Safe Language Guardrails
 
 > **Audience**: Anyone presenting, writing about, or demoing the Energy Grid SRE Agent lab
-> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
 > **Rule**: Every customer-facing artifact must reference this document before publication
 
 This document prevents accidental overclaiming. Review it before every demo.
@@ -28,7 +28,7 @@ This document prevents accidental overclaiming. Review it before every demo.
 | **Least Privilege** | "Production-grade RBAC" or "least-privilege permissions" | "The demo uses broad permissions for convenience. See our demo-vs-production RBAC matrix for what production deployments should look like." | Demo grants AKS Cluster Admin, subscription-scoped Reader, and other overbroad roles. These are documented as `⚠️ DEMO ONLY` in CAPABILITY-CONTRACTS.md §10. |
 | **Audit Evidence** | "Compliance-ready evidence package" | "We define evidence capture contracts (file paths, naming, MTTR timestamps) and populate them during demo runs. Full compliance packaging is a future wave." | Evidence folders exist but are empty placeholders until populated with real demo run artifacts. |
 | **Data Retention** | "Complete audit history" | "Log Analytics retains 90 days; App Insights retains 90 days. Activity Log export to Log Analytics is configured in Bicep but verify ingestion during live UAT before claiming full KQL queryability. See our retention table in CAPABILITY-CONTRACTS.md §11." | Retention is configured but live verification is needed before claiming complete audit evidence. |
-| **Status and API pin** | "API behavior is fully frozen in this tenant" | "Azure SRE Agent is GA. This lab currently uses `Microsoft.App/agents@2025-05-01-preview` because this subscription provider metadata exposes only that API version. Telemetry schemas may change across API versions." | Must appear in every customer-facing artifact, not just footers. |
+| **Status and API pin** | "API behavior is fully frozen in this tenant" | "Azure SRE Agent is GA. This lab pins `Microsoft.App/agents@2026-01-01` and `upgradeChannel: 'Stable'`. If a subscription exposes only older preview provider metadata, the deploy script skips SRE Agent instead of falling back." | Must appear in every customer-facing artifact, not just footers. |
 | **CI/CD Correlation** | "Commit-to-incident tracing" | "SRE Agent supports MCP integration with GitHub/Azure DevOps for commit-to-incident correlation — this is a natural extension." | No CI/CD pipeline exists in this demo. |
 
 ---
@@ -48,7 +48,7 @@ This document prevents accidental overclaiming. Review it before every demo.
 
 The following statement (or equivalent) must appear **prominently** in every customer-facing artifact:
 
-> **Azure SRE Agent is generally available (GA).** This demo lab currently uses `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata exposes only that API version. We will move to `2026-01-01` after provider exposure and successful `what-if` validation.
+> **Azure SRE Agent is generally available (GA).** This demo lab pins `Microsoft.App/agents@2026-01-01` and `upgradeChannel: 'Stable'`. If a subscription exposes only older preview provider metadata, the deploy script skips SRE Agent rather than silently deploying the legacy preview API.
 
 "Prominently" means: in the first section of the document, not in a footer or appendix.
 

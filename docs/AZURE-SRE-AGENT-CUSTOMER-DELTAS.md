@@ -1,6 +1,6 @@
 # Azure SRE Agent Service Demo — Customer Readiness Delta Analysis
 
-> **Version**: 1.0 &middot; **Date**: 2026-04-25 &middot; **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
+> **Version**: 1.0 &middot; **Date**: 2026-04-25 &middot; **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
 > **Applicable regions**: East US 2, Sweden Central, Australia East
 > **Repo**: [`johnstel/azure-sre-agent-energy-grid`](https://github.com/johnstel/azure-sre-agent-energy-grid)
 
@@ -75,7 +75,7 @@ The demo deploys a three-tier, fully-IaC architecture via a single `main.bicep` 
 | **Compute** | AKS (Standard tier, public API, Azure CNI + Calico, OIDC + Workload Identity, Container Insights, Azure Policy addon, Key Vault Secrets Provider) | `infra/bicep/modules/aks.bicep` |
 | **Application** | 8 microservices in `energy` namespace: grid-dashboard (Vue.js), ops-console (Vue.js), meter-service (Node.js), asset-service (Rust), dispatch-service (Go), load-simulator (Python), RabbitMQ, MongoDB | `k8s/base/application.yaml` |
 | **Observability** | Log Analytics (30-day retention), App Insights (90-day retention), Managed Grafana, Azure Monitor Prometheus, 4 scheduled-query alert rules (opt-in) | `infra/bicep/main.bicep:134-268` |
-| **SRE Agent** | `Microsoft.App/agents@2025-05-01-preview` with user-assigned managed identity, `accessLevel: 'High'`, `mode: 'Review'` | `infra/bicep/modules/sre-agent.bicep:77-107` |
+| **SRE Agent** | `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`, user-assigned managed identity, `accessLevel: 'High'`, `mode: 'Review'` | `infra/bicep/modules/sre-agent.bicep:76-108` |
 | **Mission Control** | Local-only Fastify 5 + Vue 3 SPA. Includes "Ask Copilot" assistant (read-only, GitHub Copilot SDK). Binds to `127.0.0.1:3333`. | `mission-control/README.md` |
 
 **Key distinction**: Azure SRE Agent is the cloud-side AI diagnostic and remediation service (the product being demonstrated). Mission Control is a local demo cockpit for launching scenarios and viewing wallboard state. They share the same AKS cluster and observability stack but have no direct integration with each other.

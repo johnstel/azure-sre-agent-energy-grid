@@ -5,7 +5,7 @@
 .DESCRIPTION
     This script deploys all Azure infrastructure needed for the SRE Agent demo,
     including AKS, Container Registry, Key Vault, observability tools, and
-    Azure SRE Agent (Microsoft.App/agents@2025-05-01-preview).
+    Azure SRE Agent (Microsoft.App/agents@2026-01-01, GA stable channel).
     It uses device code authentication by default for dev container support.
 
 .PARAMETER Location
@@ -75,6 +75,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+$SreAgentTargetApiVersion = '2026-01-01'
+$SreAgentLegacyPreviewApiVersion = '2025-05-01-preview'
 
 if ($AksApiServerAuthorizedIpRanges.Count -gt 0) {
     $cidrPattern = '^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\/([0-9]|[12][0-9]|3[0-2])$'
@@ -535,6 +538,58 @@ function Write-SubscriptionDeploymentFailureSummary {
     }
 }
 
+function Test-AlertWorkspaceReadinessFailure {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [string]$ErrorText
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ErrorText)) {
+        return $false
+    }
+
+    return $ErrorText -match '(?i)deploy-alerts' -and $ErrorText -match '(?i)workspace could not be found'
+}
+
+function Wait-LogAnalyticsWorkspaceReady {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName,
+
+        [Parameter(Mandatory)]
+        [string]$WorkspaceName,
+
+        [Parameter()]
+        [int]$TimeoutSeconds = 180
+    )
+
+    Write-Host "`n⏳ Azure Monitor could not resolve the new Log Analytics workspace yet." -ForegroundColor Yellow
+    Write-Host "  Waiting for workspace readiness before retrying alert deployment: $WorkspaceName" -ForegroundColor Gray
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $workspaceState = az resource show `
+            --resource-group $ResourceGroupName `
+            --resource-type 'Microsoft.OperationalInsights/workspaces' `
+            --name $WorkspaceName `
+            --query 'properties.provisioningState' `
+            --output tsv 2>$null
+
+        if ($LASTEXITCODE -eq 0 -and $workspaceState -eq 'Succeeded') {
+            Write-Host "  ✅ Log Analytics workspace is provisioned. Giving Azure Monitor a short propagation window..." -ForegroundColor Green
+            Start-Sleep -Seconds 30
+            return $true
+        }
+
+        Start-Sleep -Seconds 10
+    } while ((Get-Date) -lt $deadline)
+
+    Write-Host "  ⚠️  Timed out waiting for Log Analytics workspace readiness." -ForegroundColor Yellow
+    return $false
+}
+
 function Get-DeletedKeyVaultConflict {
     [CmdletBinding()]
     param(
@@ -648,8 +703,9 @@ function Get-SreAgentProviderStatus {
         return [pscustomobject]@{
             RegistrationState  = 'Unknown'
             HasAgentsResource  = $false
-            SupportsPreviewApi = $false
+            SupportsTargetApi  = $false
             DefaultApiVersion  = ''
+            ApiVersions        = @()
         }
     }
 
@@ -660,8 +716,9 @@ function Get-SreAgentProviderStatus {
         return [pscustomobject]@{
             RegistrationState  = 'Unknown'
             HasAgentsResource  = $false
-            SupportsPreviewApi = $false
+            SupportsTargetApi  = $false
             DefaultApiVersion  = ''
+            ApiVersions        = @()
         }
     }
 
@@ -674,8 +731,9 @@ function Get-SreAgentProviderStatus {
     return [pscustomobject]@{
         RegistrationState  = $provider.registrationState
         HasAgentsResource  = $null -ne $agentsResource
-        SupportsPreviewApi = $apiVersions -contains '2025-05-01-preview'
+        SupportsTargetApi  = $apiVersions -contains $SreAgentTargetApiVersion
         DefaultApiVersion  = if ($agentsResource -and $agentsResource.PSObject.Properties.Name -contains 'defaultApiVersion') { $agentsResource.defaultApiVersion } else { '' }
+        ApiVersions        = $apiVersions
     }
 }
 
@@ -755,15 +813,18 @@ if ($deploySreAgent) {
         $sreAgentProvider = Get-SreAgentProviderStatus
     }
 
-    if (-not $sreAgentProvider.HasAgentsResource -or -not $sreAgentProvider.SupportsPreviewApi) {
+    if (-not $sreAgentProvider.HasAgentsResource -or -not $sreAgentProvider.SupportsTargetApi) {
         $deploySreAgent = $false
-        $sreAgentSkipReason = 'Microsoft.App/agents@2025-05-01-preview is not available for this subscription.'
+        $availableApiVersions = if ($sreAgentProvider.ApiVersions.Count -gt 0) { $sreAgentProvider.ApiVersions -join ', ' } else { 'none reported' }
+        $sreAgentSkipReason = "Microsoft.App/agents@$SreAgentTargetApiVersion is not available for this subscription. Not falling back to legacy preview API $SreAgentLegacyPreviewApiVersion. Available versions: $availableApiVersions."
         Write-Host "  ⚠️  $sreAgentSkipReason" -ForegroundColor Yellow
         Write-Host "      Continuing with core infrastructure deployment." -ForegroundColor Gray
     }
     else {
-        $apiVersion = if ($sreAgentProvider.DefaultApiVersion) { $sreAgentProvider.DefaultApiVersion } else { '2025-05-01-preview' }
-        Write-Host "  ✅ Microsoft.App/agents is available (API: $apiVersion)" -ForegroundColor Green
+        Write-Host "  ✅ Microsoft.App/agents is available (API: $SreAgentTargetApiVersion, Stable channel)" -ForegroundColor Green
+        if ($sreAgentProvider.DefaultApiVersion -and $sreAgentProvider.DefaultApiVersion -ne $SreAgentTargetApiVersion) {
+            Write-Host "      Provider default API is $($sreAgentProvider.DefaultApiVersion); deployment remains pinned to $SreAgentTargetApiVersion." -ForegroundColor Gray
+        }
     }
 }
 else {
@@ -788,6 +849,7 @@ else {
 
 # Set variables
 $resourceGroupName = "rg-$WorkloadName-$Location"
+$logAnalyticsWorkspaceName = "log-$WorkloadName"
 $deploymentName = "sre-demo-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 $bicepFile = Join-Path $PSScriptRoot "..\infra\bicep\main.bicep"
 $parametersFile = Join-Path $PSScriptRoot "..\infra\bicep\main.bicepparam"
@@ -987,7 +1049,7 @@ try {
     )
 
     $deployment = $null
-    for ($attempt = 1; $attempt -le 2; $attempt++) {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
         $create = Invoke-AzCliJsonArgs -Arguments $createArgs
 
         if ($create.ExitCode -eq 0 -and $create.Json) {
@@ -995,9 +1057,12 @@ try {
             break
         }
 
+        $deploymentErrorText = [System.Collections.Generic.List[string]]::new()
+
         Write-Host "`nAzure CLI deployment command failed." -ForegroundColor Red
         if ($create.Raw) {
             Write-Host "Azure CLI output:`n$($create.Raw.Trim())" -ForegroundColor Red
+            [void]$deploymentErrorText.Add($create.Raw)
         }
 
         # Best-effort: if a deployment record exists, pull structured error details.
@@ -1016,6 +1081,7 @@ try {
             if ($show.Json.properties.error) {
                 Write-Host "`nDeployment error (structured):" -ForegroundColor Yellow
                 Write-Host ($show.Json.properties.error | ConvertTo-Json -Depth 50) -ForegroundColor Yellow
+                [void]$deploymentErrorText.Add(($show.Json.properties.error | ConvertTo-Json -Depth 50))
             }
         }
 
@@ -1030,6 +1096,15 @@ try {
                     continue
                 }
             }
+        }
+
+        if (
+            $attempt -lt 3 -and
+            (Test-AlertWorkspaceReadinessFailure -ErrorText ($deploymentErrorText -join "`n")) -and
+            (Wait-LogAnalyticsWorkspaceReady -ResourceGroupName $resourceGroupName -WorkspaceName $logAnalyticsWorkspaceName)
+        ) {
+            Write-Host "`n🔁 Retrying deployment after Log Analytics workspace propagation..." -ForegroundColor Yellow
+            continue
         }
 
         throw "Deployment failed (see output above)."

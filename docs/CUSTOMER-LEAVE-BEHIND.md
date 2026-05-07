@@ -1,10 +1,10 @@
 # Customer Leave-Behind: Azure SRE Agent Energy Grid Demo
 
-> **Azure SRE Agent is generally available (GA).** This lab currently uses `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata only exposes that API version today. This document is an evidence-safe summary of the demo lab and **requires Dallas approval before external customer use**.
+> **Azure SRE Agent is generally available (GA).** This lab pins `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`. If a subscription exposes only older preview provider metadata, deployment skips SRE Agent rather than falling back. This document is an evidence-safe summary of the demo lab and **requires Dallas approval before external customer use**.
 
 **Version date:** 2026-04-29
 
-**Valid for API version:** `2025-05-01-preview` · **Check for updates:** Ask your Microsoft contact for the latest version of this document before sharing internally. We will move to `2026-01-01` after provider exposure and successful `what-if` validation.
+**Valid for API version:** `2026-01-01` · **Check for updates:** Ask your Microsoft contact for the latest version of this document before sharing internally.
 
 ## What Azure SRE Agent Is
 

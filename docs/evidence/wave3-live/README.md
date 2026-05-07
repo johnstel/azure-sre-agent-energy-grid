@@ -5,7 +5,7 @@
 **Scope**: Azure SRE Agent Service capabilities only — **Mission Control is out of scope**
 **Current verdict recommendation**: 🟡 `PASS_WITH_PENDING_HUMAN_PORTAL`
 
-> **GA/lab API disclosure**: Azure SRE Agent is generally available, but this lab currently pins `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata exposes only that API version. This evidence package documents only what this repo can prove. Where the deployed service or portal has not been human-validated, the status remains pending and must not be presented as proven.
+> **GA/lab API disclosure**: Azure SRE Agent is generally available, and this lab pins `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`. If a subscription exposes only older preview provider metadata, deployment skips the SRE Agent instead of falling back to the legacy preview API. This evidence package documents only what this repo can prove. Where the deployed service or portal has not been human-validated, the status remains pending and must not be presented as proven.
 
 ---
 

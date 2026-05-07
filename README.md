@@ -1,6 +1,6 @@
 # Azure SRE Agent Energy Grid Demo Lab ⚡
 
-> **Azure SRE Agent is generally available (GA).** This lab currently keeps Bicep pinned to `Microsoft.App/agents@2025-05-01-preview` because the active subscription provider metadata exposes only that API version today. We will move to `2026-01-01` after provider exposure and successful `what-if` validation; track the gate in [SRE Agent API Rollout](docs/SRE-AGENT-API-ROLLOUT.md). Remediation remains operator-controlled unless real approval UI/API evidence is captured.
+> **Azure SRE Agent is generally available (GA).** This lab pins Bicep to `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`. If a subscription still exposes only older preview provider metadata, `scripts/deploy.ps1` skips SRE Agent rather than falling back to the legacy preview API. Remediation remains operator-controlled unless real approval UI/API evidence is captured.
 
 ## Why This Demo Exists
 
@@ -152,7 +152,7 @@ The full demo lab is the default when SRE Agent deployment is available; use `.\
 |---------|-------------|
 | `.\scripts\deploy.ps1 -Location eastus2` | Deploy all infrastructure to Azure |
 | `.\scripts\deploy.ps1 -WhatIf` | Preview what would be deployed |
-| `.\scripts\check-sre-agent-api-rollout.ps1 -ResourceGroupName <rg>` | Check whether `Microsoft.App/agents@2026-01-01` can be safely adopted |
+| `.\scripts\check-sre-agent-api-rollout.ps1 -ResourceGroupName <rg>` | Check whether the subscription exposes `Microsoft.App/agents@2026-01-01` |
 | `.\scripts\validate-deployment.ps1 -ResourceGroupName <rg>` | Verify resources and app are healthy |
 | `.\scripts\destroy.ps1 -ResourceGroupName <rg>` | Tear down all infrastructure |
 
@@ -204,7 +204,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 **⚠️ Important Notes:**
 
-- SRE Agent docs use GA-language; this lab still pins the ARM API to `Microsoft.App/agents@2025-05-01-preview` until issue #51 validation gates pass.
+- SRE Agent docs use GA-language; this lab pins the ARM API to `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`.
 - SRE Agent is available for this lab in **East US 2**, **Sweden Central**, and **Australia East**
 - AKS cluster must **NOT** be a private cluster for SRE Agent to access
 - Firewall must allow `*.azuresre.ai`

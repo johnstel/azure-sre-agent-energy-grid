@@ -1,7 +1,7 @@
 # Demo Narrative: Energy Grid SRE Agent
 
 > **Duration**: 20 minutes · **Audience**: SRE managers, security reviewers, executive buyers
-> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
 > **Pre-read**: [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) · [DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)
 
 ---
@@ -191,7 +191,7 @@ For a 10-minute demo, use only scenarios 1 and 2. For a 5-minute demo, use scena
 |---|----------|-----------------|
 | 1 | "Can it break things?" | "In this Review-mode demo, treat agent output as recommendations. The operator decides what to execute; do not claim a specific approval/denial API unless portal evidence exists." |
 | 2 | "What permissions does it need?" | "Minimum: Reader + Log Analytics Reader (`accessLevel: 'Low'`). For remediation: add Contributor (`accessLevel: 'High'`). See our RBAC matrix in CAPABILITY-CONTRACTS.md §10." |
-| 3 | "Is this production-ready?" | "Azure SRE Agent is GA, but this demo lab is not a production blueprint. We keep operator-controlled remediation, broad demo permissions, and a `2025-05-01-preview` API pin in this subscription until `2026-01-01` is exposed and validated." |
+| 3 | "Is this production-ready?" | "Azure SRE Agent is GA, but this demo lab is not a production blueprint. We keep operator-controlled remediation and broad demo permissions, and we pin the ARM resource to `Microsoft.App/agents@2026-01-01` with the Stable channel. If a subscription exposes only older preview provider metadata, deployment skips SRE Agent rather than falling back." |
 | 4 | "What about auto-remediation?" | "Auto mode exists but we deliberately run in Review mode. Auto requires a separate security review — rollback procedures, blast radius containment, and kill-switch documentation." |
 | 5 | "Where's the audit trail?" | "SRE Agent operational telemetry is configured to App Insights; ARM-level actions appear in the Activity Log. Exact conversation/action fields are SCHEMA_TBD until verified in the deployed API version. We capture KQL evidence for every demo run." |
 | 6 | "What if the agent is wrong?" | "In Review mode for this demo, treat the output as a recommendation. If it's wrong, the operator does not execute it. Do not claim a specific reject/deny API unless the portal exposes it and you capture evidence." |

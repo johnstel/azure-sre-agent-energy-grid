@@ -1,7 +1,7 @@
 # Troubleshooting Guide
 
 > **Audience**: Operators and support engineers diagnosing issues in the Energy Grid demo lab
-> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview`)
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
 > **Trust model**: Agent recommends, operator executes
 
 This guide is organized by **symptom**. Start with what you observe, follow the decision tree to the right section, and each section gives you diagnosis, fix, and verification steps.

@@ -1,7 +1,7 @@
 # Supportability Guide
 
 > **Audience**: Customer support engineers, SRE teams, and operators responsible for this demo lab
-> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
 > **Trust model**: Agent recommends, operator executes — unless real portal approval UI/API evidence is captured
 
 This document is the starting point for anyone supporting the Azure SRE Agent Energy Grid demo lab. It defines what is supportable, how to verify health, when to escalate, and how to restore a working state.
@@ -207,7 +207,7 @@ For the complete guardrail table, see [Safe Language Guardrails](SAFE-LANGUAGE-G
 
 | Limitation | Impact | Workaround | Reference |
 |------------|--------|------------|-----------|
-| API version pinned to `2025-05-01-preview` | Cannot use `2026-01-01` GA features until provider validates | Wait for issue #51 gates to pass | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
+| Subscription provider metadata may expose only preview API versions | SRE Agent deployment is skipped instead of falling back to a legacy preview API | Wait for `Microsoft.App/agents@2026-01-01` provider exposure, then rerun deployment | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
 | `maxPods=30` on existing node pools | Pod scheduling pressure at scale | Maintenance-window node pool replacement | [AKS maxPods Runbook](AKS-MAXPODS-MAINTENANCE-RUNBOOK.md) |
 | `SCHEMA_TBD` telemetry fields | SRE Agent App Insights dimensions may change | Do not build production dashboards against these fields | [Capability Contracts §8](CAPABILITY-CONTRACTS.md) |
 | Private clusters not supported | SRE Agent cannot access private API servers | Use public or authorized-IP clusters | [SRE Agent Setup](SRE-AGENT-SETUP.md) |

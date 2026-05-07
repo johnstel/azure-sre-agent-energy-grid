@@ -3,7 +3,7 @@
 // =============================================================================
 // Deploys an Azure SRE Agent with managed identity and role assignments.
 // Based on: https://github.com/microsoft/sre-agent/tree/main/samples/bicep-deployment
-// Resource type: Microsoft.App/agents@2025-05-01-preview
+// Resource type: Microsoft.App/agents@2026-01-01
 // =============================================================================
 
 @description('Name of the SRE Agent')
@@ -73,8 +73,7 @@ resource roleAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
 }]
 
 // SRE Agent
-#disable-next-line BCP081
-resource sreAgent 'Microsoft.App/agents@2025-05-01-preview' = {
+resource sreAgent 'Microsoft.App/agents@2026-01-01' = {
   name: agentName
   location: location
   tags: tags
@@ -100,6 +99,7 @@ resource sreAgent 'Microsoft.App/agents@2025-05-01-preview' = {
         connectionString: appInsightsConnectionString
       }
     }
+    upgradeChannel: 'Stable'
   }
   dependsOn: [
     roleAssignments

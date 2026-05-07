@@ -76,7 +76,7 @@
         }
       ],
       "safetyNotes": [
-        "Azure SRE Agent is GA; this lab remains pinned to Microsoft.App/agents@2025-05-01-preview in the current subscription, and you should not describe a live diagnosis unless real portal evidence is captured.",
+        "Azure SRE Agent is GA; this lab pins Microsoft.App/agents@2026-01-01 with the Stable channel, and you should not describe a live diagnosis unless real portal evidence is captured.",
         "Frame remediation as recommendation-first; the operator executes recovery in this demo."
       ]
     },
@@ -312,26 +312,26 @@
     },
     {
       "scenarioName": "network-block",
-      "title": "Network Block \u2014 Meter Service Isolated",
+      "title": "Network Block \u2014 Portals and Meter Service Isolated",
       "demoTier": "extended",
       "order": 3,
       "hook": [
-        "You have meter-service isolated by a NetworkPolicy after a security policy update."
+        "You have the live portals and meter-service isolated by NetworkPolicies after a security policy update."
       ],
       "observe": [
         "Check Mission Control Scenarios tile for one active fault.",
         "Open Mission Control Active Incidents for dependent workload symptoms.",
-        "Run kubectl exec -n energy deploy/grid-dashboard -- curl -s meter-service:3000/health to test reachability.",
+        "Run kubectl get svc -n energy to get the Grid Dashboard and Ops Console public IPs, then curl both; they should fail while pods remain Running.",
         "Run kubectl get networkpolicy -n energy to inspect policy changes."
       ],
       "suggestedPrompt": {
         "stage": "specific",
-        "text": "Are there any network policies blocking traffic in the energy namespace?",
+        "text": "Are there any network policies blocking the live portals or meter traffic in the energy namespace?",
         "source": "docs/SRE-AGENT-PROMPTS.md"
       },
       "restorePath": {
-        "label": "Operator Restore: use Mission Control Repair All if available. Manual Restore: delete the blocking NetworkPolicy.",
-        "command": "kubectl delete networkpolicy deny-meter-service -n energy",
+        "label": "Operator Restore: use Mission Control Repair All if available. Manual Restore: delete the blocking NetworkPolicies.",
+        "command": "kubectl delete networkpolicy deny-meter-service deny-grid-dashboard deny-ops-console -n energy",
         "missionControlAction": "repair-all"
       },
       "sourceRefs": [

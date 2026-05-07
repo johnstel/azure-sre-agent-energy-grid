@@ -182,7 +182,7 @@ try {
 
     if ($apiVersions -notcontains $TargetApiVersion) {
         Write-Status "BLOCKED: Microsoft.App/agents@$TargetApiVersion is not exposed in this subscription yet." 'Yellow'
-        Write-Status "Keep infra/bicep/modules/sre-agent.bicep pinned to 2025-05-01-preview." 'Yellow'
+        Write-Status "Do not deploy the legacy preview API. Wait for provider metadata to expose Microsoft.App/agents@$TargetApiVersion in this subscription." 'Yellow'
         exit 2
     }
 
@@ -205,7 +205,7 @@ try {
     Copy-Item -Path $moduleSource -Destination $candidateModule
 
     $candidateContent = Get-Content -Raw -Path $candidateModule
-    $candidateContent = $candidateContent -replace 'Microsoft\.App/agents@2025-05-01-preview', "Microsoft.App/agents@$TargetApiVersion"
+    $candidateContent = $candidateContent -replace 'Microsoft\.App/agents@[^''\s]+', "Microsoft.App/agents@$TargetApiVersion"
     Set-Content -Path $candidateModule -Value $candidateContent -NoNewline
 
     $agentContext = Get-ExistingSreAgentContext -GroupName $ResourceGroupName -Name $AgentName
