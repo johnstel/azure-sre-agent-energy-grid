@@ -9,8 +9,11 @@
     It uses device code authentication by default for dev container support.
 
 .PARAMETER Location
-    Azure region for deployment. Must be an SRE Agent supported region.
-    Valid values: eastus2, swedencentral, australiaeast
+    Primary Azure region for deployment. Central US is preferred for this lab when available.
+    Valid values: centralus, eastus2, swedencentral, australiaeast
+
+.PARAMETER SreAgentLocation
+    Azure region for SRE Agent when the primary region does not support Microsoft.App/agents.
 
 .PARAMETER WorkloadName
     Name prefix for resources. Default: srelab
@@ -47,8 +50,12 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [ValidateSet('eastus2', 'swedencentral', 'australiaeast')]
-    [string]$Location = 'eastus2',
+    [ValidateSet('centralus', 'eastus2', 'swedencentral', 'australiaeast')]
+    [string]$Location = 'centralus',
+
+    [Parameter()]
+    [ValidateSet('eastus2', 'swedencentral', 'australiaeast', 'uksouth', 'francecentral', 'canadacentral', 'koreacentral')]
+    [string]$SreAgentLocation = 'eastus2',
 
     [Parameter()]
     [ValidateLength(3, 10)]
@@ -143,6 +150,119 @@ function Invoke-AzCliJsonArgs {
         ExitCode = $exitCode
         Raw      = $raw
         Json     = $json
+    }
+}
+
+function Set-SecurityControlTags {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string[]]$ResourceGroupNames
+    )
+
+    $uniqueResourceGroupNames = @($ResourceGroupNames | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+
+    foreach ($resourceGroupNameToTag in $uniqueResourceGroupNames) {
+        Write-Host "  • Tagging resource group: $resourceGroupNameToTag" -ForegroundColor White
+        az group update `
+            --name $resourceGroupNameToTag `
+            --set tags.SecurityControl=Ignore `
+            --only-show-errors `
+            --output none
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to apply SecurityControl=Ignore to resource group '$resourceGroupNameToTag'."
+        }
+
+        $resourceIds = @(az resource list `
+                --resource-group $resourceGroupNameToTag `
+                --query "[].id" `
+                --output tsv `
+                --only-show-errors)
+
+        foreach ($resourceId in $resourceIds) {
+            if ([string]::IsNullOrWhiteSpace($resourceId)) {
+                continue
+            }
+
+            az tag update `
+                --resource-id $resourceId `
+                --operation Merge `
+                --tags SecurityControl=Ignore `
+                --only-show-errors `
+                --output none
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "    ⚠️  Could not tag resource: $resourceId" -ForegroundColor Yellow
+            }
+        }
+    }
+}
+
+function Ensure-AzureProviderFeatureRegistered {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ProviderNamespace,
+
+        [Parameter(Mandatory)]
+        [string]$FeatureName,
+
+        [Parameter(Mandatory)]
+        [string]$Description,
+
+        [Parameter()]
+        [int]$TimeoutMinutes = 20
+    )
+
+    Write-Host "`n🔎 Checking Azure feature: $ProviderNamespace/$FeatureName" -ForegroundColor Yellow
+    Write-Host "  Required for: $Description" -ForegroundColor Gray
+
+    $featureState = az feature show `
+        --namespace $ProviderNamespace `
+        --name $FeatureName `
+        --query properties.state `
+        --output tsv 2>$null
+
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($featureState)) {
+        $featureState = 'Unknown'
+    }
+
+    if ($featureState -ne 'Registered') {
+        Write-Host "  Feature state is '$featureState'. Registering..." -ForegroundColor Yellow
+        az feature register `
+            --namespace $ProviderNamespace `
+            --name $FeatureName `
+            --only-show-errors `
+            --output none
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to register Azure feature '$ProviderNamespace/$FeatureName'."
+        }
+
+        $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
+        do {
+            Start-Sleep -Seconds 30
+            $featureState = az feature show `
+                --namespace $ProviderNamespace `
+                --name $FeatureName `
+                --query properties.state `
+                --output tsv 2>$null
+
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "  • Feature state: $featureState" -ForegroundColor Gray
+            }
+        } while ($featureState -ne 'Registered' -and (Get-Date) -lt $deadline)
+
+        if ($featureState -ne 'Registered') {
+            throw "Timed out waiting for Azure feature '$ProviderNamespace/$FeatureName' to register."
+        }
+    }
+
+    Write-Host "  ✅ Feature is registered. Refreshing provider registration..." -ForegroundColor Green
+    az provider register --namespace $ProviderNamespace --wait --only-show-errors | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to refresh provider registration for '$ProviderNamespace'."
     }
 }
 
@@ -696,7 +816,10 @@ function Resolve-DeletedKeyVaultConflict {
 
 function Get-SreAgentProviderStatus {
     [CmdletBinding()]
-    param()
+    param(
+        [Parameter()]
+        [string]$Location = ''
+    )
 
     $providerRaw = az provider show --namespace Microsoft.App --output json 2>$null | Out-String
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($providerRaw)) {
@@ -704,8 +827,10 @@ function Get-SreAgentProviderStatus {
             RegistrationState  = 'Unknown'
             HasAgentsResource  = $false
             SupportsTargetApi  = $false
+            SupportsLocation   = $false
             DefaultApiVersion  = ''
             ApiVersions        = @()
+            Locations          = @()
         }
     }
 
@@ -717,8 +842,10 @@ function Get-SreAgentProviderStatus {
             RegistrationState  = 'Unknown'
             HasAgentsResource  = $false
             SupportsTargetApi  = $false
+            SupportsLocation   = $false
             DefaultApiVersion  = ''
             ApiVersions        = @()
+            Locations          = @()
         }
     }
 
@@ -728,12 +855,27 @@ function Get-SreAgentProviderStatus {
         $apiVersions = @($agentsResource.apiVersions)
     }
 
+    $locations = @()
+    if ($agentsResource -and $agentsResource.locations) {
+        $locations = @($agentsResource.locations)
+    }
+
+    $normalizedLocation = ($Location -replace '\s', '').ToLowerInvariant()
+    $supportsLocation = if ([string]::IsNullOrWhiteSpace($Location)) {
+        $true
+    }
+    else {
+        @($locations | ForEach-Object { ($_ -replace '\s', '').ToLowerInvariant() }) -contains $normalizedLocation
+    }
+
     return [pscustomobject]@{
         RegistrationState  = $provider.registrationState
         HasAgentsResource  = $null -ne $agentsResource
         SupportsTargetApi  = $apiVersions -contains $SreAgentTargetApiVersion
+        SupportsLocation   = $supportsLocation
         DefaultApiVersion  = if ($agentsResource -and $agentsResource.PSObject.Properties.Name -contains 'defaultApiVersion') { $agentsResource.defaultApiVersion } else { '' }
         ApiVersions        = $apiVersions
+        Locations          = $locations
     }
 }
 
@@ -800,28 +942,34 @@ Write-Host "  ✅ Subscription context is valid for ARM deployments" -Foreground
 
 Write-Host "  📋 Subscription: $($account.name) ($($account.id))" -ForegroundColor Green
 
+Ensure-AzureProviderFeatureRegistered `
+    -ProviderNamespace 'Microsoft.Network' `
+    -FeatureName 'AllowBringYourOwnPublicIpAddress' `
+    -Description 'AKS managed outbound public IP creation'
+
 $deploySreAgent = -not $SkipSreAgent
 $sreAgentSkipReason = ''
 
 if ($deploySreAgent) {
     Write-Host "`n🤖 Checking Azure SRE Agent availability..." -ForegroundColor Yellow
-    $sreAgentProvider = Get-SreAgentProviderStatus
+    $sreAgentProvider = Get-SreAgentProviderStatus -Location $SreAgentLocation
 
     if ($sreAgentProvider.RegistrationState -ne 'Registered') {
         Write-Host "  Microsoft.App provider is not registered. Attempting registration..." -ForegroundColor Yellow
         az provider register --namespace Microsoft.App --wait --only-show-errors | Out-Null
-        $sreAgentProvider = Get-SreAgentProviderStatus
+        $sreAgentProvider = Get-SreAgentProviderStatus -Location $SreAgentLocation
     }
 
-    if (-not $sreAgentProvider.HasAgentsResource -or -not $sreAgentProvider.SupportsTargetApi) {
+    if (-not $sreAgentProvider.HasAgentsResource -or -not $sreAgentProvider.SupportsTargetApi -or -not $sreAgentProvider.SupportsLocation) {
         $deploySreAgent = $false
         $availableApiVersions = if ($sreAgentProvider.ApiVersions.Count -gt 0) { $sreAgentProvider.ApiVersions -join ', ' } else { 'none reported' }
-        $sreAgentSkipReason = "Microsoft.App/agents@$SreAgentTargetApiVersion is not available for this subscription. Not falling back to legacy preview API $SreAgentLegacyPreviewApiVersion. Available versions: $availableApiVersions."
+        $availableLocations = if ($sreAgentProvider.Locations.Count -gt 0) { $sreAgentProvider.Locations -join ', ' } else { 'none reported' }
+        $sreAgentSkipReason = "Microsoft.App/agents@$SreAgentTargetApiVersion is not available for this subscription in $SreAgentLocation. Not falling back to legacy preview API $SreAgentLegacyPreviewApiVersion. Available versions: $availableApiVersions. Available locations: $availableLocations."
         Write-Host "  ⚠️  $sreAgentSkipReason" -ForegroundColor Yellow
         Write-Host "      Continuing with core infrastructure deployment." -ForegroundColor Gray
     }
     else {
-        Write-Host "  ✅ Microsoft.App/agents is available (API: $SreAgentTargetApiVersion, Stable channel)" -ForegroundColor Green
+        Write-Host "  ✅ Microsoft.App/agents is available in $SreAgentLocation (API: $SreAgentTargetApiVersion, Stable channel)" -ForegroundColor Green
         if ($sreAgentProvider.DefaultApiVersion -and $sreAgentProvider.DefaultApiVersion -ne $SreAgentTargetApiVersion) {
             Write-Host "      Provider default API is $($sreAgentProvider.DefaultApiVersion); deployment remains pinned to $SreAgentTargetApiVersion." -ForegroundColor Gray
         }
@@ -833,6 +981,10 @@ else {
 }
 
 $deploySreAgentValue = if ($deploySreAgent) { 'true' } else { 'false' }
+
+if ($deploySreAgent -and $Location -ne $SreAgentLocation) {
+    Write-Host "  ℹ️  Primary lab resources will deploy to $Location; Azure SRE Agent will deploy to $SreAgentLocation because Microsoft.App/agents is region-limited." -ForegroundColor Cyan
+}
 
 # Confirm subscription
 Write-Host "`n⚠️  Resources will be deployed to subscription: $($account.name)" -ForegroundColor Yellow
@@ -938,6 +1090,7 @@ Write-Host "  • Workload Name:   $WorkloadName" -ForegroundColor White
 Write-Host "  • Resource Group:  $resourceGroupName" -ForegroundColor White
 Write-Host "  • Deployment Name: $deploymentName" -ForegroundColor White
 Write-Host "  • SRE Agent:       $(if ($deploySreAgent) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • SRE Agent Region:$SreAgentLocation" -ForegroundColor White
 Write-Host "  • Agent Access:    $SreAgentAccessLevel$(if ($SreAgentAccessLevel -eq 'High') { ' ⚠️  (remediation; internal use only)' } else { ' ✅ (diagnosis-only)' })" -ForegroundColor White
 Write-Host "  • AKS API CIDRs:   $(if ($AksApiServerAuthorizedIpRanges.Count -gt 0) { $AksApiServerAuthorizedIpRanges -join ', ' } else { '(none - unrestricted public API endpoint)' })" -ForegroundColor White
 if ($sreAgentSkipReason) {
@@ -953,6 +1106,7 @@ if ($WhatIf) {
     $whatIfParameterArgs = @(
         $parametersFile
         "location=$Location"
+        "sreAgentLocation=$SreAgentLocation"
         "workloadName=$WorkloadName"
         "deploySreAgent=$deploySreAgentValue"
         "sreAgentAccessLevel=$SreAgentAccessLevel"
@@ -1007,6 +1161,7 @@ try {
     $deployParameterArgs = @(
         $parametersFile
         "location=$Location"
+        "sreAgentLocation=$SreAgentLocation"
         "workloadName=$WorkloadName"
         "deploySreAgent=$deploySreAgentValue"
         "sreAgentAccessLevel=$SreAgentAccessLevel"
@@ -1150,6 +1305,10 @@ try {
         Write-Host "  • Incident Webhook: $($outputs.defaultActionGroupHasWebhook.value)" -ForegroundColor White
     }
 
+    if ($outputs.aksNodeResourceGroup.value) {
+        Write-Host "  • AKS Node RG:      $($outputs.aksNodeResourceGroup.value)" -ForegroundColor White
+    }
+
     if ($outputs.sreAgentId.value) {
         Write-Host "  • SRE Agent:        $($outputs.sreAgentName.value)" -ForegroundColor White
         Write-Host "  • SRE Agent Portal: $($outputs.sreAgentPortalUrl.value)" -ForegroundColor White
@@ -1163,6 +1322,13 @@ try {
     $outputsFile = Join-Path $PSScriptRoot "deployment-outputs.json"
     $deployment.properties.outputs | ConvertTo-Json -Depth 10 | Set-Content $outputsFile
     Write-Host "`n  📄 Outputs saved to: $outputsFile" -ForegroundColor Gray
+
+    Write-Host "`n🏷️  Ensuring SecurityControl=Ignore tags..." -ForegroundColor Yellow
+    $resourceGroupsToTag = @($outputs.resourceGroupName.value)
+    if ($outputs.aksNodeResourceGroup.value) {
+        $resourceGroupsToTag += $outputs.aksNodeResourceGroup.value
+    }
+    Set-SecurityControlTags -ResourceGroupNames $resourceGroupsToTag
 
 }
 catch {

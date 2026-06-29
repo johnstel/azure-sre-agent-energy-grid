@@ -71,6 +71,8 @@ metadata:
     app: rabbitmq
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: rabbitmq
@@ -83,7 +85,7 @@ spec:
         nodepool-type: user
       containers:
         - name: rabbitmq
-          image: rabbitmq:3.11-management-alpine
+          image: rabbitmq:4.3.2-management-alpine
           ports:
             - containerPort: 5672
               name: amqp
@@ -317,6 +319,34 @@ spec:
     spec:
       nodeSelector:
         nodepool-type: user
+      initContainers:
+        - name: ensure-rabbitmq-queue
+          image: curlimages/curl:8.16.0
+          command:
+            - sh
+            - -c
+            - |
+              until curl --fail --silent --show-error --user "$ORDER_QUEUE_USERNAME:$ORDER_QUEUE_PASSWORD" http://rabbitmq:15672/api/overview > /dev/null; do
+                echo "waiting for RabbitMQ management API"
+                sleep 2
+              done
+              curl --fail --silent --show-error --user "$ORDER_QUEUE_USERNAME:$ORDER_QUEUE_PASSWORD" \
+                --header 'content-type: application/json' \
+                --request PUT "http://rabbitmq:15672/api/queues/%2F/$ORDER_QUEUE_NAME" \
+                --data '{"durable":true,"auto_delete":false,"arguments":{}}'
+          env:
+            - name: ORDER_QUEUE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: rabbitmq-username
+            - name: ORDER_QUEUE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: rabbitmq-password
+            - name: ORDER_QUEUE_NAME
+              value: "meter-events"
       containers:
         - name: meter-service
           image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
@@ -397,6 +427,34 @@ spec:
     spec:
       nodeSelector:
         nodepool-type: user
+      initContainers:
+        - name: ensure-rabbitmq-queue
+          image: curlimages/curl:8.16.0
+          command:
+            - sh
+            - -c
+            - |
+              until curl --fail --silent --show-error --user "$ORDER_QUEUE_USERNAME:$ORDER_QUEUE_PASSWORD" http://rabbitmq:15672/api/overview > /dev/null; do
+                echo "waiting for RabbitMQ management API"
+                sleep 2
+              done
+              curl --fail --silent --show-error --user "$ORDER_QUEUE_USERNAME:$ORDER_QUEUE_PASSWORD" \
+                --header 'content-type: application/json' \
+                --request PUT "http://rabbitmq:15672/api/queues/%2F/$ORDER_QUEUE_NAME" \
+                --data '{"durable":true,"auto_delete":false,"arguments":{}}'
+          env:
+            - name: ORDER_QUEUE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: rabbitmq-username
+            - name: ORDER_QUEUE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: rabbitmq-password
+            - name: ORDER_QUEUE_NAME
+              value: "meter-events"
       containers:
         - name: dispatch-service
           image: ghcr.io/azure-samples/aks-store-demo/makeline-service:latest

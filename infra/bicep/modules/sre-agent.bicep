@@ -23,6 +23,7 @@ param accessLevel string = 'High'
 param appInsightsAppId string
 
 @description('Application Insights connection string')
+@secure()
 param appInsightsConnectionString string
 
 @description('Unique suffix for resource naming')

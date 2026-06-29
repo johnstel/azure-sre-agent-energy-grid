@@ -92,6 +92,10 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-01-01' = {
       }
     ]
   }
+  dependsOn: [
+    aksSubnetNsg
+    servicesSubnetNsg
+  ]
 }
 
 // =============================================================================

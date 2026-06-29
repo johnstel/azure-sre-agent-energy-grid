@@ -17,13 +17,26 @@ targetScope = 'subscription'
 @maxLength(10)
 param workloadName string = 'srelab'
 
-@description('Azure region for deployment. Must be a region supporting SRE Agent (East US 2, Sweden Central, Australia East)')
+@description('Primary Azure region for the lab resources')
 @allowed([
+  'centralus'
   'eastus2'
   'swedencentral'
   'australiaeast'
 ])
-param location string = 'eastus2'
+param location string = 'centralus'
+
+@description('Azure region for Azure SRE Agent. Microsoft.App/agents is not available in every Azure region; use the nearest supported region when the primary lab region is unsupported.')
+@allowed([
+  'eastus2'
+  'swedencentral'
+  'australiaeast'
+  'uksouth'
+  'francecentral'
+  'canadacentral'
+  'koreacentral'
+])
+param sreAgentLocation string = 'eastus2'
 
 @description('Deploy full observability stack (Managed Grafana, Prometheus)')
 param deployObservability bool = true
@@ -66,7 +79,7 @@ param kubernetesVersion string = '1.34'
   'Standard_D2as_v6'
   'Standard_D4as_v6'
 ])
-param systemNodeVmSize string = 'Standard_D2s_v6'
+param systemNodeVmSize string = 'Standard_D2as_v5'
 
 @description('AKS user node pool VM size for workloads')
 @allowed([
@@ -83,7 +96,7 @@ param systemNodeVmSize string = 'Standard_D2s_v6'
   'Standard_D2as_v6'
   'Standard_D4as_v6'
 ])
-param userNodeVmSize string = 'Standard_D2s_v6'
+param userNodeVmSize string = 'Standard_D2as_v5'
 
 @description('System node pool node count')
 @minValue(1)
@@ -129,6 +142,9 @@ param tags object = {
 
 var resourceGroupName = 'rg-${workloadName}-${location}'
 var uniqueSuffix = uniqueString(subscription().subscriptionId, resourceGroupName)
+var resourceTags = union(tags, {
+  SecurityControl: 'Ignore'
+})
 
 // Naming convention for resources
 var names = {
@@ -151,7 +167,7 @@ var names = {
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2024-03-01' = {
   name: resourceGroupName
   location: location
-  tags: union(tags, { SecurityControl: 'Ignore' })
+  tags: resourceTags
 }
 
 // =============================================================================
@@ -165,7 +181,7 @@ module logAnalytics 'modules/log-analytics.bicep' = {
   params: {
     name: names.logAnalytics
     location: location
-    tags: tags
+    tags: resourceTags
     retentionInDays: 90 // Wave 1: Aligned to App Insights for evidence retention
   }
 }
@@ -177,14 +193,14 @@ module appInsights 'modules/app-insights.bicep' = {
   params: {
     name: names.appInsights
     location: location
-    tags: tags
+    tags: resourceTags
     workspaceId: logAnalytics.outputs.workspaceId
   }
 }
 
 // Activity Log Diagnostics (Wave 1: observable foundation)
 module activityLogDiagnostics 'modules/activity-log-diagnostics.bicep' = {
-  name: 'deploy-activity-log-diagnostics'
+  name: 'deploy-activity-log-diagnostics-${location}'
   params: {
     diagnosticSettingName: 'activity-log-${workloadName}'
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
@@ -198,7 +214,7 @@ module network 'modules/network.bicep' = {
   params: {
     vnetName: names.vnet
     location: location
-    tags: tags
+    tags: resourceTags
     addressPrefix: '10.0.0.0/16'
     aksSubnetPrefix: '10.0.0.0/22'
     servicesSubnetPrefix: '10.0.4.0/24'
@@ -212,7 +228,7 @@ module containerRegistry 'modules/container-registry.bicep' = {
   params: {
     name: names.acr
     location: location
-    tags: tags
+    tags: resourceTags
     sku: 'Basic'
     adminUserEnabled: acrAdminUserEnabled
   }
@@ -225,7 +241,7 @@ module aks 'modules/aks.bicep' = {
   params: {
     name: names.aks
     location: location
-    tags: tags
+    tags: resourceTags
     kubernetesVersion: kubernetesVersion
     systemNodeVmSize: systemNodeVmSize
     userNodeVmSize: userNodeVmSize
@@ -247,7 +263,7 @@ module keyVault 'modules/key-vault.bicep' = {
   params: {
     name: names.keyVault
     location: location
-    tags: tags
+    tags: resourceTags
     enableRbacAuthorization: true
   }
 }
@@ -258,8 +274,8 @@ module sreAgent 'modules/sre-agent.bicep' = if (deploySreAgent) {
   name: 'deploy-sre-agent'
   params: {
     agentName: names.sreAgent
-    location: location
-    tags: tags
+    location: sreAgentLocation
+    tags: resourceTags
     accessLevel: sreAgentAccessLevel
     appInsightsAppId: appInsights.outputs.appId
     appInsightsConnectionString: appInsights.outputs.connectionString
@@ -275,7 +291,7 @@ module observability 'modules/observability.bicep' = if (deployObservability) {
     grafanaName: names.grafana
     prometheusName: names.prometheus
     location: location
-    tags: tags
+    tags: resourceTags
     aksClusterId: aks.outputs.aksId
   }
 }
@@ -286,7 +302,7 @@ module defaultActionGroup 'modules/action-group.bicep' = if (deployActionGroup) 
   params: {
     name: 'ag-${workloadName}'
     location: location
-    tags: tags
+    tags: resourceTags
     shortName: actionGroupShortName
     webhookServiceUri: incidentWebhookServiceUri
   }
@@ -302,7 +318,7 @@ module alerts 'modules/alerts.bicep' = if (deployAlerts) {
   params: {
     namePrefix: 'alert-${workloadName}'
     location: location
-    tags: tags
+    tags: resourceTags
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
     appNamespace: 'energy'
     actionGroupIds: effectiveAlertActionGroupIds
@@ -316,6 +332,7 @@ module alerts 'modules/alerts.bicep' = if (deployAlerts) {
 output resourceGroupName string = resourceGroup.name
 output aksClusterName string = aks.outputs.aksName
 output aksClusterFqdn string = aks.outputs.aksFqdn
+output aksNodeResourceGroup string = aks.outputs.aksNodeResourceGroup
 output acrLoginServer string = containerRegistry.outputs.loginServer
 output logAnalyticsWorkspaceId string = logAnalytics.outputs.workspaceId
 output appInsightsId string = appInsights.outputs.appInsightsId
