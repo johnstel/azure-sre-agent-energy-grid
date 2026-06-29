@@ -51,6 +51,16 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
+// Grant the deployer portal/CLI read access to RBAC-enabled vault secrets.
+resource deployerSecretsUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableRbacAuthorization) {
+  name: guid(keyVault.id, deployer().objectId, '4633458b-17de-408a-b874-0445c86b69e6')
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6') // Key Vault Secrets User
+    principalId: deployer().objectId
+  }
+}
+
 // =============================================================================
 // OUTPUTS
 // =============================================================================
