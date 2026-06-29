@@ -3,7 +3,7 @@
 > **Issue**: [#5 — Research SRE Agent REST API integration](https://github.com/johnstel/azure-sre-agent-energy-grid/issues/5)
 > **Owner**: Parker, project SRE Dev
 > **Date**: 2026-04-27
-> **Status**: Azure SRE Agent is GA. This lab remains pinned to `Microsoft.App/agents@2025-05-01-preview` because this subscription currently exposes only that API version.
+> **Status**: Azure SRE Agent is GA. This lab now pins `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`; subscriptions that expose only older preview provider metadata skip SRE Agent deployment instead of falling back.
 
 ## Executive verdict
 
@@ -123,8 +123,8 @@ Recommended demo language:
 
 | Risk | Evidence | Demo impact | Mitigation |
 |---|---|---|---|
-| Tenant/API-version behavior can change | Repo guardrails require GA status + API-pin disclosure; provider metadata in this subscription still exposes `2025-05-01-preview`. | API, telemetry schema, and portal UX can differ until `2026-01-01` is exposed and validated here. | Keep safe language in all customer-facing docs and demos. |
-| ARM API version drift | Repo setup references `Microsoft.App/agents@2025-05-01-preview`; current Microsoft Learn ARM template reference lists `Microsoft.App/agents@2026-01-01` as latest. | Infrastructure may need later review, but this spike must not modify Bicep. | Track separately with infra owner if deployment drift appears. |
+| Tenant/API-version behavior can change | Repo guardrails require GA status + API-pin disclosure; provider metadata in this subscription still exposes only the older preview API. | API, telemetry schema, and portal UX can differ until `2026-01-01` is exposed and validated here. | Keep safe language in all customer-facing docs and demos. |
+| ARM API version drift | Repo setup now references `Microsoft.App/agents@2026-01-01`; current Microsoft Learn ARM template reference lists it as latest. | Subscriptions without provider exposure skip SRE Agent deployment. | Re-run provider metadata and what-if validation before customer demo use. |
 | Chat/action API gap | Official docs reviewed do not document a supported chat/conversation/action endpoint and auth model. | Direct Mission Control integration could overclaim unsupported behavior. | Block direct API implementation until Microsoft publishes docs. |
 | Hook API is narrow | Hook API manages custom-agent hooks via REST API v2; it is not a conversation API. | Misusing hook API as integration proof would be misleading. | Document hooks as governance/customization only. |
 | Telemetry schema may vary | Audit docs document `customEvents` event types and fields, but repo guardrails currently mark exact fields as `SCHEMA_TBD` until verified in the deployed API version. | Demo evidence queries could fail or fields may differ. | Validate KQL in the customer's deployed agent before claiming specific fields. |

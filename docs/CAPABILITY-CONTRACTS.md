@@ -1,7 +1,7 @@
 # Capability Contracts
 
 > **Version**: 0.2 · **Wave**: 0 — Contracts only, no runtime changes
-> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
 > **Repo**: [`johnstel/azure-sre-agent-energy-grid`](https://github.com/johnstel/azure-sre-agent-energy-grid)
 
 This document defines the shared contracts that every capability in the demo lab consumes. No implementation work should start for a wave until the contracts it depends on are locked here.
@@ -353,13 +353,13 @@ Azure SRE Agent is GA. App Insights telemetry emitted by the agent (custom dimen
 
 1. Any KQL query or dashboard that references SRE Agent-specific App Insights fields must be tagged with a `// SCHEMA_TBD` comment.
 2. Do not build production-grade dashboards or alerts against `SCHEMA_TBD` fields.
-3. When this subscription exposes `Microsoft.App/agents@2026-01-01` and `what-if` validates it, audit all `SCHEMA_TBD` references and update or remove the tag.
-4. Document observed field names in `docs/evidence/kql/README.md` with the preview API version where they were seen.
+3. Keep `SCHEMA_TBD` tags until live evidence captures the exact telemetry fields emitted by the deployed `Microsoft.App/agents@2026-01-01` resource.
+4. Document observed field names in `docs/evidence/kql/README.md` with the deployed API version where they were seen.
 
 ### Example
 
 ```kql
-// SCHEMA_TBD — observed in 2025-05-01-preview, may change
+// SCHEMA_TBD — observed field names may change across SRE Agent service/API versions
 traces
 | where customDimensions["sre.agent.conversationId"] != ""
 | project timestamp, message, customDimensions

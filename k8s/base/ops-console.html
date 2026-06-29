@@ -61,15 +61,21 @@
   .grid-map-svg:focus-visible { outline: 3px solid rgba(34,211,238,.6); outline-offset: -3px; }
   .map-fallback { position: absolute; inset: 0; display: grid; place-items: center; padding: 2rem; text-align: center; background: rgba(15,23,42,.96); color: var(--muted); line-height: 1.5; }
   .map-fallback[hidden] { display: none; }
-  .map-edge { stroke: #64748b; stroke-width: 2.4; fill: none; opacity: .82; }
+  .map-edge { stroke: #64748b; stroke-width: 2.6; fill: none; opacity: .82; stroke-linecap: square; stroke-linejoin: miter; }
   .map-edge.healthy { stroke: var(--green); opacity: .86; }
   .map-edge.warning { stroke: var(--amber); stroke-width: 3; opacity: .9; }
   .map-edge.critical { stroke: var(--red); stroke-width: 3.4; opacity: .95; filter: drop-shadow(0 0 6px rgba(248,113,113,.45)); }
   .map-edge.unknown { stroke: #94a3b8; stroke-dasharray: 8 7; opacity: .58; }
   .map-edge.disabled { stroke: #94a3b8; stroke-dasharray: 3 7; opacity: .5; }
+  .map-edge.transmission { stroke-width: 4; }
+  .map-edge.distribution { stroke-width: 3; }
+  .map-edge.control { stroke-dasharray: 7 6; stroke-width: 2.2; }
   .map-edge-label { fill: #cbd5e1; font-size: 11px; paint-order: stroke; stroke: #020617; stroke-width: 4px; stroke-linejoin: round; }
+  .map-busbar { stroke: #cbd5e1; stroke-width: 3.2; stroke-linecap: square; opacity: .8; }
+  .map-busbar-label { fill: #94a3b8; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; paint-order: stroke; stroke: #020617; stroke-width: 4px; stroke-linejoin: round; }
   .map-node .node-box { fill: #182338; stroke: #475569; stroke-width: 1.5; filter: drop-shadow(0 10px 18px rgba(2,6,23,.45)); }
   .map-node.service .node-box { stroke: rgba(34,211,238,.65); }
+  .map-node-symbol-shape { fill: none; stroke: #e2e8f0; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; opacity: .9; pointer-events: none; }
   .map-node.datastore .node-box, .map-node.datastore .node-cap { fill: #14213a; stroke: rgba(167,139,250,.75); stroke-width: 1.5; }
   .map-node.healthy .node-box, .map-node.datastore.healthy .node-box, .map-node.datastore.healthy .node-cap { fill: rgba(6,78,59,.92); stroke: var(--green); stroke-width: 2.2; filter: drop-shadow(0 0 14px rgba(52,211,153,.36)); }
   .map-node.warning .node-box, .map-node.datastore.warning .node-box, .map-node.datastore.warning .node-cap { fill: rgba(120,53,15,.92); stroke: var(--amber); stroke-width: 2.4; filter: drop-shadow(0 0 14px rgba(251,191,36,.34)); }
@@ -350,30 +356,28 @@ const DISPATCH_TYPES = ['Load Balance', 'Frequency Adj', 'Capacity Shift', 'Emer
    namespace: 'energy',
    disclaimer: 'Demo electrical-grid model only. Asset colors are driven by approved lab health endpoints and static scenario context; this is not connected to real SCADA, GIS, OMS, or utility operations.',
    nodes: [
-     { id: 'north-generation', label: 'North Gen', resourceName: 'asset-service', metaphor: '230 kV generation', kind: 'generation', position: { x: 90, y: 100 }, healthSource: 'live', healthPath: '/api/assets/health', stateNote: 'Demo signal: asset-service health represents generation/asset telemetry availability.' },
-     { id: 'west-wind', label: 'West Wind', resourceName: 'asset-service', metaphor: '115 kV wind tie', kind: 'generation', position: { x: 90, y: 280 }, healthSource: 'static', nominal: true },
-     { id: 'grid-control', label: 'Grid Control', resourceName: 'dispatch-service', metaphor: 'Balancing authority', kind: 'control', position: { x: 360, y: 40 }, healthSource: 'live', healthPath: '/api/dispatch/health', stateNote: 'Demo signal: dispatch-service health represents control and dispatch availability.' },
-     { id: 'north-substation', label: 'North Substation', resourceName: 'asset-service', metaphor: 'Transmission node', kind: 'substation', position: { x: 360, y: 220 }, healthSource: 'live', healthPath: '/api/assets/health' },
-     { id: 'battery-reserve', label: 'Battery Reserve', resourceName: 'asset-service', metaphor: 'Grid storage', kind: 'storage', position: { x: 360, y: 500 }, healthSource: 'static', nominal: true },
-     { id: 'east-substation', label: 'East Substation', resourceName: 'dispatch-service', metaphor: 'Distribution node', kind: 'substation', position: { x: 610, y: 170 }, healthSource: 'live', healthPath: '/api/dispatch/health' },
-     { id: 'south-substation', label: 'South Substation', resourceName: 'dispatch-service', metaphor: 'Distribution node', kind: 'substation', position: { x: 610, y: 370 }, healthSource: 'live', healthPath: '/api/dispatch/health' },
-     { id: 'ami-feeder', label: 'AMI Feeder A', resourceName: 'meter-service', metaphor: 'Smart meter circuit', kind: 'feeder', position: { x: 860, y: 100 }, healthSource: 'live', healthPath: '/api/meter/health', stateNote: 'Demo signal: meter-service health represents AMI telemetry and customer outage visibility.' },
-     { id: 'hospital-feeder', label: 'Hospital Feeder', resourceName: 'meter-service', metaphor: 'Critical load circuit', kind: 'feeder', position: { x: 860, y: 300 }, healthSource: 'live', healthPath: '/api/meter/health' },
-     { id: 'residential-feeder', label: 'Residential Feed', resourceName: 'load-simulator', metaphor: 'Customer load zone', kind: 'feeder', position: { x: 860, y: 500 }, healthSource: 'static', nominal: true }
+     { id: 'north-generation', label: 'North Gen', resourceName: 'asset-service', metaphor: '230 kV generation', kind: 'generation', position: { x: 70, y: 80 }, healthSource: 'live', healthPath: '/api/assets/health', stateNote: 'Demo signal: asset-service health represents generation/asset telemetry availability.' },
+     { id: 'west-wind', label: 'West Wind', resourceName: 'asset-service', metaphor: '115 kV wind tie', kind: 'generation', position: { x: 70, y: 210 }, healthSource: 'static', nominal: true },
+     { id: 'grid-control', label: 'Grid Control', resourceName: 'dispatch-service', metaphor: 'Balancing authority', kind: 'control', position: { x: 320, y: 38 }, healthSource: 'live', healthPath: '/api/dispatch/health', stateNote: 'Demo signal: dispatch-service health represents control and dispatch availability.' },
+     { id: 'north-substation', label: 'North Substation', resourceName: 'asset-service', metaphor: 'Transmission bus', kind: 'substation', position: { x: 320, y: 185 }, healthSource: 'live', healthPath: '/api/assets/health' },
+     { id: 'battery-reserve', label: 'Battery Reserve', resourceName: 'asset-service', metaphor: 'Grid storage', kind: 'storage', position: { x: 320, y: 430 }, healthSource: 'static', nominal: true },
+     { id: 'east-substation', label: 'East Substation', resourceName: 'dispatch-service', metaphor: 'Distribution bus', kind: 'substation', position: { x: 585, y: 185 }, healthSource: 'live', healthPath: '/api/dispatch/health' },
+     { id: 'south-substation', label: 'South Substation', resourceName: 'dispatch-service', metaphor: 'Distribution bus', kind: 'substation', position: { x: 585, y: 430 }, healthSource: 'live', healthPath: '/api/dispatch/health' },
+     { id: 'ami-feeder', label: 'AMI Feeder A', resourceName: 'meter-service', metaphor: 'Smart meter circuit', kind: 'feeder', position: { x: 840, y: 95 }, healthSource: 'live', healthPath: '/api/meter/health', stateNote: 'Demo signal: meter-service health represents AMI telemetry and customer outage visibility.' },
+     { id: 'hospital-feeder', label: 'Hospital Feeder', resourceName: 'meter-service', metaphor: 'Critical load circuit', kind: 'feeder', position: { x: 840, y: 285 }, healthSource: 'live', healthPath: '/api/meter/health' },
+     { id: 'residential-feeder', label: 'Residential Feed', resourceName: 'load-simulator', metaphor: 'Customer load zone', kind: 'feeder', position: { x: 840, y: 475 }, healthSource: 'static', nominal: true }
    ],
    edges: [
-     { source: 'north-generation', target: 'north-substation', label: '230 kV gen tie', type: 'transmission' },
-     { source: 'west-wind', target: 'north-substation', label: '115 kV wind tie', type: 'transmission' },
-     { source: 'grid-control', target: 'north-substation', label: 'SCADA control', type: 'control' },
-     { source: 'grid-control', target: 'east-substation', label: 'Dispatch control', type: 'control' },
-     { source: 'grid-control', target: 'south-substation', label: 'Dispatch control', type: 'control' },
-     { source: 'north-substation', target: 'east-substation', label: '230 kV backbone', type: 'transmission' },
-     { source: 'north-substation', target: 'battery-reserve', label: '34.5 kV storage tie', type: 'distribution' },
-     { source: 'battery-reserve', target: 'south-substation', label: 'Reserve support', type: 'distribution' },
-     { source: 'east-substation', target: 'ami-feeder', label: '13.8 kV feeder A', type: 'distribution' },
-     { source: 'east-substation', target: 'hospital-feeder', label: 'Critical feeder', type: 'distribution' },
-     { source: 'south-substation', target: 'residential-feeder', label: '13.8 kV feeder C', type: 'distribution' },
-     { source: 'ami-feeder', target: 'residential-feeder', label: 'AMI outage reports', type: 'telemetry' }
+     { source: 'north-generation', target: 'north-substation', label: '230 kV gen tie', type: 'transmission', route: [[246, 118], [320, 118], [320, 223]], labelPosition: { x: 257, y: 108 } },
+     { source: 'west-wind', target: 'north-substation', label: '115 kV wind tie', type: 'transmission', route: [[246, 248], [285, 248], [285, 223], [320, 223]], labelPosition: { x: 252, y: 268 } },
+     { source: 'grid-control', target: 'north-substation', label: 'SCADA control', type: 'control', route: [[408, 114], [408, 185]], labelPosition: { x: 426, y: 151 } },
+     { source: 'grid-control', target: 'east-substation', label: 'Dispatch control', type: 'control', route: [[496, 76], [673, 76], [673, 185]], labelPosition: { x: 585, y: 65 } },
+     { source: 'north-substation', target: 'east-substation', label: '230 kV backbone', type: 'transmission', route: [[496, 223], [585, 223]], labelPosition: { x: 540, y: 211 } },
+     { source: 'north-substation', target: 'battery-reserve', label: '34.5 kV storage tie', type: 'distribution', route: [[408, 261], [408, 430]], labelPosition: { x: 425, y: 348 } },
+     { source: 'battery-reserve', target: 'south-substation', label: 'Reserve support', type: 'distribution', route: [[496, 468], [585, 468]], labelPosition: { x: 541, y: 456 } },
+     { source: 'east-substation', target: 'ami-feeder', label: '13.8 kV feeder A', type: 'distribution', route: [[761, 205], [805, 205], [805, 133], [840, 133]], labelPosition: { x: 785, y: 194 } },
+     { source: 'east-substation', target: 'hospital-feeder', label: 'Critical feeder', type: 'distribution', route: [[761, 241], [805, 241], [805, 323], [840, 323]], labelPosition: { x: 785, y: 262 } },
+     { source: 'south-substation', target: 'residential-feeder', label: '13.8 kV feeder C', type: 'distribution', route: [[761, 468], [840, 468], [840, 513]], labelPosition: { x: 798, y: 456 } }
    ]
   };
   const MAP_NODE = { width: 176, height: 76 };
@@ -497,6 +501,15 @@ function addLogEntry() {
     if (result.severity === 'warning') return 'warning - HTTP ' + result.httpStatus;
     if (result.severity === 'critical') return 'critical - HTTP ' + result.httpStatus;
     return 'unknown';
+  }
+
+  function gridStateTextForResult(result) {
+    if (!result) return 'checking grid signal';
+    if (result.reason === 'network') return 'signal unreachable';
+    if (result.severity === 'healthy') return 'grid normal';
+    if (result.severity === 'warning') return 'fault indicator';
+    if (result.severity === 'critical') return 'outage indicator';
+    return 'unknown grid state';
   }
 
   function fetchLiveHealth(node) {
@@ -626,9 +639,9 @@ function addLogEntry() {
       const result = mapState.healthById[node.id];
       if (!result) return { text: 'checking live health', className: 'unknown', severity: 'unknown', symbol: '?' };
       const symbol = result.severity === 'healthy' ? '✓' : result.severity === 'warning' ? '!' : '×';
-      return { text: healthTextForResult(result), className: result.severity, severity: result.severity, symbol };
+      return { text: gridStateTextForResult(result), className: result.severity, severity: result.severity, symbol };
     }
-    if (node.nominal) return { text: 'nominal - static demo', className: 'healthy', severity: 'healthy', symbol: '✓' };
+    if (node.nominal) return { text: 'grid normal', className: 'healthy', severity: 'healthy', symbol: '✓' };
      return { text: 'static demo context', className: 'static', severity: 'unknown', symbol: 'S' };
   }
 
@@ -1077,10 +1090,49 @@ function addLogEntry() {
    return { x: a.x + dx / scale, y: a.y + dy / scale };
  }
 
+ function routePath(points) {
+   return points.map(function(point, index) {
+     return (index === 0 ? 'M ' : 'L ') + point[0] + ' ' + point[1];
+   }).join(' ');
+ }
+
+ function edgeRoute(edge, source, target) {
+   if (edge.route && edge.route.length >= 2) return edge.route;
+   const start = edgeAnchor(source, target);
+   const end = edgeAnchor(target, source);
+   const midX = Math.round((start.x + end.x) / 2);
+   return [[Math.round(start.x), Math.round(start.y)], [midX, Math.round(start.y)], [midX, Math.round(end.y)], [Math.round(end.x), Math.round(end.y)]];
+ }
+
+ function edgeLabelPosition(edge, points) {
+   if (edge.labelPosition) return edge.labelPosition;
+   const midpoint = points[Math.floor(points.length / 2)];
+   return { x: midpoint[0], y: midpoint[1] - 10 };
+ }
+
+ function renderElectricalSymbol(group, node, x, y) {
+   const sx = x + MAP_NODE.width - 28;
+   const sy = y + MAP_NODE.height - 24;
+   const symbol = createSvgElement('g', { class: 'map-node-symbol-shape', 'aria-hidden': 'true' });
+   if (node.kind === 'generation') {
+     symbol.appendChild(createSvgElement('circle', { cx: sx, cy: sy, r: 11 }));
+     symbol.appendChild(createSvgElement('path', { d: 'M ' + (sx - 7) + ' ' + sy + ' C ' + (sx - 3) + ' ' + (sy - 8) + ' ' + (sx + 3) + ' ' + (sy + 8) + ' ' + (sx + 7) + ' ' + sy }));
+   } else if (node.kind === 'substation') {
+     symbol.appendChild(createSvgElement('path', { d: 'M ' + (sx - 12) + ' ' + (sy - 8) + ' L ' + (sx + 12) + ' ' + (sy - 8) + ' M ' + (sx - 12) + ' ' + sy + ' L ' + (sx + 12) + ' ' + sy + ' M ' + (sx - 12) + ' ' + (sy + 8) + ' L ' + (sx + 12) + ' ' + (sy + 8) }));
+   } else if (node.kind === 'feeder') {
+     symbol.appendChild(createSvgElement('path', { d: 'M ' + (sx - 12) + ' ' + sy + ' L ' + (sx - 4) + ' ' + sy + ' M ' + (sx - 4) + ' ' + (sy - 8) + ' L ' + (sx - 4) + ' ' + (sy + 8) + ' M ' + (sx + 4) + ' ' + (sy - 8) + ' L ' + (sx + 4) + ' ' + (sy + 8) + ' M ' + (sx + 4) + ' ' + sy + ' L ' + (sx + 12) + ' ' + sy }));
+   } else if (node.kind === 'storage') {
+     symbol.appendChild(createSvgElement('path', { d: 'M ' + (sx - 12) + ' ' + (sy - 8) + ' L ' + (sx - 12) + ' ' + (sy + 8) + ' M ' + (sx - 5) + ' ' + (sy - 5) + ' L ' + (sx - 5) + ' ' + (sy + 5) + ' M ' + (sx + 3) + ' ' + (sy - 8) + ' L ' + (sx + 3) + ' ' + (sy + 8) + ' M ' + (sx + 10) + ' ' + (sy - 5) + ' L ' + (sx + 10) + ' ' + (sy + 5) }));
+   } else {
+     symbol.appendChild(createSvgElement('path', { d: 'M ' + sx + ' ' + (sy - 12) + ' L ' + (sx + 12) + ' ' + sy + ' L ' + sx + ' ' + (sy + 12) + ' L ' + (sx - 12) + ' ' + sy + ' Z' }));
+   }
+   group.appendChild(symbol);
+ }
+
  function renderServiceNode(stage, node) {
    const status = getMapStatus(node);
    const group = createSvgElement('g', {
-      class: 'map-node service ' + status.className,
+      class: 'map-node service kind-' + node.kind + ' ' + status.className,
       tabindex: '0',
       role: 'button',
       'aria-label': node.label + ', ' + node.metaphor + ', ' + status.text + '. Activate to open details.',
@@ -1099,9 +1151,10 @@ function addLogEntry() {
    const subtitle = createSvgElement('text', { class: 'map-node-subtitle', x: x + 16, y: y + 46, 'aria-hidden': 'true' });
    subtitle.textContent = node.metaphor;
    group.appendChild(subtitle);
-   const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 64, 'aria-hidden': 'true' });
-   state.textContent = status.text;
-   group.appendChild(state);
+    const state = createSvgElement('text', { class: 'map-node-status', x: x + 16, y: y + 64, 'aria-hidden': 'true' });
+    state.textContent = status.text;
+    group.appendChild(state);
+   renderElectricalSymbol(group, node, x, y);
    group.appendChild(createSvgElement('rect', { class: 'node-ring', x: x - 4, y: y - 4, width: MAP_NODE.width + 8, height: MAP_NODE.height + 8, rx: 18, ry: 18 }));
    group.appendChild(createSvgElement('rect', { class: 'node-focus-ring', x: x - 7, y: y - 7, width: MAP_NODE.width + 14, height: MAP_NODE.height + 14, rx: 21, ry: 21 }));
    if (mapState.selectedNodeId === node.id) group.classList.add('selected');
@@ -1146,47 +1199,46 @@ function addLogEntry() {
    const stage = document.getElementById('grid-map-stage');
    if (!svg || !stage || mapState.rendered) return;
    stage.innerHTML = '';
-   const defs = createSvgElement('defs');
-   const marker = createSvgElement('marker', { id: 'map-arrowhead', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' });
-   marker.appendChild(createSvgElement('path', { d: 'M 0 0 L 10 5 L 0 10 z', fill: '#94a3b8' }));
-   defs.appendChild(marker);
-   stage.appendChild(defs);
 
    const nodesById = GRID_TOPOLOGY.nodes.reduce((acc, node) => {
      acc[node.id] = node;
      return acc;
    }, {});
 
+   [
+    { x1: 496, y1: 223, x2: 585, y2: 223, label: '230 kV bus', x: 540, y: 211 },
+    { x1: 761, y1: 205, x2: 840, y2: 205, label: '13.8 kV feeder bus', x: 801, y: 194 },
+    { x1: 761, y1: 468, x2: 840, y2: 468, label: '13.8 kV feeder bus', x: 801, y: 456 }
+   ].forEach(bus => {
+     stage.appendChild(createSvgElement('line', { class: 'map-busbar', x1: bus.x1, y1: bus.y1, x2: bus.x2, y2: bus.y2, 'aria-hidden': 'true' }));
+     const label = createSvgElement('text', { class: 'map-busbar-label', x: bus.x, y: bus.y, 'aria-hidden': 'true' });
+     label.textContent = bus.label;
+     stage.appendChild(label);
+   });
+
    GRID_TOPOLOGY.edges.forEach(edge => {
      const source = nodesById[edge.source];
       const target = nodesById[edge.target];
       if (!source || !target) return;
-       const start = edgeAnchor(source, target);
-       const end = edgeAnchor(target, source);
+       const points = edgeRoute(edge, source, target);
+       const pathData = routePath(points);
        const edgeStatus = getEdgeStatus(edge, source, target);
        const edgeKey = edge.source + ':' + edge.target;
-       const edgeLine = createSvgElement('line', {
-         class: 'map-edge ' + edgeStatus.className + (mapState.selectedEdgeKey === edgeKey ? ' selected' : ''),
-         x1: start.x,
-         y1: start.y,
-         x2: end.x,
-         y2: end.y,
-         'marker-end': 'url(#map-arrowhead)',
+       const edgeLine = createSvgElement('path', {
+         class: 'map-edge ' + (edge.type || 'distribution') + ' ' + edgeStatus.className + (mapState.selectedEdgeKey === edgeKey ? ' selected' : ''),
+         d: pathData,
          role: 'img',
          'aria-label': edge.label + ', ' + edgeStatus.label,
          'data-edge-key': edgeKey
        });
        stage.appendChild(edgeLine);
-       const edgeHit = createSvgElement('line', {
+       const edgeHit = createSvgElement('path', {
          class: 'map-edge-hit',
-         x1: start.x, y1: start.y, x2: end.x, y2: end.y,
+         d: pathData,
          'data-edge-key': edgeKey,
          'aria-hidden': 'true'
        });
        stage.appendChild(edgeHit);
-       const label = createSvgElement('text', { class: 'map-edge-label', x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 - 8, 'text-anchor': 'middle', 'aria-hidden': 'true' });
-       label.textContent = edge.label + (edgeStatus.className === 'unknown' ? ' · unknown' : edgeStatus.className === 'critical' ? ' · critical' : edgeStatus.className === 'warning' ? ' · warning' : '');
-       stage.appendChild(label);
     });
 
    GRID_TOPOLOGY.nodes.forEach(node => {

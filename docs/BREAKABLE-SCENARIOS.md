@@ -269,14 +269,14 @@ kubectl delete deployment grid-health-monitor -n energy
 
 ---
 
-### 7. Network Policy Blocking — Meter Service Isolated
+### 7. Network Policy Blocking — Meter Service and Portals Isolated
 
 **File:** `k8s/scenarios/network-block.yaml`
 
 **What happens:**
-- Applies NetworkPolicy that blocks all traffic to meter-service
+- Applies NetworkPolicies that block all traffic to meter-service, grid-dashboard, and ops-console
 - Meter service becomes isolated from the grid after a bad security policy update
-- Grid dashboard can't submit meter readings
+- Public demo portals stop responding through their LoadBalancer IPs
 
 **How to break:**
 ```bash
@@ -285,25 +285,27 @@ kubectl apply -f k8s/scenarios/network-block.yaml
 
 **What to observe:**
 ```bash
-# Test connectivity from grid-dashboard
-kubectl exec -n energy deploy/grid-dashboard -- curl -s meter-service:3000/health
-# Should timeout or fail
+# Test public portals and meter-service
+curl -m 8 http://<ops-console-ip>/?view=map
+curl -m 8 http://<grid-dashboard-ip>/
+kubectl exec -n energy deploy/asset-service -- curl -s --max-time 5 meter-service:3000/health
+# Should timeout, fail, or return no response
 ```
 
 **SRE Agent prompts:**
-- "Why can't the grid dashboard reach meter-service?"
+- "Why did the live demo portals and meter-service stop responding?"
 - "Diagnose network connectivity issues in the energy namespace"
 - "What network policies are blocking meter data ingestion?"
 
 **Pass/Fail Criteria:**
-- ✅ **PASS**: SRE Agent identifies NetworkPolicy blocking traffic to meter-service
+- ✅ **PASS**: SRE Agent identifies NetworkPolicies blocking traffic to meter-service and the public portal pods
 - ✅ **PASS**: Agent recommends removing or modifying the blocking network policy
 - ❌ **FAIL**: Agent does not check NetworkPolicies
 - ❌ **FAIL**: Agent attributes connectivity failure to DNS or application issues
 
 **How to fix:**
 ```bash
-kubectl delete networkpolicy deny-meter-service -n energy
+kubectl delete networkpolicy deny-meter-service deny-grid-dashboard deny-ops-console -n energy
 ```
 
 ---
@@ -519,8 +521,8 @@ kubectl get deployment mongodb rabbitmq -n energy
 kubectl get endpoints mongodb rabbitmq -n energy
 kubectl get endpoints meter-service -n energy
 
-# 3) Remove the extra NetworkPolicy that baseline apply does not delete
-kubectl delete networkpolicy deny-meter-service -n energy
+# 3) Remove the extra NetworkPolicies that baseline apply does not delete
+kubectl delete networkpolicy deny-meter-service deny-grid-dashboard deny-ops-console -n energy
 
 # 4) Verify platform recovery
 kubectl get pods -n energy

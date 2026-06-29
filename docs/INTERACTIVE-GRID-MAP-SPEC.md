@@ -11,7 +11,7 @@
 
 > **This grid map is a demo topology visualization inside the deployed cloud demo, over Kubernetes service and application health signals.** It does not connect to real SCADA systems, GIS coordinates, utility telemetry, or production energy grids. All "substation," "transmission line," and "generator" labels are fictional energy-domain metaphors for the Kubernetes services deployed in the `energy` namespace.
 >
-> **Azure SRE Agent is generally available (GA).** This demo currently uses `Microsoft.App/agents@2025-05-01-preview` because this subscription provider metadata exposes only that API version. Move to `2026-01-01` after provider exposure and successful `what-if` validation.
+> **Azure SRE Agent is generally available (GA).** This demo pins `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`. If a subscription exposes only older preview provider metadata, deployment skips SRE Agent rather than falling back.
 >
 > The grid map must comply with the safe-language rules in [Safe Language Guardrails](SAFE-LANGUAGE-GUARDRAILS.md) and [Analyst Safe Language](ANALYST-SAFE-LANGUAGE.md). No element of this screen may claim real utility grid monitoring, autonomous remediation, or production-grade observability.
 

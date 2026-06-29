@@ -1,8 +1,8 @@
 # =============================================================================
-# SCENARIO 7: Network Policy Blocking - Meter Service Isolated
+# SCENARIO 7: Network Policy Blocking - Meter Service and Portals Isolated
 # =============================================================================
-# A security policy update gone wrong isolates the meter-service from the
-# grid, blocking all ingress and egress traffic.
+# A security policy update gone wrong isolates the meter-service and the
+# public demo portals from the grid, blocking all ingress and egress traffic.
 #
 # Scenario is intended to test whether SRE Agent can diagnose: Network
 # connectivity issues and service unavailability, and recommend checking network
@@ -12,7 +12,7 @@
 # kubectl apply -f k8s/scenarios/network-block.yaml
 #
 # HOW TO FIX:
-# kubectl delete networkpolicy deny-meter-service -n energy
+# kubectl delete networkpolicy deny-meter-service deny-grid-dashboard deny-ops-console -n energy
 # =============================================================================
 ---
 apiVersion: networking.k8s.io/v1
@@ -40,5 +40,61 @@ spec:
     - Ingress
     - Egress
   # BREAKING CHANGE: No ingress or egress rules = all traffic denied
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-grid-dashboard
+  namespace: energy
+  labels:
+    scenario: network-block
+    sre-demo: breakable
+  annotations:
+    sre.scenario: network-block
+    sre.service: grid-dashboard
+    sre.namespace: energy
+    sre.component: network-policy
+    sre.runbook_id: RB-007-network-block
+    sre.root_cause_category: networking
+    sre.change_source: manual-kubectl
+    sre.version: "2026-05-07"
+spec:
+  podSelector:
+    matchLabels:
+      app: grid-dashboard
+  policyTypes:
+    - Ingress
+    - Egress
+  # BREAKING CHANGE: block the public Grid Dashboard portal.
+  ingress: []
+  egress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-ops-console
+  namespace: energy
+  labels:
+    scenario: network-block
+    sre-demo: breakable
+  annotations:
+    sre.scenario: network-block
+    sre.service: ops-console
+    sre.namespace: energy
+    sre.component: network-policy
+    sre.runbook_id: RB-007-network-block
+    sre.root_cause_category: networking
+    sre.change_source: manual-kubectl
+    sre.version: "2026-05-07"
+spec:
+  podSelector:
+    matchLabels:
+      app: ops-console
+  policyTypes:
+    - Ingress
+    - Egress
+  # BREAKING CHANGE: block the public Ops Console portal.
   ingress: []
   egress: []
