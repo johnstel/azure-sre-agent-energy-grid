@@ -70,6 +70,8 @@ Show the healthy energy grid:
 
 **This is the #1 objection killer.** Present the three-tier model:
 
+During deployment, the repo-managed Azure Managed Grafana incident dashboard is imported into the lab's Managed Grafana workspace. Use it as a read-only evidence surface for pod health, readiness, restarts, CPU/memory, requests/errors, dependency failures, and the scenario timeline. It is not presented as a detector, a diagnosis engine, or a remediation tool.
+
 | Tier | SRE Agent Config | What It Can Do | Who Approves |
 |------|-----------------|----------------|--------------|
 | **Diagnosis Only** | `mode: 'Review'`, `accessLevel: 'Low'` | Read logs, query metrics, analyze state | N/A — read-only |

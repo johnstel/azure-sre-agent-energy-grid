@@ -75,6 +75,7 @@ No output means the management port is not externally reachable.
 
 **Verify:**
 - [ ] Deployment completes without errors
+- [ ] The repo-managed Grafana incident dashboard was imported during deployment from `infra/grafana/energy-grid-incident-dashboard.json` and the deploy script exited non-zero if the import/verification step failed
 - [ ] Note the resource group name from output (e.g., `rg-srelab-eastus2`)
 
 ```powershell
@@ -82,6 +83,7 @@ No output means the management port is not externally reachable.
 ```
 
 - [ ] All resources report healthy
+- [ ] The managed Grafana dashboard is present and shows the expected title: `Energy Grid — Incident Overview`
 - [ ] AKS cluster is accessible: `kubectl get nodes`
 
 ---
