@@ -217,6 +217,7 @@ const statusBadgeClass = computed(() => {
 function setActiveRun(run: RehearsalRun) {
   activeRun.value = run;
   selectedScenario.value = run.scenarioName;
+  const checksumEntry = run.evidencePackage.attachmentChecksums.find((entry) => entry.path === run.evidencePackage.evidencePath) ?? run.evidencePackage.attachmentChecksums[0];
   evidenceForm.value = {
     evidencePath: run.evidencePackage.evidencePath ?? '',
     manifestPath: run.evidencePackage.manifestPath ?? '',
@@ -227,7 +228,7 @@ function setActiveRun(run: RehearsalRun) {
     alertHistoryPath: run.evidencePackage.alertHistoryPath ?? '',
     kqlExportPath: run.evidencePackage.kqlExportPath ?? '',
     recoveryCheckPath: run.evidencePackage.recoveryCheckPath ?? '',
-    checksum: Object.values(run.evidencePackage.attachmentChecksums)[0] ?? '',
+    checksum: checksumEntry?.checksum ?? '',
     complete: run.evidencePackage.complete,
     notes: run.notes ?? '',
   };
@@ -338,7 +339,9 @@ async function saveEvidence() {
       alertHistoryPath: evidenceForm.value.alertHistoryPath || undefined,
       kqlExportPath: evidenceForm.value.kqlExportPath || undefined,
       recoveryCheckPath: evidenceForm.value.recoveryCheckPath || undefined,
-      attachmentChecksums: evidenceForm.value.checksum ? { portal: evidenceForm.value.checksum } : {},
+      attachmentChecksums: evidenceForm.value.evidencePath && evidenceForm.value.checksum
+        ? [{ path: evidenceForm.value.evidencePath, checksum: evidenceForm.value.checksum }]
+        : [],
       complete: evidenceForm.value.complete,
       notes: evidenceForm.value.notes || undefined,
     });

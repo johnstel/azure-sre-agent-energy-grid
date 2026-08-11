@@ -50,14 +50,15 @@ Each run carries a `RehearsalEvidencePackage` with optional repo-relative paths:
 | `recoveryCheckPath` | Post-recovery verification |
 | `summaryPath` | Operator-facing summary package |
 | `artifactDirectory` | Deterministic package root for generated files |
-| `attachmentChecksums` | `{ key: sha256 }` map for integrity |
+| `attachmentChecksums` | Array of `{ path, checksum }` entries for integrity validation |
 | `sensitivePatterns` | Configured regex-like patterns that trigger redaction checks |
 | `complete` | Boolean — operator asserts package is final |
 
 **Path rules** — all evidence paths must:
 - Be repo-relative (not absolute, not URLs)
 - Live under `docs/evidence/`
-- Be validated before they are persisted to the rehearsal package
+- Be validated against the configured repository root before they are persisted to the rehearsal package
+- Be resolved from the verified repository root rather than `process.cwd()`
 
 Generated artifact bundles are written under the selected `artifactDirectory` (default `docs/evidence/mission-control/<scenario>`), with a manifest and summary file emitted as part of the evidence-package phase.
 
@@ -146,7 +147,7 @@ Base path: `/api/rehearsals`
   "scenarioName": "OOMKilled",
   "evidencePath": "docs/evidence/oom-diagnosis.md",
   "manifestPath": "docs/evidence/oom-manifest.json",
-  "attachmentChecksums": { "portal": "sha256:abc123" },
+  "attachmentChecksums": [{ "path": "docs/evidence/oom-diagnosis.md", "checksum": "sha256:abc123" }],
   "complete": true,
   "notes": "Reviewed by operator"
 }

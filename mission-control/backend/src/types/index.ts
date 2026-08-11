@@ -608,6 +608,11 @@ export interface RehearsalTimestamps {
   t5?: string;
 }
 
+export interface RehearsalAttachmentChecksum {
+  path: string;
+  checksum: string;
+}
+
 export interface RehearsalEvidencePackage {
   evidencePath?: string;
   manifestPath?: string;
@@ -620,7 +625,7 @@ export interface RehearsalEvidencePackage {
   recoveryCheckPath?: string;
   summaryPath?: string;
   artifactDirectory?: string;
-  attachmentChecksums: Record<string, string>;
+  attachmentChecksums: RehearsalAttachmentChecksum[];
   redactionFindings: string[];
   sensitivePatterns: string[];
   complete: boolean;
@@ -699,7 +704,7 @@ export interface UpdateRehearsalEvidenceRequest {
   recoveryCheckPath?: string;
   summaryPath?: string;
   artifactDirectory?: string;
-  attachmentChecksums?: Record<string, string>;
+  attachmentChecksums?: RehearsalAttachmentChecksum[];
   redactionFindings?: string[];
   sensitivePatterns?: string[];
   complete?: boolean;

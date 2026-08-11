@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -25,6 +26,72 @@ async function withTempState<T>(operation: (stateDir: string) => Promise<T>): Pr
     await rm(tempDir, { recursive: true, force: true });
   }
 }
+
+test('concurrent advances and evidence updates preserve both mutations', async () => {
+  await withTempState(async () => {
+    await createRehearsalRun({ scenarioName: 'OOMKilled' });
+    const [advanced, evidenceUpdated] = await Promise.all([
+      advanceRehearsalRun('OOMKilled', { notes: 'phase update' }),
+      updateRehearsalEvidence({
+        scenarioName: 'OOMKilled',
+        evidencePath: 'docs/evidence/wave1-live/oom-killed/sre-agent/portal.png',
+        manifestPath: 'docs/evidence/wave1-live/oom-killed/manifest.json',
+        attachmentChecksums: [{ path: 'docs/evidence/wave1-live/oom-killed/sre-agent/portal.png', checksum: 'placeholder' }],
+        complete: true,
+        notes: 'evidence update',
+      }),
+    ]);
+    assert.equal(advanced.phase, 'baseline');
+    assert.equal(evidenceUpdated.phase, 'baseline');
+    assert.equal(evidenceUpdated.evidencePackage.evidencePath, 'docs/evidence/wave1-live/oom-killed/sre-agent/portal.png');
+    assert.equal(evidenceUpdated.evidencePackage.attachmentChecksums[0]?.checksum, 'placeholder');
+  });
+});
+
+test('advance and resume reject interrupted, reset, and completed runs', async () => {
+  await withTempState(async () => {
+    await createRehearsalRun({ scenarioName: 'ServiceMismatch' });
+    await interruptRehearsalRun({ scenarioName: 'ServiceMismatch', reason: 'Pause for operator review' });
+    await assert.rejects(() => advanceRehearsalRun('ServiceMismatch'), /interrupted/i);
+
+    await resumeRehearsalRun({ scenarioName: 'ServiceMismatch' });
+    await resetRehearsalRun('ServiceMismatch');
+    await assert.rejects(() => advanceRehearsalRun('ServiceMismatch'), /reset/i);
+    await assert.rejects(() => resumeRehearsalRun({ scenarioName: 'ServiceMismatch' }), /interrupted/i);
+
+    let completedRun = await createRehearsalRun({ scenarioName: 'OOMKilled' });
+    for (let index = 0; index < 9; index += 1) {
+      completedRun = await advanceRehearsalRun('OOMKilled');
+    }
+    assert.equal(completedRun.status, 'completed');
+    await assert.rejects(() => advanceRehearsalRun('OOMKilled'), /already complete/i);
+    await assert.rejects(() => resumeRehearsalRun({ scenarioName: 'OOMKilled' }), /interrupted/i);
+  });
+});
+
+test('evidence paths resolve from the configured repository root when cwd changes', async () => {
+  await withTempState(async (stateDir) => {
+    const repositoryRoot = join(stateDir, 'repo');
+    const nestedDir = join(repositoryRoot, 'nested');
+    await mkdir(nestedDir, { recursive: true });
+    const previousCwd = process.cwd();
+    process.env['REHEARSAL_REPOSITORY_ROOT'] = repositoryRoot;
+    process.chdir(nestedDir);
+    try {
+      await createRehearsalRun({ scenarioName: 'OOMKilled' });
+      await updateRehearsalEvidence({
+        scenarioName: 'OOMKilled',
+        evidencePath: 'docs/evidence/wave1-live/oom-killed/sre-agent/portal.png',
+        manifestPath: 'docs/evidence/wave1-live/oom-killed/manifest.json',
+        complete: true,
+      });
+      assert.ok(existsSync(join(repositoryRoot, 'docs/evidence/wave1-live/oom-killed/sre-agent/portal.png')));
+    } finally {
+      process.chdir(previousCwd);
+      delete process.env['REHEARSAL_REPOSITORY_ROOT'];
+    }
+  });
+});
 
 test('OOMKilled advances through the rehearsal phases and completes evidence packaging', async () => {
   await withTempState(async () => {
