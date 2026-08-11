@@ -737,6 +737,32 @@ function Get-SreAgentProviderStatus {
     }
 }
 
+function Import-GrafanaDashboardDefinition {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName,
+
+        [Parameter()]
+        [string]$GrafanaName = ''
+    )
+
+    $provisionScript = Join-Path $PSScriptRoot 'provision-grafana-dashboard.ps1'
+    if (-not (Test-Path $provisionScript)) {
+        throw "Grafana dashboard provisioning script not found at '$provisionScript'."
+    }
+
+    $arguments = @('-NoLogo', '-NoProfile', '-File', $provisionScript, '-ResourceGroupName', $ResourceGroupName)
+    if (-not [string]::IsNullOrWhiteSpace($GrafanaName)) {
+        $arguments += @('-GrafanaName', $GrafanaName)
+    }
+
+    & pwsh @arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Grafana dashboard provisioning failed.'
+    }
+}
+
 # Banner
 Write-Host @"
 
@@ -1375,6 +1401,20 @@ if (Test-Path $k8sPath) {
 }
 else {
     Write-Host "  ⚠️  Application manifest not found at: $k8sPath" -ForegroundColor Yellow
+}
+
+# Provision the repo-managed Grafana dashboard
+Write-Host "`n📊 Provisioning repo-managed Grafana dashboard..." -ForegroundColor Yellow
+try {
+    $grafanaName = az grafana list --resource-group $resourceGroupName --query "[0].name" --output tsv 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($grafanaName)) {
+        throw 'Unable to resolve the Managed Grafana workspace name.'
+    }
+
+    Import-GrafanaDashboardDefinition -ResourceGroupName $resourceGroupName -GrafanaName $grafanaName
+}
+catch {
+    throw "Grafana dashboard provisioning failed: $($_.Exception.Message)"
 }
 
 # Run validation

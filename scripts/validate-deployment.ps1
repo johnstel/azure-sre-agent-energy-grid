@@ -192,6 +192,24 @@ if ($grafana) {
     if (Write-Check "Managed Grafana exists" $true $grafana.name) {
         $passedChecks++
     }
+
+    $dashboardTitle = 'Energy Grid — Incident Overview'
+    $dashboardListRaw = az grafana dashboard list --resource-group $ResourceGroupName --name $grafana.name --output json 2>$null
+    $dashboardList = @()
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($dashboardListRaw)) {
+        try {
+            $dashboardList = @($dashboardListRaw | ConvertFrom-Json)
+        }
+        catch {
+            $dashboardList = @()
+        }
+    }
+
+    $dashboardFound = ($dashboardList | Where-Object { $_.title -eq $dashboardTitle }).Count -gt 0
+    $totalChecks++
+    if (Write-Check "Managed Grafana incident dashboard provisioned" $dashboardFound "Expected dashboard: $dashboardTitle") {
+        $passedChecks++
+    }
 }
 
 # =============================================================================

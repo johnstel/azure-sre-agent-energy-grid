@@ -50,7 +50,7 @@ All data is scoped to the `energy` namespace unless noted otherwise.
 2. Authenticate with your Entra ID credentials (Grafana Viewer role minimum).
 3. Navigate to **Dashboards → Energy Grid — Incident Overview**.
 
-> If the dashboard has not been provisioned yet (no JSON definition committed to this repo), the Managed Grafana instance deploys with the Azure Monitor Workspace data source pre-connected. Build or import the dashboard manually using the panel definitions in [§ What the Dashboard Shows](#what-the-dashboard-shows).
+> The dashboard is now provisioned during deployment by `scripts/provision-grafana-dashboard.ps1`, which imports `infra/grafana/energy-grid-incident-dashboard.json` into the Managed Grafana workspace with overwrite semantics and fails the deployment if the import or verification step fails. If a live deployment is unavailable, the dashboard definition in this repo remains the source of truth for the intended layout and variables.
 
 ---
 
