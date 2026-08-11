@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import ssl
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -42,11 +43,26 @@ def _read_service_account_token():
 
 
 class GridStatusAPI:
-    def __init__(self):
-        self.token = _read_service_account_token()
-        self.host = os.getenv('KUBERNETES_SERVICE_HOST', '127.0.0.1')
-        self.port = os.getenv('KUBERNETES_SERVICE_PORT', '443')
-        self.base_url = f'https://{self.host}:{self.port}'
+    def __init__(self, token=None, host=None, port=None, ca_bundle_path=None, base_url=None, ssl_context=None, request_timeout=5):
+        self.token = token if token is not None else _read_service_account_token()
+        self.host = host or os.getenv('KUBERNETES_SERVICE_HOST', '127.0.0.1')
+        self.port = port or os.getenv('KUBERNETES_SERVICE_PORT', '443')
+        self.base_url = base_url or f'https://{self.host}:{self.port}'
+        self.ca_bundle_path = ca_bundle_path or os.getenv('KUBERNETES_CA_CERT_PATH', '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt')
+        self.request_timeout = request_timeout
+        self.ssl_context = ssl_context
+        self.request_errors = {}
+
+    def _build_ssl_context(self):
+        if self.ssl_context is not None:
+            return self.ssl_context
+        if self.ca_bundle_path:
+            ca_path = Path(self.ca_bundle_path)
+            if ca_path.exists():
+                context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+                context.load_verify_locations(cafile=str(ca_path))
+                return context
+        return ssl.create_default_context()
 
     def _request(self, path):
         headers = {}
@@ -54,17 +70,29 @@ class GridStatusAPI:
             headers['Authorization'] = f'Bearer {self.token}'
         req = request.Request(self.base_url + path, headers=headers, method='GET')
         try:
-            with request.urlopen(req, timeout=5) as resp:
+            context = self._build_ssl_context()
+            with request.urlopen(req, context=context, timeout=self.request_timeout) as resp:
                 body = resp.read().decode('utf-8')
                 return json.loads(body) if body else {}
-        except (error.URLError, error.HTTPError, TimeoutError, ValueError, OSError) as exc:
-            return {'error': str(exc)}
+        except (error.URLError, error.HTTPError, TimeoutError, ValueError, OSError, ssl.SSLError) as exc:
+            error_message = str(exc)
+            self.request_errors[path] = error_message
+            return {'error': error_message, 'sourceStatus': 'error'}
 
     def _list_items(self, path):
         if hasattr(self, 'items') and self.items is not None and path in self.items:
             return self.items[path]
         payload = self._request(path)
+        if isinstance(payload, dict) and payload.get('sourceStatus') == 'error':
+            return []
         return payload.get('items', []) if isinstance(payload, dict) else []
+
+    def _request_error_for(self, *paths):
+        for path in paths:
+            error_message = self.request_errors.get(path)
+            if error_message:
+                return error_message
+        return None
 
     def _resource_path(self, kind, namespace):
         if kind == 'deployment':
@@ -188,7 +216,7 @@ class GridStatusAPI:
             return 'warning'
         return 'healthy'
 
-    def _build_node(self, resource_name, resource, pods, service, endpoint, warning_events, activeScenario, timestamp):
+    def _build_node(self, resource_name, resource, pods, service, endpoint, warning_events, request_error, activeScenario, timestamp):
         pod_readiness, restart_count, pressure, pressure_note = self._pod_readiness(pods)
         deployment_readiness = self._readiness(resource) if resource else 'unknown'
         endpoint_state = self._service_endpoint_state(service, endpoint)
@@ -211,7 +239,20 @@ class GridStatusAPI:
             'resourcePressureNote': self._sanitize_text(pressure_note),
             'mongodbReachable': None,
             'rabbitmqReachable': None,
+            'sourceStatus': 'ok',
+            'sourceError': None,
         }
+        if request_error:
+            node['status'] = 'unknown'
+            node['readiness'] = 'unknown'
+            node['podReadiness'] = 'unknown'
+            node['deploymentReadiness'] = 'unknown'
+            node['resourcePressure'] = 'unknown'
+            node['serviceEndpointState'] = 'unknown'
+            node['summary'] = self._sanitize_text(f'Governed status unavailable for {resource_name}: {request_error}')
+            node['reason'] = 'source-error'
+            node['sourceStatus'] = 'error'
+            node['sourceError'] = self._sanitize_text(request_error)
         if resource_name == 'mongodb':
             node['mongodbReachable'] = reachability
         if resource_name == 'rabbitmq':
@@ -261,10 +302,19 @@ class GridStatusAPI:
             service = self._service_items(resource_name)[0] if self._service_items(resource_name) else None
             endpoint = self._endpoint_items(resource_name)[0] if self._endpoint_items(resource_name) else None
             warning_events = [event for event in self._event_items(resource_name) if event.get('type') == 'Warning']
-            node = self._build_node(resource_name, resource, pods, service, endpoint, warning_events, activeScenario, timestamp)
+            request_error = self._request_error_for(
+                self._resource_path(spec['kind'], ALLOWED_NAMESPACE),
+                f'/api/v1/namespaces/{ALLOWED_NAMESPACE}/pods',
+                f'/api/v1/namespaces/{ALLOWED_NAMESPACE}/services',
+                f'/api/v1/namespaces/{ALLOWED_NAMESPACE}/endpoints',
+                f'/api/v1/namespaces/{ALLOWED_NAMESPACE}/events',
+            )
+            node = self._build_node(resource_name, resource, pods, service, endpoint, warning_events, request_error, activeScenario, timestamp)
             nodes.append(node)
             events.extend(self._build_events(resource_name, warning_events, activeScenario, timestamp))
         events.sort(key=lambda entry: (entry.get('reason') == 'scenario', entry.get('timestamp', '')))
+        original_node_count = len(nodes)
+        original_event_count = len(events)
         payload = {
             'schemaVersion': '1.2',
             'dataContractVersion': 'cloud-demo-v2',
@@ -294,7 +344,7 @@ class GridStatusAPI:
                 payload['nodes'] = payload['nodes'][:-1]
             serialized = json.dumps(payload).encode('utf-8')
         payload['outputBytes'] = len(serialized)
-        payload['truncated'] = len(serialized) > max_output_bytes or len(payload['events']) < max_events or len(payload['nodes']) < len(nodes)
+        payload['truncated'] = len(serialized) > max_output_bytes or len(payload['events']) < original_event_count or len(payload['nodes']) < original_node_count
         return payload
 
 

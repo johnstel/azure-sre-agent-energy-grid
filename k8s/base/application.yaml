@@ -2445,6 +2445,51 @@ data:
     }
 
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ops-console-status-reader
+  namespace: energy
+  labels:
+    app: ops-console
+    sre-demo: breakable
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ops-console-status-reader
+  namespace: energy
+  labels:
+    app: ops-console
+    sre-demo: breakable
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "events"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-console-status-reader
+  namespace: energy
+  labels:
+    app: ops-console
+    sre-demo: breakable
+subjects:
+  - kind: ServiceAccount
+    name: ops-console-status-reader
+    namespace: energy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ops-console-status-reader
+
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -2462,6 +2507,7 @@ spec:
       labels:
         app: ops-console
     spec:
+      serviceAccountName: ops-console-status-reader
       nodeSelector:
         nodepool-type: user
       containers:

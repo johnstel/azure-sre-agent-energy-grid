@@ -30,6 +30,16 @@ class GridMapStaticContractTests(unittest.TestCase):
         self.assertIn("SECRET_PATTERNS", source)
         self.assertIn("[redacted]", source)
 
+    def test_application_manifest_uses_least_privilege_rbac(self):
+        manifest_path = ROOT / 'k8s/base/application.yaml'
+        source = manifest_path.read_text(encoding='utf-8')
+        self.assertIn('serviceAccountName: ops-console-status-reader', source)
+        self.assertIn('name: ops-console-status-reader', source)
+        self.assertIn('resources: ["pods", "services", "endpoints", "events"]', source)
+        self.assertIn('resources: ["deployments", "statefulsets"]', source)
+        self.assertIn('verbs: ["get", "list"]', source)
+        self.assertNotIn('resources: ["secrets", "configmaps"]', source)
+
 
 if __name__ == '__main__':
     unittest.main()
