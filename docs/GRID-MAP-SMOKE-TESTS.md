@@ -13,7 +13,7 @@
 **Issue**: [#22 test(grid-map): cloud demo smoke tests for breakable scenarios](https://github.com/johnstel/azure-sre-agent-energy-grid/issues/22)
 **Depends on**: #15 (data contract — merged as `CLOUD-GRID-MAP-DATA-CONTRACT.md`), #21 (grid map renderer — merged)
 **Host**: `ops-console` in AKS `energy` namespace
-**Data contract version**: `cloud-demo-v1`
+**Data contract version**: `cloud-demo-v2`
 **Related docs**: [`CLOUD-GRID-MAP-DATA-CONTRACT.md`](CLOUD-GRID-MAP-DATA-CONTRACT.md), [`INTERACTIVE-GRID-MAP-SPEC.md`](INTERACTIVE-GRID-MAP-SPEC.md), [`SAFE-LANGUAGE-GUARDRAILS.md`](SAFE-LANGUAGE-GUARDRAILS.md)
 
 ---
@@ -28,12 +28,14 @@
 6. [Missing-Data and Stale-Data Edge Cases](#6-missing-data-and-stale-data-edge-cases)
 7. [Safe-Language Audit](#7-safe-language-audit)
 8. [Accessibility Audit](#8-accessibility-audit)
-9. [V1 Unsupported Dynamic States](#9-v1-unsupported-dynamic-states)
+9. [V1.2 Transient Scenario Nodes](#9-v12-transient-scenario-nodes)
 10. [Automated Contract Validation](#10-automated-contract-validation)
 
 ---
 
-## 1. V1 Data Contract Summary
+## 1. V1.2 / Governed Status Contract Summary
+
+The cloud-demo data contract now exposes a governed read-only status payload from `/api/grid-status/v1` and renders transient scenario-only nodes for `high-cpu`, `pending-pods`, `probe-failure`, and `missing-config`. The V1.2 contract still uses three live health endpoints and the same safe-language guardrails.
 
 The V1 cloud-demo data contract exposes **three live health endpoints** and **seven static/unknown
 nodes**. All health polling is done by `ops-console` nginx proxies — no browser JavaScript reads
@@ -76,6 +78,9 @@ severity is a visual impact cue only and must not be described as root cause.
 
 ### For manual checklist execution (live cluster required)
 
+> **Timing**: The client polls `/api/grid-status/v1` every 10 s. Allow one full poll cycle before
+> asserting a state change. The 30 s detection/recovery SLA accounts for pod readiness + poll lag.
+
 - [ ] AKS `energy` namespace is healthy and all baseline pods are Running
 - [ ] `ops-console` service is reachable in a browser (`kubectl port-forward` or LoadBalancer IP)
 - [ ] Grid Map view is visible (click **Grid Map** tab in ops-console)
@@ -107,18 +112,17 @@ data contract. This is the primary traceability record for acceptance criterion 
 | 1 | OOMKilled | `oom-killed.yaml` | `meter-service` | **Full** — live health endpoint | `critical` | — (no cascade in V1; mongodb/rabbitmq are static) | `meter-service → rabbitmq` and `meter-service → mongodb` edges go critical |
 | 2 | CrashLoop | `crash-loop.yaml` | `asset-service` | **Full** — live health endpoint | `critical` | — | `dispatch-service → asset-service` and `ops-console → asset-service` edges go critical; `asset-service → mongodb` edge goes critical |
 | 3 | ImagePullBackOff | `image-pull-backoff.yaml` | `dispatch-service` | **Full** — live health endpoint | `critical` | — | All edges to/from `dispatch-service` go critical |
-| 4 | HighCPU | `high-cpu.yaml` | `frequency-calc-overload` (new deploy) | **None — unsupported in V1** | N/A | — | None. See [Section 9](#9-v1-unsupported-dynamic-states) |
-| 5 | PendingPods | `pending-pods.yaml` | `substation-monitor` (new deploy) | **None — unsupported in V1** | N/A | — | None. See [Section 9](#9-v1-unsupported-dynamic-states) |
-| 6 | ProbeFailure | `probe-failure.yaml` | `grid-health-monitor` (new deploy) | **None — unsupported in V1** | N/A | — | None. See [Section 9](#9-v1-unsupported-dynamic-states) |
+| 4 | HighCPU | `high-cpu.yaml` | `frequency-calc-overload` (transient) | **Transient node** — rendered as `unknown` (no live probe) | `unknown` | — | None (node has no edges in V1.2) |
+| 5 | PendingPods | `pending-pods.yaml` | `substation-monitor` (transient) | **Transient node** — rendered as `unknown` (no live probe) | `unknown` | — | None (node has no edges in V1.2) |
+| 6 | ProbeFailure | `probe-failure.yaml` | `grid-health-monitor` (transient) | **Transient node** — rendered as `unknown` (no live probe) | `unknown` | — | None (node has no edges in V1.2) |
 | 7 | NetworkBlock | `network-block.yaml` | `meter-service` | **Full** — NetworkPolicy blocks proxy path | `critical` | `rabbitmq` (if unreachable from meter-service path) | `meter-service → rabbitmq` edge goes critical |
-| 8 | MissingConfig | `missing-config.yaml` | `grid-zone-config` (new deploy) | **None — unsupported in V1** | N/A | — | None. See [Section 9](#9-v1-unsupported-dynamic-states) |
+| 8 | MissingConfig | `missing-config.yaml` | `grid-zone-config` (transient) | **Transient node** — rendered as `unknown` (no live probe) | `unknown` | — | None (node has no edges in V1.2) |
 | 9 | MongoDBDown | `mongodb-down.yaml` | `mongodb` (static node) | **Partial** — mongodb is static/in-cluster; downstream services may degrade if app health checks DB | `unknown` on mongodb (no live endpoint); downstream `meter-service`/`dispatch-service`/`asset-service` may show `critical` if app health reflects DB loss (app-dependent) | `meter-service`, `dispatch-service`, `asset-service` (indirect, app-dependent) | All `→ mongodb` edges stay unknown/gray (static); downstream service edges may go critical if health endpoints degrade |
 | 10 | ServiceMismatch | `service-mismatch.yaml` | `meter-service` | **Full** — Service selector mismatch makes health endpoint unreachable | `critical` (health endpoint timeout via misconfigured Service) | — | `grid-dashboard → meter-service` edge goes critical; `meter-service → rabbitmq` and `meter-service → mongodb` edges go critical |
 
-**Summary**: 6 of 10 scenarios have full or partial V1 visibility. 4 scenarios (HighCPU,
-PendingPods, ProbeFailure, MissingConfig) are **not visible** on the V1 grid map because they
-create new Deployments outside the topology graph. See [Section 9](#9-v1-unsupported-dynamic-states)
-for documented follow-up needs.
+**Summary**: All 10 scenarios have visibility on the V1.2 grid map. 6 have full or partial live
+severity. 4 transient-node scenarios (`HighCPU`, `PendingPods`, `ProbeFailure`, `MissingConfig`)
+render as `unknown` because no governed live probe exists yet — see [Section 9](#9-v12-transient-scenario-nodes).
 
 ---
 
@@ -632,36 +636,30 @@ Run the automated script:
 
 ---
 
-## 9. V1 Unsupported Dynamic States
+## 9. V1.2 Transient Scenario Nodes
 
-The following 4 scenarios create new Deployments that are **outside** the `grid-map-topology.json`
-topology graph. The V1 data contract has no mechanism to surface their state in the grid map.
-These are documented here as known V1 limitations — do not pretend full Kubernetes event visibility
-exists.
+With V1.2, the four scenario-only deployments (`frequency-calc-overload`, `substation-monitor`,
+`grid-health-monitor`, `grid-zone-config`) are declared in `grid-map-topology.json` as transient
+nodes. They are **always rendered** on the map with default state `unknown` / dashed-gray.
 
-| Scenario | Unsupported State | Why Not Visible in V1 |
-|---|---|---|
-| HighCPU (`high-cpu.yaml`) | CPU stress on `frequency-calc-overload` deployment | New Deployment not in topology; no live health endpoint for it; existing `dispatch-service` health endpoint is unaffected |
-| PendingPods (`pending-pods.yaml`) | Pending pods on `substation-monitor` deployment | New Deployment not in topology; `meter-service` health endpoint is unaffected |
-| ProbeFailure (`probe-failure.yaml`) | Liveness probe failure on `grid-health-monitor` deployment | New Deployment not in topology; no mapped node reflects this failure |
-| MissingConfig (`missing-config.yaml`) | Missing ConfigMap on `grid-zone-config` deployment | New Deployment not in topology; `dispatch-service` continues running normally |
+| Scenario | Transient Node | V1.2 State When Active | V1.2 State When Inactive |
+|---|---|---|---|
+| HighCPU (`high-cpu.yaml`) | `frequency-calc-overload` | `unknown` (no live probe yet) | `unknown` / absent |
+| PendingPods (`pending-pods.yaml`) | `substation-monitor` | `unknown` (no live probe yet) | `unknown` / absent |
+| ProbeFailure (`probe-failure.yaml`) | `grid-health-monitor` | `unknown` (no live probe yet) | `unknown` / absent |
+| MissingConfig (`missing-config.yaml`) | `grid-zone-config` | `unknown` (no live probe yet) | `unknown` / absent |
 
-Additionally, the following node states are not fully observable in V1 by design:
-- **MongoDB failure** (`mongodb-down.yaml`): The `mongodb` node renders as `unknown`/static in V1. Downstream service degradation is indirect and app-dependent.
-- **Pod logs, Kubernetes events, restart counts**: Not available in V1 (no browser-safe endpoint).
-- **Event strip dynamic rows**: The strip remains in a safe unavailable empty state until a governed V2 event endpoint exists.
-- **Grid-worker disabled state**: Rendered as `disabled` but no dynamic health signal exists.
-- **Forecast-service absent state**: Rendered as `unknown`/optional-absent but no health endpoint exists.
+**What changed from V1**: These nodes now appear on the map at all times (dashed border,
+"(scenario)" label suffix). They remain `unknown` because no governed health probe exists for them
+yet. A future V2 governed status endpoint may promote them to live severity.
 
-### Follow-up issues required for full Kubernetes visibility
+### Remaining V1.2 limitations
 
-The following V2+ follow-up issues should be created to address these gaps:
-
-1. **V2 read-only in-cluster status endpoint** — Expose a governed, read-only status API from ops-console (or a new microservice) that aggregates pod state, events, and restart counts for all topology nodes. This would enable HighCPU, PendingPods, ProbeFailure, and MissingConfig scenarios to appear on the grid map.
-
-2. **Topology extension for auxiliary workloads** — Optionally extend `grid-map-topology.json` to include auxiliary nodes (`frequency-calc-overload`, `substation-monitor`, `grid-health-monitor`, `grid-zone-config`) so they can appear as transient/scenario-only nodes.
-
-3. **MongoDB and RabbitMQ health proxy** — Add a server-side health proxy that checks MongoDB and RabbitMQ TCP reachability and exposes a browser-safe `/api/mongodb/health` and `/api/rabbitmq/health` endpoint from ops-console. This would make MongoDBDown fully observable.
+- **MongoDB / RabbitMQ**: Still `unknown`/static. Downstream degradation is app-dependent.
+- **Pod logs, Kubernetes events, restart counts**: Not exposed (no browser-safe endpoint).
+- **Event strip dynamic rows**: Safe unavailable empty state until a governed V2 event endpoint.
+- **grid-worker**: Rendered as `disabled`; no dynamic health signal.
+- **forecast-service**: Rendered as `unknown`/optional-absent; no health endpoint.
 
 ---
 

@@ -247,7 +247,7 @@ The detail panel is a right-side drawer that opens when a node or edge is select
 
 ### 3.6 Event Strip
 
-A horizontal strip at the bottom shows the 5 most recent events only if the Issue A cloud data contract exposes event data. If V1 does not expose events, the strip shows a safe unavailable state instead of implying Kubernetes event visibility. Each populated event row shows:
+A horizontal strip at the bottom shows the 5 most recent events only if the Issue A cloud data contract exposes event data. In the governed v1.2 contract, the map consumes a bounded read-only snapshot from `/api/grid-status/v1`, includes scenario-aware transient nodes, and uses explicit `unknown` handling rather than inferred root-cause claims. If the snapshot is unavailable, the strip shows a safe unavailable state instead of implying Kubernetes event visibility. Each populated event row shows:
 
 ```
 {timestamp} {severity-icon} {involvedObject.name}: {reason} — {message (truncated to 120 chars)}
