@@ -22,7 +22,7 @@
         "enable": false,
         "hide": true,
         "iconColor": "rgba(255, 180, 0, 0.85)",
-        "name": "Detection",
+        "name": "Scenario state",
         "target": {
           "refId": "A"
         },
@@ -37,7 +37,7 @@
         "enable": false,
         "hide": true,
         "iconColor": "rgba(0, 143, 255, 0.85)",
-        "name": "Diagnosis",
+        "name": "Operator note",
         "target": {
           "refId": "A"
         },
@@ -52,7 +52,7 @@
         "enable": false,
         "hide": true,
         "iconColor": "rgba(50, 172, 45, 0.85)",
-        "name": "Remediation",
+        "name": "Remediation note",
         "target": {
           "refId": "A"
         },
@@ -67,7 +67,7 @@
         "enable": false,
         "hide": true,
         "iconColor": "rgba(96, 200, 50, 0.85)",
-        "name": "Recovery",
+        "name": "Recovery note",
         "target": {
           "refId": "A"
         },
@@ -131,7 +131,7 @@
             "spanNulls": false
           },
           "mappings": [],
-          "noValue": "Unknown",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -156,7 +156,7 @@
       },
       "id": 1,
       "options": {
-        "content": "### Incident handoff\n- Environment (context): **$environment**\n- Namespace: **$namespace**\n- Service: **$service**\n- Scenario (context): **$scenario**\n- This dashboard surfaces Kubernetes and application telemetry for operator review.\n- Requests/errors and dependency-failure panels use Azure Monitor / Log Analytics data when available; otherwise they show an empty state instead of a healthy-looking zero.\n- Use the links above for the runbook, safe-language guardrails, and the portal handoff.",
+        "content": "### Incident handoff\n- Environment (context): **$environment**\n- Namespace: **$namespace**\n- Service: **$service**\n- Scenario (context): **$scenario**\n- This dashboard surfaces Kubernetes and app telemetry for operator review.\n- Requests/errors and dependency-failure panels use Azure Monitor / Log Analytics data when available; otherwise they remain empty rather than implying healthy zeros.\n- The service selector uses the repo-owned service prefix values, and the Azure Monitor queries use prefix matching for the selected service.\n- Use the links above for the runbook, safe-language guardrails, and the portal handoff.",
         "mode": "markdown"
       },
       "pluginVersion": "10.4.3",
@@ -238,7 +238,7 @@
             "mode": "thresholds"
           },
           "mappings": [],
-          "noValue": "Unknown",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -430,7 +430,7 @@
           "refId": "A",
           "azureMonitor": {
             "queryType": "Logs",
-            "query": "AppRequests\n| where TimeGenerated between (ago(30m) .. now())\n| extend namespace = tostring(customDimensions['sre.namespace']), service = tostring(customDimensions['sre.service']), scenario = tostring(customDimensions['sre.scenario']), resultCode = tostring(ResultCode)\n| where namespace =~ '$namespace'\n| where ('$service' == '.*' or service =~ '$service')\n| where ('$scenario' == 'all' or scenario =~ '$scenario')\n| summarize Requests = count(), Errors = countif(todouble(resultCode) >= 500) by service\n| order by Errors desc, Requests desc",
+            "query": "AppRequests\n| where TimeGenerated between (ago(30m) .. now())\n| extend namespace = tostring(customDimensions['sre.namespace']), service = tostring(customDimensions['sre.service']), scenario = tostring(customDimensions['sre.scenario']), resultCode = tostring(ResultCode)\n| where namespace =~ '$namespace'\n| where ('$service' == '.*' or service startswith '$service')\n| where ('$scenario' == 'all' or scenario =~ '$scenario')\n| summarize Requests = count(), Errors = countif(todouble(resultCode) >= 500) by service\n| order by Errors desc, Requests desc",
             "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
             "resourceGroup": "__RESOURCE_GROUP__",
             "subscriptionId": "__SUBSCRIPTION_ID__"
@@ -480,7 +480,7 @@
           "refId": "A",
           "azureMonitor": {
             "queryType": "Logs",
-            "query": "AppDependencies\n| where TimeGenerated between (ago(30m) .. now())\n| extend namespace = tostring(customDimensions['sre.namespace']), service = tostring(customDimensions['sre.service']), scenario = tostring(customDimensions['sre.scenario']), dependencyType = tostring(DependencyType), success = tostring(Success)\n| where namespace =~ '$namespace'\n| where ('$service' == '.*' or service =~ '$service')\n| where ('$scenario' == 'all' or scenario =~ '$scenario')\n| where success =~ 'False'\n| summarize Failures = count() by dependencyType, service\n| order by Failures desc",
+            "query": "AppDependencies\n| where TimeGenerated between (ago(30m) .. now())\n| extend namespace = tostring(customDimensions['sre.namespace']), service = tostring(customDimensions['sre.service']), scenario = tostring(customDimensions['sre.scenario']), dependencyType = tostring(DependencyType), success = tostring(Success)\n| where namespace =~ '$namespace'\n| where ('$service' == '.*' or service startswith '$service')\n| where ('$scenario' == 'all' or scenario =~ '$scenario')\n| where success =~ 'False'\n| summarize Failures = count() by dependencyType, service\n| order by Failures desc",
             "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
             "resourceGroup": "__RESOURCE_GROUP__",
             "subscriptionId": "__SUBSCRIPTION_ID__"
@@ -509,7 +509,7 @@
             "spanNulls": false
           },
           "mappings": [],
-          "noValue": "Unknown"
+          "noValue": "No data"
         },
         "overrides": []
       },
@@ -536,7 +536,7 @@
           "refId": "A",
           "azureMonitor": {
             "queryType": "Logs",
-            "query": "AppRequests\n| where TimeGenerated between (ago(2h) .. now())\n| extend namespace = tostring(customDimensions['sre.namespace']), service = tostring(customDimensions['sre.service']), scenario = tostring(customDimensions['sre.scenario']), resultCode = tostring(ResultCode)\n| where namespace =~ '$namespace'\n| where ('$service' == '.*' or service =~ '$service')\n| where ('$scenario' == 'all' or scenario =~ '$scenario')\n| summarize Errors = countif(todouble(resultCode) >= 500) by bin(TimeGenerated, 15m)\n| order by TimeGenerated asc",
+            "query": "AppRequests\n| where TimeGenerated between (ago(2h) .. now())\n| extend namespace = tostring(customDimensions['sre.namespace']), service = tostring(customDimensions['sre.service']), scenario = tostring(customDimensions['sre.scenario']), resultCode = tostring(ResultCode)\n| where namespace =~ '$namespace'\n| where ('$service' == '.*' or service startswith '$service')\n| where ('$scenario' == 'all' or scenario =~ '$scenario')\n| summarize Errors = countif(todouble(resultCode) >= 500) by bin(TimeGenerated, 15m)\n| order by TimeGenerated asc",
             "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
             "resourceGroup": "__RESOURCE_GROUP__",
             "subscriptionId": "__SUBSCRIPTION_ID__"
@@ -656,10 +656,6 @@
             "value": "all"
           },
           {
-            "text": "baseline",
-            "value": "baseline"
-          },
-          {
             "text": "oom-killed",
             "value": "oom-killed"
           },
@@ -672,7 +668,7 @@
             "value": "service-mismatch"
           }
         ],
-        "query": "all,baseline,oom-killed,mongodb-down,service-mismatch",
+        "query": "all,oom-killed,mongodb-down,service-mismatch",
         "type": "custom",
         "includeAll": false,
         "multi": false

@@ -12,6 +12,15 @@ The Azure Managed Grafana incident dashboard visualises infrastructure- and appl
 
 ---
 
+## Variables and Filter Semantics
+
+- The `environment` variable is intentionally non-interactive context. It is retained for handoff and documentation, but it does not drive a verified telemetry dimension in the emitted AppRequests/AppDependencies data.
+- The `namespace` variable filters every panel that accepts a namespace scope.
+- The `service` variable is a single-select service prefix filter. It uses the repo-owned service prefixes (for example `meter`, `asset`, `dispatch`) so service selection still works even when workload pods have hashed suffixes.
+- The `scenario` variable filters the app-telemetry panels by the repo-owned `sre.scenario` dimension. It is limited to the breakable scenarios that are intentionally represented in this lab.
+
+---
+
 ## What the Dashboard Shows
 
 | Panel | Data Source | Signal |

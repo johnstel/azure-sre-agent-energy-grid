@@ -123,6 +123,11 @@ try {
         $message = if ($importOutput) { ($importOutput | Out-String).Trim() } else { 'No import output was returned.' }
         throw "Grafana dashboard import failed: $message"
     }
+
+    $importedDashboardJson = $importOutput | ConvertFrom-Json
+    if (-not $importedDashboardJson.uid) {
+        throw 'Grafana dashboard import did not return a dashboard UID.'
+    }
 }
 finally {
     if (Test-Path $tempDashboardPath) {
@@ -138,6 +143,16 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($dashboardList)) {
 $dashboard = @($dashboardList | ConvertFrom-Json | Where-Object { $_.title -eq $dashboardDefinition.title }) | Select-Object -First 1
 if (-not $dashboard) {
     throw "Grafana dashboard '$($dashboardDefinition.title)' was not found after import."
+}
+
+$verifiedDashboard = az grafana dashboard show --resource-group $ResourceGroupName --name $GrafanaName --dashboard $dashboard.uid --output json 2>$null
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($verifiedDashboard)) {
+    throw 'Grafana dashboard verification after import failed.'
+}
+
+$verifiedDashboardDefinition = $verifiedDashboard | ConvertFrom-Json
+if ($verifiedDashboardDefinition.definition -and (($verifiedDashboardDefinition.definition | ConvertTo-Json -Depth 20) -match '__[A-Z0-9_]+__')) {
+    throw 'Imported dashboard still contains unresolved provisioning placeholders.'
 }
 
 Write-Host "  ✅ Imported Grafana dashboard '$($dashboardDefinition.title)' (UID: $($dashboard.uid))" -ForegroundColor Green

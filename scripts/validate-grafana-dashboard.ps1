@@ -57,6 +57,9 @@ $scenarioVariable = @($dashboardDefinition.templating.list | Where-Object { $_.n
 if ($scenarioVariable -and $scenarioVariable.current.value -eq $null) {
     throw 'The scenario variable must have a current selection.'
 }
+if ($scenarioVariable -and (($scenarioVariable.options | ForEach-Object { $_.value }) -contains 'baseline')) {
+    throw 'The scenario variable must not expose the baseline option unless the telemetry contract emits it.'
+}
 
 $serviceVariable = @($dashboardDefinition.templating.list | Where-Object { $_.name -eq 'service' }) | Select-Object -First 1
 if ($serviceVariable -and $serviceVariable.multi -eq $true) {
@@ -98,8 +101,11 @@ if ($requestPanel.datasource.type -ne 'grafana-azure-monitor-datasource') {
 if (-not $requestPanel.targets[0].azureMonitor -or $requestPanel.targets[0].azureMonitor.queryType -ne 'Logs') {
     throw 'Requests and errors panel must include Azure Monitor Logs query configuration.'
 }
-if ($requestPanel.targets[0].azureMonitor.query -notmatch 'AppRequests' -or $requestPanel.targets[0].azureMonitor.query -notmatch 'sre\.scenario') {
-    throw 'Requests and errors panel must query AppRequests and filter on the sre.scenario dimension.'
+if ($requestPanel.targets[0].azureMonitor.query -notmatch 'AppRequests' -or $requestPanel.targets[0].azureMonitor.query -notmatch 'sre\.scenario' -or $requestPanel.targets[0].azureMonitor.query -notmatch 'sre\.namespace' -or $requestPanel.targets[0].azureMonitor.query -notmatch 'sre\.service') {
+    throw 'Requests and errors panel must query AppRequests and filter on the sre.namespace, sre.service, and sre.scenario dimensions.'
+}
+if ($requestPanel.targets[0].azureMonitor.query -notmatch 'startswith ''\$service''') {
+    throw 'Requests and errors panel must use service-prefix matching for the selected service.'
 }
 if ($requestPanel.datasource.uid -ne '__AZURE_MONITOR_DATASOURCE_UID__') {
     throw 'Requests and errors panel must reference the Azure Monitor datasource placeholder.'
@@ -118,8 +124,11 @@ if ($dependencyPanel.datasource.type -ne 'grafana-azure-monitor-datasource') {
 if (-not $dependencyPanel.targets[0].azureMonitor -or $dependencyPanel.targets[0].azureMonitor.queryType -ne 'Logs') {
     throw 'Dependency failures panel must include Azure Monitor Logs query configuration.'
 }
-if ($dependencyPanel.targets[0].azureMonitor.query -notmatch 'AppDependencies' -or $dependencyPanel.targets[0].azureMonitor.query -notmatch 'sre\.scenario') {
-    throw 'Dependency failures panel must query AppDependencies and filter on the sre.scenario dimension.'
+if ($dependencyPanel.targets[0].azureMonitor.query -notmatch 'AppDependencies' -or $dependencyPanel.targets[0].azureMonitor.query -notmatch 'sre\.scenario' -or $dependencyPanel.targets[0].azureMonitor.query -notmatch 'sre\.namespace' -or $dependencyPanel.targets[0].azureMonitor.query -notmatch 'sre\.service') {
+    throw 'Dependency failures panel must query AppDependencies and filter on the sre.namespace, sre.service, and sre.scenario dimensions.'
+}
+if ($dependencyPanel.targets[0].azureMonitor.query -notmatch 'startswith ''\$service''') {
+    throw 'Dependency failures panel must use service-prefix matching for the selected service.'
 }
 if ($dependencyPanel.datasource.uid -ne '__AZURE_MONITOR_DATASOURCE_UID__') {
     throw 'Dependency failures panel must reference the Azure Monitor datasource placeholder.'
@@ -135,8 +144,11 @@ if (-not $timelinePanel) {
 if ($timelinePanel.datasource.type -ne 'grafana-azure-monitor-datasource') {
     throw 'Scenario timeline panel must use the Azure Monitor datasource.'
 }
-if ($timelinePanel.targets[0].azureMonitor.query -notmatch 'AppRequests' -or $timelinePanel.targets[0].azureMonitor.query -notmatch 'sre\.scenario') {
-    throw 'Scenario timeline panel must query AppRequests and filter on the sre.scenario dimension.'
+if ($timelinePanel.targets[0].azureMonitor.query -notmatch 'AppRequests' -or $timelinePanel.targets[0].azureMonitor.query -notmatch 'sre\.scenario' -or $timelinePanel.targets[0].azureMonitor.query -notmatch 'sre\.namespace' -or $timelinePanel.targets[0].azureMonitor.query -notmatch 'sre\.service') {
+    throw 'Scenario timeline panel must query AppRequests and filter on the sre.namespace, sre.service, and sre.scenario dimensions.'
+}
+if ($timelinePanel.targets[0].azureMonitor.query -notmatch 'startswith ''\$service''') {
+    throw 'Scenario timeline panel must use service-prefix matching for the selected service.'
 }
 
 Write-Host "✅ Dashboard definition validated: $resolvedDefinitionPath" -ForegroundColor Green
