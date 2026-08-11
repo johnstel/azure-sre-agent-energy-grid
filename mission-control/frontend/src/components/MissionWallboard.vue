@@ -173,7 +173,8 @@
     </div>
 
     <PortalValidation v-if="controlPanelOpen" />
-
+    <RehearsalWorkflow v-if="controlPanelOpen" />
+    
     <div class="wallboard__main">
       <section class="inventory-panel" aria-labelledby="inventory-heading">
         <div class="wallboard-panel__heading">
@@ -520,6 +521,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useApi } from '@/composables/useApi';
 import { useWebSocket } from '@/composables/useWebSocket';
 import PortalValidation from './PortalValidation.vue';
+import RehearsalWorkflow from './RehearsalWorkflow.vue';
 import ScenarioNarrationPanel from './ScenarioNarrationPanel.vue';
 import Terminal from './Terminal.vue';
 import type {

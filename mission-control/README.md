@@ -12,6 +12,7 @@ A local single-page application for managing the Azure SRE Agent Energy Grid dem
 - **Scenarios** — Enable/disable 10 breakable SRE scenarios with one click
 - **Scenario Narration** — Read-only, hideable presenter guidance sourced from structured metadata; it does not show expected Azure SRE Agent responses
 - **Portal Validation** — Track and confirm Azure SRE Agent portal evidence for OOMKilled, MongoDBDown, and ServiceMismatch scenarios
+- **Rehearsal Workflow** — Capture rehearsal state machine progress, evidence paths, redaction findings, and timing for Mission Control handoffs ([docs](docs/REHEARSAL-WORKFLOW.md))
 - **WebSocket Streaming** — Real-time deploy/destroy output in a terminal viewer
 
 ## Quick Start
