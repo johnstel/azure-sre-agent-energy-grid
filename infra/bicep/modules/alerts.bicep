@@ -121,9 +121,10 @@ resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
     criteria: {
       allOf: [
         {
-          query: 'AppRequests | where TimeGenerated > ago(10m) | extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"]) | where namespace == "${appNamespace}" | where service in ("meter-service", "asset-service", "dispatch-service") | where toint(ResultCode) >= 500 | summarize Errors = count() by bin(TimeGenerated, 5m)'
-          timeAggregation: 'Count'
-          operator: 'GreaterThan'
+          query: 'AppRequests | where TimeGenerated > ago(10m) | extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"]) | where namespace == "${appNamespace}" | where service in ("meter-service", "asset-service", "dispatch-service") | where toint(ResultCode) >= 500 | summarize Errors = count()'
+          timeAggregation: 'Total'
+          metricMeasureColumn: 'Errors'
+          operator: 'GreaterThanOrEqual'
           threshold: 3
           failingPeriods: {
             numberOfEvaluationPeriods: 1
@@ -161,9 +162,10 @@ resource dependencyFailureAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-
     criteria: {
       allOf: [
         {
-          query: 'AppDependencies | where TimeGenerated > ago(10m) | extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"]), dependencyType = tostring(Type) | where namespace == "${appNamespace}" | where service in ("meter-service", "asset-service", "dispatch-service") | where dependencyType in ("RabbitMQ", "MongoDB") | where Success == false | summarize Failures = count() by bin(TimeGenerated, 5m)'
-          timeAggregation: 'Count'
-          operator: 'GreaterThan'
+          query: 'AppDependencies | where TimeGenerated > ago(10m) | extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"]), dependencyType = tostring(DependencyType) | where namespace == "${appNamespace}" | where service in ("meter-service", "asset-service", "dispatch-service") | where dependencyType in~ ("RabbitMQ", "MongoDB") | where Success == false | summarize Failures = count()'
+          timeAggregation: 'Total'
+          metricMeasureColumn: 'Failures'
+          operator: 'GreaterThanOrEqual'
           threshold: 1
           failingPeriods: {
             numberOfEvaluationPeriods: 1
