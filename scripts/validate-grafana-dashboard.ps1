@@ -66,6 +66,18 @@ if ($serviceVariable -and $serviceVariable.multi -eq $true) {
     throw 'The service variable must remain single-select so the prefix filter semantics are unambiguous.'
 }
 
+$builtInAnnotations = @($dashboardDefinition.annotations.list | Where-Object { $_.builtIn -eq 1 })
+if ($builtInAnnotations.Count -eq 0) {
+    throw 'Dashboard definition must include a built-in annotation entry.'
+}
+$primaryAnnotationName = ($builtInAnnotations | Select-Object -First 1).name
+if ($primaryAnnotationName -eq 'Injection') {
+    throw 'The dashboard built-in annotation label must not use the ambiguous "Injection" name.'
+}
+if ($primaryAnnotationName -ne 'Annotations & Alerts') {
+    throw 'The dashboard built-in annotation label must be "Annotations & Alerts" unless it truly represents fault-injection events.'
+}
+
 $panels = @($dashboardDefinition.panels)
 if ($panels.Count -lt 6) {
     throw 'Dashboard definition must include at least 6 panels.'

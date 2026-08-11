@@ -30,9 +30,11 @@ The Azure Managed Grafana incident dashboard visualises infrastructure- and appl
 | CPU & Memory Utilisation | Prometheus (container_cpu_usage_seconds_total, container_memory_working_set_bytes) | Per-pod resource consumption vs. requests/limits |
 | Requests and errors | Azure Monitor / Log Analytics (AppRequests) | Request volume and 5xx error trends filtered by the selected namespace, service, and scenario |
 | Dependency failures | Azure Monitor / Log Analytics (AppDependencies) | Dependency failure counts by dependency type and service |
-| Scenario timeline and annotations | Azure Monitor / Log Analytics (AppRequests) | Error trend over time and scenario-aware context for the selected scope |
+| Scenario timeline and annotations | Azure Monitor / Log Analytics (AppRequests) | Error trend over time and scenario-aware context for the selected scope, with manual timeline annotations surfaced as **Annotations & Alerts** |
 
 All data is scoped to the `energy` namespace unless noted otherwise.
+
+The built-in Grafana annotation group is labeled **Annotations & Alerts**. It is used for operator timeline markers and evidence notes on the dashboard rather than for automated detection; if a future version of the dashboard needs to represent explicit fault-injection events, that label should be reconsidered and documented separately.
 
 ---
 
