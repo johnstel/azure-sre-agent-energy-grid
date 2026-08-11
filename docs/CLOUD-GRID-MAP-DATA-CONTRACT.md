@@ -21,16 +21,47 @@ Issue #68 adds a governed read-only in-cluster status API (`/api/grid-status/v1`
 
 ```jsonc
 {
-  "version": "1.2",
-  "timestamp": "2026-08-11T15:00:00Z",   // ISO 8601 server clock
-  "nodes": {
-    "<node-id>": {
-      "severity": "healthy" | "warning" | "critical" | "unknown" | "disabled",
-      "source": "live" | "static" | "absent",
-      "lastChecked": "2026-08-11T15:00:00Z", // null when source=static
-      "staleAfterMs": 30000                   // client marks stale if exceeded
+  "schemaVersion": "1.2",
+  "dataContractVersion": "cloud-demo-v2",
+  "namespace": "energy",
+  "generatedAt": "2026-08-11T15:00:00Z",
+  "sourceTimestamp": "2026-08-11T15:00:00Z",
+  "stalenessSeconds": 0,
+  "allowlistedResources": ["asset-service", "dispatch-service", "grid-dashboard", "grid-worker", "load-simulator", "meter-service", "mongodb", "ops-console", "rabbitmq"],
+  "allowlistedNamespaces": ["energy"],
+  "nodes": [
+    {
+      "id": "meter-service",
+      "status": "healthy",
+      "readiness": "ready",
+      "podReadiness": "ready",
+      "deploymentReadiness": "ready",
+      "restartCount": 0,
+      "warningEvents": 0,
+      "resourcePressure": "none",
+      "serviceEndpointState": "ready",
+      "sourceTimestamp": "2026-08-11T15:00:00Z",
+      "stalenessSeconds": 0,
+      "summary": "Governed status for meter-service",
+      "reason": "governed-status",
+      "resourcePressureNote": "all pods are ready",
+      "mongodbReachable": null,
+      "rabbitmqReachable": null
     }
-  }
+  ],
+  "events": [
+    {
+      "nodeId": "meter-service",
+      "severity": "warning",
+      "timestamp": "2026-08-11T15:00:00Z",
+      "reason": "Warning",
+      "message": "Warning event surfaced from the governed in-cluster snapshot",
+      "objectName": "meter-service"
+    }
+  ],
+  "activeScenario": "oom-killed",
+  "bannerMessage": "Governed read-only in-cluster status snapshot loaded.",
+  "scenarioNodeIds": ["meter-service", "asset-service", "dispatch-service"]
 }
 ```
 

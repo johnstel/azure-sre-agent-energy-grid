@@ -332,10 +332,10 @@
         <section class="map-event-strip" aria-labelledby="map-event-strip-title">
           <div class="map-event-strip-header">
             <h3 id="map-event-strip-title" class="map-event-strip-title">Recent demo events</h3>
-            <span id="map-event-strip-status" class="map-event-strip-status">V1 unavailable</span>
+            <span id="map-event-strip-status" class="map-event-strip-status">Governed status snapshot</span>
           </div>
           <div id="map-event-empty" class="map-event-empty" role="status" aria-live="polite">
-            Outage event data is not exposed by the V1 demo grid contract. This strip does not read Kubernetes events, SCADA, OMS, or real grid telemetry.
+            No governed demo events were returned by the in-cluster status snapshot. Transient scenario nodes remain visible in the topology and their status is shown via the read-only status contract.
           </div>
           <ul id="map-event-list" class="map-event-list" aria-label="Most recent demo grid events" hidden></ul>
         </section>
@@ -351,36 +351,76 @@ const DISPATCH_TYPES = ['Load Balance', 'Frequency Adj', 'Capacity Shift', 'Emer
  const ASSET_TYPES = ['Solar Farm', 'Wind Array', 'Gas Turbine', 'Hydroelectric', 'Battery Bank', 'Substation'];
  const ASSET_NAMES = ['Ridgeline Solar Alpha', 'Cedar Wind Farm', 'Riverside Gas Unit 3', 'Lakeview Hydro Station', 'Eastport Battery Grid', 'Northgate Substation 7', 'Summit Solar Bravo', 'Pinecrest Wind Array', 'Valley Gas Peaker 1', 'Harbor Hydro Complex'];
  const GRID_TOPOLOGY = {
-   schemaVersion: '1.1',
-   host: 'ops-console',
-   namespace: 'energy',
-   disclaimer: 'Demo electrical-grid model only. Asset colors are driven by approved lab health endpoints and static scenario context; this is not connected to real SCADA, GIS, OMS, or utility operations.',
-   nodes: [
-     { id: 'north-generation', label: 'North Gen', resourceName: 'asset-service', metaphor: '230 kV generation', kind: 'generation', position: { x: 70, y: 80 }, healthSource: 'live', healthPath: '/api/assets/health', stateNote: 'Demo signal: asset-service health represents generation/asset telemetry availability.' },
-     { id: 'west-wind', label: 'West Wind', resourceName: 'asset-service', metaphor: '115 kV wind tie', kind: 'generation', position: { x: 70, y: 210 }, healthSource: 'static', nominal: true },
-     { id: 'grid-control', label: 'Grid Control', resourceName: 'dispatch-service', metaphor: 'Balancing authority', kind: 'control', position: { x: 320, y: 38 }, healthSource: 'live', healthPath: '/api/dispatch/health', stateNote: 'Demo signal: dispatch-service health represents control and dispatch availability.' },
-     { id: 'north-substation', label: 'North Substation', resourceName: 'asset-service', metaphor: 'Transmission bus', kind: 'substation', position: { x: 320, y: 185 }, healthSource: 'live', healthPath: '/api/assets/health' },
-     { id: 'battery-reserve', label: 'Battery Reserve', resourceName: 'asset-service', metaphor: 'Grid storage', kind: 'storage', position: { x: 320, y: 430 }, healthSource: 'static', nominal: true },
-     { id: 'east-substation', label: 'East Substation', resourceName: 'dispatch-service', metaphor: 'Distribution bus', kind: 'substation', position: { x: 585, y: 185 }, healthSource: 'live', healthPath: '/api/dispatch/health' },
-     { id: 'south-substation', label: 'South Substation', resourceName: 'dispatch-service', metaphor: 'Distribution bus', kind: 'substation', position: { x: 585, y: 430 }, healthSource: 'live', healthPath: '/api/dispatch/health' },
-     { id: 'ami-feeder', label: 'AMI Feeder A', resourceName: 'meter-service', metaphor: 'Smart meter circuit', kind: 'feeder', position: { x: 840, y: 95 }, healthSource: 'live', healthPath: '/api/meter/health', stateNote: 'Demo signal: meter-service health represents AMI telemetry and customer outage visibility.' },
-     { id: 'hospital-feeder', label: 'Hospital Feeder', resourceName: 'meter-service', metaphor: 'Critical load circuit', kind: 'feeder', position: { x: 840, y: 285 }, healthSource: 'live', healthPath: '/api/meter/health' },
-     { id: 'residential-feeder', label: 'Residential Feed', resourceName: 'load-simulator', metaphor: 'Customer load zone', kind: 'feeder', position: { x: 840, y: 475 }, healthSource: 'static', nominal: true }
-   ],
-   edges: [
-     { source: 'north-generation', target: 'north-substation', label: '230 kV gen tie', type: 'transmission', route: [[246, 118], [320, 118], [320, 223]], labelPosition: { x: 257, y: 108 } },
-     { source: 'west-wind', target: 'north-substation', label: '115 kV wind tie', type: 'transmission', route: [[246, 248], [285, 248], [285, 223], [320, 223]], labelPosition: { x: 252, y: 268 } },
-     { source: 'grid-control', target: 'north-substation', label: 'SCADA control', type: 'control', route: [[408, 114], [408, 185]], labelPosition: { x: 426, y: 151 } },
-     { source: 'grid-control', target: 'east-substation', label: 'Dispatch control', type: 'control', route: [[496, 76], [673, 76], [673, 185]], labelPosition: { x: 585, y: 65 } },
-     { source: 'north-substation', target: 'east-substation', label: '230 kV backbone', type: 'transmission', route: [[496, 223], [585, 223]], labelPosition: { x: 540, y: 211 } },
-     { source: 'north-substation', target: 'battery-reserve', label: '34.5 kV storage tie', type: 'distribution', route: [[408, 261], [408, 430]], labelPosition: { x: 425, y: 348 } },
-     { source: 'battery-reserve', target: 'south-substation', label: 'Reserve support', type: 'distribution', route: [[496, 468], [585, 468]], labelPosition: { x: 541, y: 456 } },
-     { source: 'east-substation', target: 'ami-feeder', label: '13.8 kV feeder A', type: 'distribution', route: [[761, 205], [805, 205], [805, 133], [840, 133]], labelPosition: { x: 785, y: 194 } },
-     { source: 'east-substation', target: 'hospital-feeder', label: 'Critical feeder', type: 'distribution', route: [[761, 241], [805, 241], [805, 323], [840, 323]], labelPosition: { x: 785, y: 262 } },
-     { source: 'south-substation', target: 'residential-feeder', label: '13.8 kV feeder C', type: 'distribution', route: [[761, 468], [840, 468], [840, 513]], labelPosition: { x: 798, y: 456 } }
-   ]
-  };
-  const MAP_NODE = { width: 176, height: 76 };
+  schemaVersion: '1.2',
+  host: 'ops-console',
+  namespace: 'energy',
+  disclaimer: 'Demo topology only. This map visualizes Kubernetes service/application health for the Azure SRE Agent demo and is not connected to real grid telemetry, SCADA, GIS, or utility infrastructure.',
+  dataContract: {
+    version: 'cloud-demo-v2',
+    source: 'governed read-only in-cluster status API',
+    refreshSeconds: 30,
+    severityOrder: ['healthy', 'warning', 'critical'],
+    unknownHandling: 'Unknown is a separate non-propagating state. Do not treat unknown as worse than critical.',
+    allowlistedNamespaces: ['energy'],
+    allowlistedResources: ['asset-service', 'meter-service', 'dispatch-service', 'mongodb', 'rabbitmq', 'load-simulator', 'grid-worker', 'grid-dashboard', 'ops-console'],
+    transientScenarioCoverage: ['high-cpu', 'pending-pods', 'probe-failure', 'missing-config'],
+    maxNodes: 12,
+    maxEvents: 8,
+    maxOutputBytes: 16384,
+    maxWindowSeconds: 900
+  },
+  nodes: [
+    { id: 'grid-dashboard', label: 'Consumer Portal', resourceName: 'grid-dashboard', metaphor: 'Customer Energy Portal', kind: 'service', icon: 'dashboard', position: { x: 120, y: 120 }, healthSource: 'static', stateNote: 'Static cloud portal context.' },
+    { id: 'ops-console', label: 'Grid Operations Console', resourceName: 'ops-console', metaphor: 'Control Room', kind: 'service', icon: 'console', position: { x: 120, y: 320 }, healthSource: 'static', stateNote: 'Host surface for the grid map.' },
+    { id: 'meter-service', label: 'Meter Service', resourceName: 'meter-service', metaphor: 'Smart Meter Ingestion', kind: 'service', icon: 'meter', position: { x: 360, y: 120 }, healthSource: 'live', healthPath: '/api/meter/health', stateNote: 'Live health endpoint and governed status API.' },
+    { id: 'asset-service', label: 'Asset Service', resourceName: 'asset-service', metaphor: 'Asset Catalog', kind: 'service', icon: 'assets', position: { x: 360, y: 320 }, healthSource: 'live', healthPath: '/api/assets/health', stateNote: 'Live health endpoint and governed status API.' },
+    { id: 'dispatch-service', label: 'Dispatch Service', resourceName: 'dispatch-service', metaphor: 'Energy Dispatch', kind: 'service', icon: 'dispatch', position: { x: 600, y: 220 }, healthSource: 'live', healthPath: '/api/dispatch/health', stateNote: 'Live health endpoint and governed status API.' },
+    { id: 'rabbitmq', label: 'RabbitMQ', resourceName: 'rabbitmq', metaphor: 'Event Bus', kind: 'datastore', icon: 'queue', position: { x: 600, y: 60 }, healthSource: 'status', stateNote: 'Governed in-cluster status only.' },
+    { id: 'mongodb', label: 'MongoDB', resourceName: 'mongodb', metaphor: 'Meter Data Store', kind: 'datastore', icon: 'database', position: { x: 840, y: 220 }, healthSource: 'status', stateNote: 'Governed in-cluster status only.' },
+    { id: 'load-simulator', label: 'Load Simulator', resourceName: 'load-simulator', metaphor: 'Consumer Demand Simulator', kind: 'service', icon: 'simulator', position: { x: 360, y: 520 }, healthSource: 'static', stateNote: 'Static load context.' },
+    { id: 'grid-worker', label: 'Grid Worker', resourceName: 'grid-worker', metaphor: 'Dispatch Worker', kind: 'service', icon: 'worker', position: { x: 600, y: 520 }, healthSource: 'static', replicas: 0, stateNote: 'Disabled in application.yaml with replicas: 0 due to AMQP protocol mismatch.' },
+    { id: 'forecast-service', label: 'Forecast Service', resourceName: 'forecast-service', metaphor: 'Demand Forecast', kind: 'service', icon: 'forecast', position: { x: 840, y: 420 }, healthSource: 'optional', optional: true, absentBehavior: 'Render as unknown with label Optional service absent in current deployment' },
+    { id: 'frequency-calc-overload', label: 'Frequency Calc Overload', resourceName: 'frequency-calc-overload', metaphor: 'CPU-heavy control loop', kind: 'service', icon: 'cpu', position: { x: 1040, y: 90 }, healthSource: 'status', transient: true, scenarioId: 'high-cpu', stateNote: 'Visible during high CPU stress scenarios.' },
+    { id: 'substation-monitor', label: 'Substation Monitor', resourceName: 'substation-monitor', metaphor: 'Scheduling-sensitive monitor', kind: 'service', icon: 'monitor', position: { x: 1040, y: 250 }, healthSource: 'status', transient: true, scenarioId: 'pending-pods', stateNote: 'Visible when pods remain Pending.' },
+    { id: 'grid-health-monitor', label: 'Grid Health Monitor', resourceName: 'grid-health-monitor', metaphor: 'Probe-sensitive health watcher', kind: 'service', icon: 'probe', position: { x: 1040, y: 410 }, healthSource: 'status', transient: true, scenarioId: 'probe-failure', stateNote: 'Visible when readiness probes fail.' },
+    { id: 'grid-zone-config', label: 'Grid Zone Config', resourceName: 'grid-zone-config', metaphor: 'Scenario configuration source', kind: 'service', icon: 'config', position: { x: 1040, y: 560 }, healthSource: 'status', transient: true, scenarioId: 'missing-config', stateNote: 'Visible when a configuration object is missing.' }
+  ],
+  edges: [
+    { source: 'grid-dashboard', target: 'meter-service', label: 'Usage and billing data', type: 'sync' },
+    { source: 'grid-dashboard', target: 'asset-service', label: 'Asset catalog reads', type: 'sync' },
+    { source: 'ops-console', target: 'dispatch-service', label: 'Operations data', type: 'sync' },
+    { source: 'ops-console', target: 'asset-service', label: 'Asset inventory', type: 'sync' },
+    { source: 'meter-service', target: 'rabbitmq', label: 'Meter events', type: 'async' },
+    { source: 'meter-service', target: 'mongodb', label: 'Meter readings', type: 'sync' },
+    { source: 'rabbitmq', target: 'dispatch-service', label: 'Dispatch commands', type: 'async' },
+    { source: 'dispatch-service', target: 'mongodb', label: 'Grid state writes', type: 'sync' },
+    { source: 'asset-service', target: 'mongodb', label: 'Asset catalog data', type: 'sync' },
+    { source: 'dispatch-service', target: 'asset-service', label: 'Asset lookups', type: 'sync' },
+    { source: 'asset-service', target: 'forecast-service', label: 'Demand forecast', type: 'sync', optional: true },
+    { source: 'load-simulator', target: 'meter-service', label: 'Simulated meter usage', type: 'sync' },
+    { source: 'grid-worker', target: 'dispatch-service', label: 'Disabled dispatch processing path', type: 'sync', disabled: true },
+    { source: 'dispatch-service', target: 'frequency-calc-overload', label: 'Control loop pressure', type: 'control', transient: true, scenarioId: 'high-cpu' },
+    { source: 'dispatch-service', target: 'substation-monitor', label: 'Scheduling pressure', type: 'control', transient: true, scenarioId: 'pending-pods' },
+    { source: 'dispatch-service', target: 'grid-health-monitor', label: 'Readiness probe watch', type: 'control', transient: true, scenarioId: 'probe-failure' },
+    { source: 'dispatch-service', target: 'grid-zone-config', label: 'Configuration dependency', type: 'control', transient: true, scenarioId: 'missing-config' }
+  ],
+  scenarioMappings: {
+    'oom-killed': { nodeId: 'meter-service', severity: 'critical' },
+    'crash-loop': { nodeId: 'asset-service', severity: 'critical' },
+    'image-pull-backoff': { nodeId: 'dispatch-service', severity: 'critical' },
+    'high-cpu': { nodeId: 'frequency-calc-overload', severity: 'warning' },
+    'pending-pods': { nodeId: 'substation-monitor', severity: 'warning' },
+    'probe-failure': { nodeId: 'grid-health-monitor', severity: 'warning' },
+    'network-block': { nodeId: 'meter-service', severity: 'critical' },
+    'missing-config': { nodeId: 'grid-zone-config', severity: 'warning' },
+    'mongodb-down': { nodeId: 'mongodb', severity: 'critical' },
+    'service-mismatch': { nodeId: 'meter-service', severity: 'critical' }
+  }
+};
+
+const API_STATUS_PATH = '/api/grid-status/v1';
+
+const MAP_NODE = { width: 176, height: 76 };
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const LIVE_HEALTH_TIMEOUT_MS = 3000;
   const MAP_HEALTH_POLL_MS = 30000;
@@ -388,7 +428,7 @@ const DISPATCH_TYPES = ['Load Balance', 'Frequency Adj', 'Capacity Shift', 'Emer
   const MAX_EVENT_STRIP_ITEMS = 5;
   const EVENT_MESSAGE_LIMIT = 120;
   const SEVERITY_RANK = { healthy: 0, warning: 1, critical: 2 };
-   const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0, dragMoved: false, healthById: {}, lastSuccessfulHealthPoll: null, healthPollInFlight: false, selectedNodeId: null, selectedEdgeKey: null, activeFilter: 'all', events: [], eventDataAvailable: false };
+   const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0, dragMoved: false, healthById: {}, lastSuccessfulHealthPoll: null, healthPollInFlight: false, selectedNodeId: null, selectedEdgeKey: null, activeFilter: 'all', events: [], eventDataAvailable: false, statusBannerMessage: '' };
  var _drawerLastFocus = null;
  var _drawerLastFocusNodeId = null;
 
@@ -477,175 +517,250 @@ function addLogEntry() {
 }
 
   function liveHealthNodes() {
-    return GRID_TOPOLOGY.nodes.filter(node => node.healthSource === 'live' && node.healthPath);
-  }
-
-  function createTimeoutSignal(timeoutMs) {
-    if (window.AbortSignal && AbortSignal.timeout) return AbortSignal.timeout(timeoutMs);
-    const controller = new AbortController();
-    window.setTimeout(() => controller.abort(), timeoutMs);
-    return controller.signal;
-  }
-
-  function severityForHttpStatus(status) {
-    if (status >= 200 && status < 300) return 'healthy';
-    if (status >= 400 && status < 500) return 'warning';
-    if (status >= 500) return 'critical';
-    return 'warning';
-  }
-
-  function healthTextForResult(result) {
-    if (!result) return 'checking live health';
-    if (result.reason === 'network') return 'critical - endpoint unreachable';
-    if (result.severity === 'healthy') return 'healthy - HTTP ' + result.httpStatus;
-    if (result.severity === 'warning') return 'warning - HTTP ' + result.httpStatus;
-    if (result.severity === 'critical') return 'critical - HTTP ' + result.httpStatus;
-    return 'unknown';
-  }
-
-  function gridStateTextForResult(result) {
-    if (!result) return 'checking grid signal';
-    if (result.reason === 'network') return 'signal unreachable';
-    if (result.severity === 'healthy') return 'grid normal';
-    if (result.severity === 'warning') return 'fault indicator';
-    if (result.severity === 'critical') return 'outage indicator';
-    return 'unknown grid state';
-  }
-
-  function fetchLiveHealth(node) {
-    const checkedAt = Date.now();
-    return fetch(node.healthPath, { method: 'GET', cache: 'no-store', signal: createTimeoutSignal(LIVE_HEALTH_TIMEOUT_MS) })
-      .then(response => ({
-        id: node.id,
-        severity: severityForHttpStatus(response.status),
-        httpStatus: response.status,
-        checkedAt,
-        successAt: checkedAt,
-        reason: 'http'
-      }))
-      .catch(error => ({
-        id: node.id,
-        severity: 'critical',
-        checkedAt,
-        successAt: null,
-        reason: 'network',
-        errorName: error && error.name ? error.name : 'NetworkError'
-      }));
-  }
-
-  function statusDotClass(severity) {
-    if (severity === 'healthy') return 'green';
-    if (severity === 'warning') return 'amber';
-    if (severity === 'critical') return 'red';
-    return 'unknown';
-  }
-
-  function renderHealthGrid() {
-    const grid = document.getElementById('health-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-    const svcs = [
-      ...liveHealthNodes().map(node => ({ name: node.label, node })),
-      { name: 'MongoDB', staticText: 'Static in-cluster - no browser health endpoint' },
-      { name: 'RabbitMQ', staticText: 'Static in-cluster - no browser health endpoint' },
-    ];
-    svcs.forEach(svc => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      if (svc.node) {
-        const result = mapState.healthById[svc.node.id];
-        const severity = result ? result.severity : 'unknown';
-        const dotClass = statusDotClass(severity);
-        const label = result ? healthTextForResult(result) : 'Checking approved health endpoint...';
-        card.innerHTML = '<h3>' + svc.name + '</h3><div style="color:var(--' + (severity === 'warning' ? 'amber' : severity === 'critical' ? 'red' : severity === 'healthy' ? 'green' : 'muted') + ')"><span class="dot ' + dotClass + '"></span> ' + label + '</div>';
-      } else {
-        card.innerHTML = '<h3>' + svc.name + '</h3><div style="color:var(--muted)"><span class="dot green"></span> ' + svc.staticText + '</div>';
+        return GRID_TOPOLOGY.nodes.filter(node => node.healthSource === 'live' && node.healthPath);
       }
-      grid.appendChild(card);
-    });
-  }
 
-  function updateMapHealthBanner() {
-    const banner = document.getElementById('map-health-banner');
-    if (!banner) return;
-    const now = Date.now();
-    const last = mapState.lastSuccessfulHealthPoll;
-    if (!last) {
-      banner.hidden = false;
-      banner.className = 'map-health-banner warning';
-      banner.textContent = mapState.healthPollInFlight
-        ? 'Checking approved demo grid signals. Static assets remain nominal while live data loads.'
-        : 'Live grid demo signals are unavailable. The map is showing static demo context; endpoint failures are marked critical only as lab scenario signals.';
-      return;
-    }
-    const age = now - last;
-    if (age > STALE_AFTER_MS) {
-      banner.hidden = false;
-      banner.className = 'map-health-banner warning';
-      banner.textContent = 'Live grid demo signal data is stale (' + Math.round(age / 1000) + 's since the last successful response). Static assets are not treated as causal outage evidence.';
-      return;
-    }
-    banner.hidden = true;
-  }
+      function createTimeoutSignal(timeoutMs) {
+        if (window.AbortSignal && AbortSignal.timeout) return AbortSignal.timeout(timeoutMs);
+        const controller = new AbortController();
+        window.setTimeout(() => controller.abort(), timeoutMs);
+        return controller.signal;
+      }
 
-  function refreshGridMapAfterHealthChange() {
-    mapState.rendered = false;
-    const mapView = document.getElementById('map-view');
-    if (mapView && !mapView.hidden) renderGridMap({ preserveViewport: true });
-    refreshDetailDrawerIfOpen();
-  }
+      function severityForHttpStatus(status) {
+        if (status >= 200 && status < 300) return 'healthy';
+        if (status >= 400 && status < 500) return 'warning';
+        if (status >= 500) return 'critical';
+        return 'warning';
+      }
 
-  function loadHealth() {
-    if (mapState.healthPollInFlight) return;
-    mapState.healthPollInFlight = true;
-    renderHealthGrid();
-    updateMapHealthBanner();
-    Promise.all(liveHealthNodes().map(fetchLiveHealth))
-      .then(results => {
-        let newestSuccess = mapState.lastSuccessfulHealthPoll;
-        results.forEach(result => {
-          mapState.healthById[result.id] = result;
-          if (result.successAt && (!newestSuccess || result.successAt > newestSuccess)) newestSuccess = result.successAt;
+      function normalizeStatusSeverity(value) {
+        if (value === 'healthy' || value === 'warning' || value === 'critical' || value === 'unknown') return value;
+        return 'unknown';
+      }
+
+      function healthTextForResult(result) {
+        if (!result) return 'checking live health';
+        if (result.reason === 'network') return 'critical - endpoint unreachable';
+        if (result.severity === 'healthy') return result.summary ? result.summary : 'healthy - governed status nominal';
+        if (result.severity === 'warning') return result.summary ? result.summary : 'warning - governed status degraded';
+        if (result.severity === 'critical') return result.summary ? result.summary : 'critical - governed status impacted';
+        return result.summary ? result.summary : 'unknown';
+      }
+
+      function gridStateTextForResult(result) {
+        if (!result) return 'checking grid signal';
+        if (result.reason === 'network') return 'signal unreachable';
+        if (result.severity === 'healthy') return 'governed status nominal';
+        if (result.severity === 'warning') return 'degraded lab signal';
+        if (result.severity === 'critical') return 'outage indicator';
+        return 'unknown grid state';
+      }
+
+      function normalizeStatusEntry(node, entry) {
+        const severity = normalizeStatusSeverity(entry && entry.status ? entry.status : entry && entry.severity ? entry.severity : 'unknown');
+        const checkedAt = entry && entry.sourceTimestamp ? Date.parse(entry.sourceTimestamp) : (entry && entry.checkedAt ? entry.checkedAt : Date.now());
+        const successAt = entry && entry.sourceTimestamp ? Date.parse(entry.sourceTimestamp) : (entry && entry.checkedAt ? entry.checkedAt : Date.now());
+        return {
+          id: node.id,
+          severity,
+          httpStatus: entry && entry.httpStatus ? entry.httpStatus : null,
+          checkedAt,
+          successAt,
+          reason: entry && entry.reason ? entry.reason : 'status',
+          summary: entry && entry.summary ? entry.summary : '',
+          readiness: entry && entry.readiness !== undefined ? entry.readiness : null,
+          restartCount: entry && entry.restartCount !== undefined ? entry.restartCount : null,
+          warningEvents: entry && entry.warningEvents !== undefined ? entry.warningEvents : null,
+          resourcePressure: entry && entry.resourcePressure ? entry.resourcePressure : null,
+          serviceEndpointState: entry && entry.serviceEndpointState ? entry.serviceEndpointState : null,
+          mongodbReachable: entry && entry.mongodbReachable !== undefined ? entry.mongodbReachable : null,
+          rabbitmqReachable: entry && entry.rabbitmqReachable !== undefined ? entry.rabbitmqReachable : null,
+          stalenessSeconds: entry && entry.stalenessSeconds !== undefined ? entry.stalenessSeconds : 0
+        };
+      }
+
+      function fetchLiveHealth(node) {
+        const checkedAt = Date.now();
+        return fetch(node.healthPath, { method: 'GET', cache: 'no-store', signal: createTimeoutSignal(LIVE_HEALTH_TIMEOUT_MS) })
+          .then(response => ({
+            id: node.id,
+            severity: severityForHttpStatus(response.status),
+            httpStatus: response.status,
+            checkedAt,
+            successAt: checkedAt,
+            reason: 'http'
+          }))
+          .catch(error => ({
+            id: node.id,
+            severity: 'critical',
+            checkedAt,
+            successAt: null,
+            reason: 'network',
+            errorName: error && error.name ? error.name : 'NetworkError'
+          }));
+      }
+
+      function fetchStatusSnapshot() {
+        const checkedAt = Date.now();
+        return fetch(STATUS_API_PATH, { method: 'GET', cache: 'no-store', signal: createTimeoutSignal(LIVE_HEALTH_TIMEOUT_MS) })
+          .then(response => {
+            if (!response.ok) {
+              return response.text().then(text => {
+                throw new Error('status ' + response.status + ': ' + text);
+              });
+            }
+            return response.json();
+          })
+          .then(payload => ({
+            payload,
+            entries: Array.isArray(payload && payload.nodes) ? payload.nodes.map(node => normalizeStatusEntry({ id: node.id }, node)) : [],
+            events: Array.isArray(payload && payload.events) ? payload.events : []
+          }))
+          .catch(error => ({
+            error: true,
+            message: error && error.message ? error.message : 'status snapshot unavailable',
+            checkedAt
+          }));
+      }
+
+      function statusDotClass(severity) {
+        if (severity === 'healthy') return 'green';
+        if (severity === 'warning') return 'amber';
+        if (severity === 'critical') return 'red';
+        return 'unknown';
+      }
+
+      function renderHealthGrid() {
+        const grid = document.getElementById('health-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        const statusNodes = GRID_TOPOLOGY.nodes.filter(node => node.healthSource === 'status' || node.healthSource === 'optional' || node.transient);
+        const cards = [
+          ...liveHealthNodes().map(node => ({ name: node.label, node })),
+          ...statusNodes.map(node => ({ name: node.label, node }))
+        ];
+        cards.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          const result = item.node ? mapState.healthById[item.node.id] : null;
+          const severity = result ? result.severity : 'unknown';
+          const dotClass = statusDotClass(severity);
+          const label = result ? healthTextForResult(result) : (item.node && item.node.healthSource === 'status' ? 'Checking governed status snapshot...' : 'Checking approved health endpoint...');
+          card.innerHTML = '<h3>' + item.name + '</h3><div style="color:var(--' + (severity === 'warning' ? 'amber' : severity === 'critical' ? 'red' : severity === 'healthy' ? 'green' : 'muted') + ')"><span class="dot ' + dotClass + '"></span> ' + label + '</div>';
+          grid.appendChild(card);
         });
-        mapState.lastSuccessfulHealthPoll = newestSuccess;
-      })
-      .catch(() => {
-        liveHealthNodes().forEach(node => {
-          if (!mapState.healthById[node.id]) {
-            mapState.healthById[node.id] = { id: node.id, severity: 'critical', checkedAt: Date.now(), successAt: null, reason: 'network' };
-          }
-        });
-      })
-     .finally(() => {
-       mapState.healthPollInFlight = false;
+      }
+
+      function updateMapHealthBanner() {
+        const banner = document.getElementById('map-health-banner');
+        if (!banner) return;
+        const now = Date.now();
+        const last = mapState.lastSuccessfulHealthPoll;
+        if (mapState.statusBannerMessage) {
+          banner.hidden = false;
+          banner.className = 'map-health-banner warning';
+          banner.textContent = mapState.statusBannerMessage;
+          return;
+        }
+        if (!last) {
+          banner.hidden = false;
+          banner.className = 'map-health-banner warning';
+          banner.textContent = mapState.healthPollInFlight
+            ? 'Checking approved demo grid signals. Static assets remain nominal while live data loads.'
+            : 'Live grid demo signals are unavailable. The map is showing static demo context; endpoint failures are marked critical only as lab scenario signals.';
+          return;
+        }
+        const age = now - last;
+        if (age > STALE_AFTER_MS) {
+          banner.hidden = false;
+          banner.className = 'map-health-banner warning';
+          banner.textContent = 'Live grid demo signal data is stale (' + Math.round(age / 1000) + 's since the last successful response). Static assets are not treated as causal outage evidence.';
+          return;
+        }
+        banner.hidden = true;
+      }
+
+      function refreshGridMapAfterHealthChange() {
+        mapState.rendered = false;
+        const mapView = document.getElementById('map-view');
+        if (mapView && !mapView.hidden) renderGridMap({ preserveViewport: true });
+        refreshDetailDrawerIfOpen();
+      }
+
+      function loadHealth() {
+        if (mapState.healthPollInFlight) return;
+        mapState.healthPollInFlight = true;
         renderHealthGrid();
         updateMapHealthBanner();
-        refreshGridMapAfterHealthChange();
-        renderEventStrip();
-        updateFilterBadges();
-      });
-   }
+        const liveRequests = liveHealthNodes().map(fetchLiveHealth);
+        const statusRequest = fetchStatusSnapshot();
+        Promise.all([...liveRequests, statusRequest])
+          .then(results => {
+            const liveResults = results.slice(0, liveRequests.length);
+            const statusResponse = results[liveRequests.length];
+            let newestSuccess = mapState.lastSuccessfulHealthPoll;
+            liveResults.forEach(result => {
+              mapState.healthById[result.id] = result;
+              if (result.successAt && (!newestSuccess || result.successAt > newestSuccess)) newestSuccess = result.successAt;
+            });
+            if (statusResponse && !statusResponse.error) {
+              statusResponse.entries.forEach(entry => {
+                mapState.healthById[entry.id] = entry;
+                if (entry.successAt && (!newestSuccess || entry.successAt > newestSuccess)) newestSuccess = entry.successAt;
+              });
+              mapState.events = Array.isArray(statusResponse.events) ? statusResponse.events : [];
+              mapState.eventDataAvailable = mapState.events.length > 0;
+              mapState.statusBannerMessage = statusResponse.payload && statusResponse.payload.bannerMessage ? statusResponse.payload.bannerMessage : '';
+            } else {
+              mapState.events = [];
+              mapState.eventDataAvailable = false;
+              mapState.statusBannerMessage = '';
+            }
+            mapState.lastSuccessfulHealthPoll = newestSuccess || mapState.lastSuccessfulHealthPoll;
+          })
+          .catch(() => {
+            liveHealthNodes().forEach(node => {
+              if (!mapState.healthById[node.id]) {
+                mapState.healthById[node.id] = { id: node.id, severity: 'critical', checkedAt: Date.now(), successAt: null, reason: 'network' };
+              }
+            });
+          })
+          .finally(() => {
+            mapState.healthPollInFlight = false;
+            renderHealthGrid();
+            updateMapHealthBanner();
+            refreshGridMapAfterHealthChange();
+            renderEventStrip();
+            updateFilterBadges();
+          });
+      }
 
- function createSvgElement(name, attrs) {
+      function createSvgElement(name, attrs) {
    const el = document.createElementNS(SVG_NS, name);
    Object.keys(attrs || {}).forEach(key => el.setAttribute(key, attrs[key]));
    return el;
  }
 
   function getMapStatus(node) {
-    if (node.replicas === 0) return { text: 'disabled - replicas 0', className: 'disabled', severity: 'unknown', symbol: 'Ⅱ' };
-    if (node.optional) return { text: 'optional absent', className: 'unknown', severity: 'unknown', symbol: '?' };
-    if (node.healthSource === 'live') {
-      const result = mapState.healthById[node.id];
-      if (!result) return { text: 'checking live health', className: 'unknown', severity: 'unknown', symbol: '?' };
-      const symbol = result.severity === 'healthy' ? '✓' : result.severity === 'warning' ? '!' : '×';
-      return { text: gridStateTextForResult(result), className: result.severity, severity: result.severity, symbol };
-    }
-    if (node.nominal) return { text: 'grid normal', className: 'healthy', severity: 'healthy', symbol: '✓' };
-     return { text: 'static demo context', className: 'static', severity: 'unknown', symbol: 'S' };
-  }
-
-  function getEdgeStatus(edge, source, target) {
+        if (node.replicas === 0) return { text: 'disabled - replicas 0', className: 'disabled', severity: 'unknown', symbol: 'Ⅱ' };
+        if (node.optional) return { text: 'optional absent', className: 'unknown', severity: 'unknown', symbol: '?' };
+        if (node.healthSource === 'live') {
+          const result = mapState.healthById[node.id];
+          if (!result) return { text: 'checking live health', className: 'unknown', severity: 'unknown', symbol: '?' };
+          const symbol = result.severity === 'healthy' ? '✓' : result.severity === 'warning' ? '!' : '×';
+          return { text: gridStateTextForResult(result), className: result.severity, severity: result.severity, symbol };
+        }
+        if (node.healthSource === 'status') {
+          const result = mapState.healthById[node.id];
+          if (!result) return { text: 'checking governed status snapshot', className: 'unknown', severity: 'unknown', symbol: '?' };
+          const symbol = result.severity === 'healthy' ? '✓' : result.severity === 'warning' ? '!' : result.severity === 'critical' ? '×' : '?';
+          return { text: gridStateTextForResult(result), className: result.severity, severity: result.severity, symbol };
+        }
+        if (node.nominal) return { text: 'grid normal', className: 'healthy', severity: 'healthy', symbol: '✓' };
+        return { text: 'static demo context', className: 'static', severity: 'unknown', symbol: 'S' };
+      }
+      function getEdgeStatus(edge, source, target) {
     if (edge.disabled) return { className: 'disabled', label: 'disabled path' };
     const sourceStatus = getMapStatus(source);
     const targetStatus = getMapStatus(target);
@@ -678,53 +793,64 @@ function addLogEntry() {
     return text.length > EVENT_MESSAGE_LIMIT ? text.slice(0, EVENT_MESSAGE_LIMIT - 1) + '\u2026' : text;
   }
   function nodeIdForEvent(event) {
-    if (!event) return null;
-    if (event.nodeId && GRID_TOPOLOGY.nodes.some(function(node) { return node.id === event.nodeId; })) return event.nodeId;
-    var name = event.objectName || event.involvedObjectName || '';
-    var match = GRID_TOPOLOGY.nodes.find(function(node) { return node.id === name || node.resourceName === name || node.label === name; });
-    return match ? match.id : null;
-  }
-  function renderEventStrip() {
-    var statusEl = document.getElementById('map-event-strip-status');
-    var emptyEl = document.getElementById('map-event-empty');
-    var listEl = document.getElementById('map-event-list');
-    if (!statusEl || !emptyEl || !listEl) return;
-    var events = Array.isArray(mapState.events) ? mapState.events.slice(0, MAX_EVENT_STRIP_ITEMS) : [];
-    listEl.innerHTML = '';
-    if (!mapState.eventDataAvailable || events.length === 0) {
-      statusEl.textContent = 'V1 unavailable';
-      emptyEl.hidden = false;
-      emptyEl.textContent = 'Outage event data is not exposed by the V1 demo grid contract. This strip does not read Kubernetes events, SCADA, OMS, or real grid telemetry.';
-      listEl.hidden = true;
-      return;
-    }
-    statusEl.textContent = events.length + ' recent';
-    emptyEl.hidden = true;
-    listEl.hidden = false;
-    events.forEach(function(event) {
-      var nodeId = nodeIdForEvent(event);
-      var fullMessage = event.message ? String(event.message) : '';
-      var shortMessage = truncateEventMessage(fullMessage);
-      var severity = event.severity || 'unknown';
-      var icon = severity === 'critical' ? '\u2715' : severity === 'warning' ? '!' : '\u2022';
-      var objectName = event.objectName || event.involvedObjectName || nodeId || 'unknown object';
-      var reason = event.reason || 'event';
-      var content = '<span class="map-event-meta"><span>' + escHtml(fmtTime(event.timestamp)) + '</span><span aria-hidden="true">' + escHtml(icon) + '</span><span>' + escHtml(severity) + '</span></span>';
-      content += '<span class="map-event-object">' + escHtml(objectName) + ': ' + escHtml(reason) + '</span>';
-      content += '<span class="map-event-message" title="' + escHtml(fullMessage) + '">' + escHtml(shortMessage) + '</span>';
-      var li = document.createElement('li');
-      li.className = 'map-event-item';
-      if (nodeId) {
-        var a11yLabel = severity + ' event - ' + objectName + ': ' + reason + '. ' + (fullMessage || shortMessage) + '. Activate to select this node on the grid map.';
-        li.innerHTML = '<button type="button" class="map-event-button" data-node-id="' + escHtml(nodeId) + '" aria-label="' + escHtml(a11yLabel) + '">' + content + '</button>';
-      } else {
-        if (fullMessage.length > EVENT_MESSAGE_LIMIT) content += '<span class="sr-only"> Full message: ' + escHtml(fullMessage) + '</span>';
-        li.innerHTML = '<div class="map-event-static">' + content + '</div>';
+        if (!event) return null;
+        if (event.nodeId && GRID_TOPOLOGY.nodes.some(function(node) { return node.id === event.nodeId; })) return event.nodeId;
+        var name = (event.objectName || event.involvedObjectName || event.resourceName || event.nodeName || '').toLowerCase();
+        var match = GRID_TOPOLOGY.nodes.find(function(node) {
+          if (!node) return false;
+          return [node.id, node.resourceName, node.label, node.scenarioId].some(function(candidate) {
+            return candidate && String(candidate).toLowerCase() === name;
+          });
+        });
+        if (match) return match.id;
+        var scenarioName = (event.scenario || event.reason || '').toLowerCase();
+        if (scenarioName && GRID_TOPOLOGY.scenarioMappings && GRID_TOPOLOGY.scenarioMappings[scenarioName]) {
+          return GRID_TOPOLOGY.scenarioMappings[scenarioName].nodeId;
+        }
+        return null;
       }
-      listEl.appendChild(li);
-    });
-  }
-  function connectedEdgesForNode(nodeId) {
+
+      function renderEventStrip() {
+        var statusEl = document.getElementById('map-event-strip-status');
+        var emptyEl = document.getElementById('map-event-empty');
+        var listEl = document.getElementById('map-event-list');
+        if (!statusEl || !emptyEl || !listEl) return;
+        var events = Array.isArray(mapState.events) ? mapState.events.slice(0, MAX_EVENT_STRIP_ITEMS) : [];
+        listEl.innerHTML = '';
+        if (!mapState.eventDataAvailable || events.length === 0) {
+          statusEl.textContent = 'Governed status-only';
+          emptyEl.hidden = false;
+          emptyEl.textContent = 'No governed demo events were returned by the in-cluster status snapshot. Transient scenario nodes remain visible in the topology and their status is shown via the read-only status contract.';
+          listEl.hidden = true;
+          return;
+        }
+        statusEl.textContent = events.length + ' recent governed events';
+        emptyEl.hidden = true;
+        listEl.hidden = false;
+        events.forEach(function(event) {
+          var nodeId = nodeIdForEvent(event);
+          var fullMessage = event.message ? String(event.message) : '';
+          var shortMessage = truncateEventMessage(fullMessage);
+          var severity = (event.severity || 'unknown').toLowerCase();
+          var icon = severity === 'critical' ? '✕' : severity === 'warning' ? '!' : '•';
+          var objectName = event.objectName || event.involvedObjectName || nodeId || 'governed status';
+          var reason = event.reason || 'event';
+          var content = '<span class="map-event-meta"><span>' + escHtml(fmtTime(event.timestamp)) + '</span><span aria-hidden="true">' + escHtml(icon) + '</span><span>' + escHtml(severity) + '</span></span>';
+          content += '<span class="map-event-object">' + escHtml(objectName) + ': ' + escHtml(reason) + '</span>';
+          content += '<span class="map-event-message" title="' + escHtml(fullMessage) + '">' + escHtml(shortMessage) + '</span>';
+          var li = document.createElement('li');
+          li.className = 'map-event-item';
+          if (nodeId) {
+            var a11yLabel = severity + ' event - ' + objectName + ': ' + reason + '. ' + (fullMessage || shortMessage) + '. Activate to select this node on the grid map.';
+            li.innerHTML = '<button type="button" class="map-event-button" data-node-id="' + escHtml(nodeId) + '" aria-label="' + escHtml(a11yLabel) + '">' + content + '</button>';
+          } else {
+            if (fullMessage.length > EVENT_MESSAGE_LIMIT) content += '<span class="sr-only"> Full message: ' + escHtml(fullMessage) + '</span>';
+            li.innerHTML = '<div class="map-event-static">' + content + '</div>';
+          }
+          listEl.appendChild(li);
+        });
+      }
+      function connectedEdgesForNode(nodeId) {
     var nodesById = {};
     GRID_TOPOLOGY.nodes.forEach(function(n) { nodesById[n.id] = n; });
     return GRID_TOPOLOGY.edges.map(function(edge) {
@@ -766,56 +892,79 @@ function addLogEntry() {
     return html;
   }
   function buildNodeBody(node) {
-   var status = getMapStatus(node);
-   var result = node.healthSource === 'live' ? (mapState.healthById[node.id] || null) : null;
-   var html = '';
-   html += '<div class="drawer-section">';
-   html += '<h3 class="drawer-section-title">Status</h3>';
-   html += '<div class="drawer-row"><span class="drawer-label">Reported status</span><span class="drawer-value ' + escHtml(status.className) + '">' + escHtml(status.text) + '</span></div>';
-   html += '<div class="drawer-row"><span class="drawer-label">Role</span><span class="drawer-value">' + escHtml(node.metaphor) + '</span></div>';
-   html += '<div class="drawer-row"><span class="drawer-label">Grid class</span><span class="drawer-value">' + escHtml(node.kind) + '</span></div>';
-   html += '<div class="drawer-row"><span class="drawer-label">Demo signal</span><span class="drawer-value">' + escHtml(node.resourceName) + '</span></div>';
-   if (node.replicas === 0) {
-     html += '<div class="drawer-row"><span class="drawer-label">Replicas</span><span class="drawer-value warning">0 \u2014 disabled</span></div>';
-   }
-   html += '</div>';
-   html += '<div class="drawer-section">';
-   html += '<h3 class="drawer-section-title">Health source</h3>';
-   if (node.healthSource === 'live' && result) {
-     html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Approved demo grid signal</span></div>';
-     html += '<div class="drawer-row"><span class="drawer-label">HTTP status</span><span class="drawer-value">' + (result.httpStatus ? result.httpStatus : '\u2014') + '</span></div>';
-     html += '<div class="drawer-row"><span class="drawer-label">Checked at</span><span class="drawer-value">' + escHtml(fmtTime(result.checkedAt)) + '</span></div>';
-     if (result.reason === 'network') {
-       html += '<div class="drawer-assessment">This grid asset is colored critical because its approved demo signal is unreachable from the browser. Treat this as a lab outage/degradation cue, not real utility operations.</div>';
-     } else if (result.severity === 'critical') {
-       html += '<div class="drawer-assessment">This grid asset is colored critical because its approved demo signal returned a server error. Connected lines inherit that lab scenario impact.</div>';
-     } else if (result.severity === 'warning') {
-       html += '<div class="drawer-assessment">This grid asset is colored degraded because its approved demo signal returned a non-success response. Connected lines inherit that lab scenario impact.</div>';
-     }
-   } else if (node.healthSource === 'live' && !result) {
-     html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Approved demo grid signal</span></div>';
-     html += '<span class="skeleton long"></span><span class="skeleton short"></span>';
-     html += '<div class="drawer-assessment">Checking approved demo grid signal&#x2026; Skeleton shown while live data loads.</div>';
-   } else if (node.healthSource === 'static') {
-     html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Static demo grid context</span></div>';
-     html += '<div class="drawer-assessment">This asset is part of the static one-line grid model. It is shown as nominal context unless connected live demo signals indicate degraded or outage impact.</div>';
-   } else if (node.healthSource === 'optional') {
-     html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Optional \u2014 absent</span></div>';
-     html += '<div class="drawer-assessment">This optional service was not detected in the current cloud demo deployment. No health data is available.</div>';
-   }
-   if (node.stateNote) {
-     html += '<div class="drawer-row" style="margin-top:.3rem"><span class="drawer-label">Note</span><span class="drawer-value" style="text-align:left;color:var(--muted)">' + escHtml(node.stateNote) + '</span></div>';
-   }
-   html += '</div>';
-   html += buildConnectedSegmentsSection(node);
-   html += '<div class="drawer-section">';
-   html += '<h3 class="drawer-section-title">Optional details</h3>';
-   html += '<div class="drawer-unavailable">SCADA measurements, outage tickets, switch states, and crew status are not available from the V1 demo grid contract. This panel shows only approved lab signal health.</div>';
-   html += '</div>';
-   html += buildHandoffSection(buildNodePrompt(node));
-   return html;
- }
- function buildEdgeBody(edge, src, tgt) {
+        var status = getMapStatus(node);
+        var result = mapState.healthById[node.id] || null;
+        var html = '';
+        html += '<div class="drawer-section">';
+        html += '<h3 class="drawer-section-title">Status</h3>';
+        html += '<div class="drawer-row"><span class="drawer-label">Reported status</span><span class="drawer-value ' + escHtml(status.className) + '">' + escHtml(status.text) + '</span></div>';
+        html += '<div class="drawer-row"><span class="drawer-label">Role</span><span class="drawer-value">' + escHtml(node.metaphor) + '</span></div>';
+        html += '<div class="drawer-row"><span class="drawer-label">Grid class</span><span class="drawer-value">' + escHtml(node.kind) + '</span></div>';
+        html += '<div class="drawer-row"><span class="drawer-label">Demo signal</span><span class="drawer-value">' + escHtml(node.resourceName) + '</span></div>';
+        if (node.replicas === 0) {
+          html += '<div class="drawer-row"><span class="drawer-label">Replicas</span><span class="drawer-value warning">0 — disabled</span></div>';
+        }
+        if (node.transient) {
+          html += '<div class="drawer-row"><span class="drawer-label">Transient</span><span class="drawer-value">Scenario-only node • ' + escHtml(node.scenarioId || 'demo') + '</span></div>';
+        }
+        html += '</div>';
+        html += '<div class="drawer-section">';
+        html += '<h3 class="drawer-section-title">Health source</h3>';
+        if (node.healthSource === 'live' && result) {
+          html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Approved demo grid signal</span></div>';
+          html += '<div class="drawer-row"><span class="drawer-label">HTTP status</span><span class="drawer-value">' + (result.httpStatus ? result.httpStatus : '—') + '</span></div>';
+          html += '<div class="drawer-row"><span class="drawer-label">Checked at</span><span class="drawer-value">' + escHtml(fmtTime(result.checkedAt)) + '</span></div>';
+          if (result.reason === 'network') {
+            html += '<div class="drawer-assessment">This grid asset is colored critical because its approved demo signal is unreachable from the browser. Treat this as a lab outage/degradation cue, not real utility operations.</div>';
+          } else if (result.severity === 'critical') {
+            html += '<div class="drawer-assessment">This grid asset is colored critical because its approved demo signal returned a server error. Connected lines inherit that lab scenario impact.</div>';
+          } else if (result.severity === 'warning') {
+            html += '<div class="drawer-assessment">This grid asset is colored degraded because its approved demo signal returned a non-success response. Connected lines inherit that lab scenario impact.</div>';
+          }
+        } else if (node.healthSource === 'live' && !result) {
+          html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Approved demo grid signal</span></div>';
+          html += '<span class="skeleton long"></span><span class="skeleton short"></span>';
+          html += '<div class="drawer-assessment">Checking approved demo grid signal… Skeleton shown while live data loads.</div>';
+        } else if (node.healthSource === 'status') {
+          html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Governed in-cluster status API</span></div>';
+          if (result) {
+            html += '<div class="drawer-row"><span class="drawer-label">Snapshot</span><span class="drawer-value">' + escHtml(result.summary || 'Governed read-only snapshot') + '</span></div>';
+            html += '<div class="drawer-row"><span class="drawer-label">Readiness</span><span class="drawer-value">' + escHtml(result.readiness !== null && result.readiness !== undefined ? result.readiness : 'unknown') + '</span></div>';
+            html += '<div class="drawer-row"><span class="drawer-label">Restart count</span><span class="drawer-value">' + escHtml(result.restartCount !== null && result.restartCount !== undefined ? String(result.restartCount) : 'unknown') + '</span></div>';
+            html += '<div class="drawer-row"><span class="drawer-label">Warning events</span><span class="drawer-value">' + escHtml(result.warningEvents !== null && result.warningEvents !== undefined ? String(result.warningEvents) : 'unknown') + '</span></div>';
+            html += '<div class="drawer-row"><span class="drawer-label">Endpoint state</span><span class="drawer-value">' + escHtml(result.serviceEndpointState || 'unknown') + '</span></div>';
+            if (result.mongodbReachable !== null && result.mongodbReachable !== undefined) {
+              html += '<div class="drawer-row"><span class="drawer-label">MongoDB Reachable</span><span class="drawer-value">' + escHtml(String(result.mongodbReachable)) + '</span></div>';
+            }
+            if (result.rabbitmqReachable !== null && result.rabbitmqReachable !== undefined) {
+              html += '<div class="drawer-row"><span class="drawer-label">RabbitMQ Reachable</span><span class="drawer-value">' + escHtml(String(result.rabbitmqReachable)) + '</span></div>';
+            }
+            html += '<div class="drawer-row"><span class="drawer-label">Checked at</span><span class="drawer-value">' + escHtml(fmtTime(result.checkedAt)) + '</span></div>';
+          } else {
+            html += '<span class="skeleton long"></span><span class="skeleton short"></span>';
+            html += '<div class="drawer-assessment">Checking the governed read-only in-cluster status snapshot…</div>';
+          }
+          html += '<div class="drawer-assessment">This node is rendered from the governed read-only in-cluster status snapshot. The map shows transient demo-only nodes without exposing cluster secrets, arbitrary objects, logs, or write capabilities.</div>';
+        } else if (node.healthSource === 'static') {
+          html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Static demo grid context</span></div>';
+          html += '<div class="drawer-assessment">This asset is part of the static one-line grid model. It is shown as nominal context unless connected live demo signals indicate degraded or outage impact.</div>';
+        } else if (node.healthSource === 'optional') {
+          html += '<div class="drawer-row"><span class="drawer-label">Source</span><span class="drawer-value">Optional — absent</span></div>';
+          html += '<div class="drawer-assessment">This optional service was not detected in the current cloud demo deployment. No health data is available.</div>';
+        }
+        if (node.stateNote) {
+          html += '<div class="drawer-row" style="margin-top:.3rem"><span class="drawer-label">Note</span><span class="drawer-value" style="text-align:left;color:var(--muted)">' + escHtml(node.stateNote) + '</span></div>';
+        }
+        html += '</div>';
+        html += buildConnectedSegmentsSection(node);
+        html += '<div class="drawer-section">';
+        html += '<h3 class="drawer-section-title">Optional details</h3>';
+        html += '<div class="drawer-unavailable">SCADA measurements, outage tickets, switch states, and crew status are not available from the V1 demo grid contract. This panel shows only approved lab signal health.</div>';
+        html += '</div>';
+        html += buildHandoffSection(buildNodePrompt(node));
+        return html;
+      }
+      function buildEdgeBody(edge, src, tgt) {
    var srcStatus = getMapStatus(src);
    var tgtStatus = getMapStatus(tgt);
    var edgeStatus = getEdgeStatus(edge, src, tgt);

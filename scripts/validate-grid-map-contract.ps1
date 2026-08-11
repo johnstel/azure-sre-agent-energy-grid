@@ -147,12 +147,28 @@ if ($topology) {
     }
 
     # Check node count
-    if ($topology.nodes -and $topology.nodes.Count -eq 10) {
-        Pass "Topology has exactly 10 nodes"
+    if ($topology.nodes -and $topology.nodes.Count -ge 12) {
+        Pass "Topology has $($topology.nodes.Count) nodes (>= 12)"
     } elseif ($topology.nodes) {
-        Warn "Topology has $($topology.nodes.Count) nodes (expected 10)"
+        Warn "Topology has $($topology.nodes.Count) nodes (expected at least 12)"
     } else {
         Fail "Topology 'nodes' array is missing"
+    }
+
+    foreach ($requiredTransientNode in @('frequency-calc-overload', 'substation-monitor', 'grid-health-monitor', 'grid-zone-config')) {
+        if ($topology.nodes | Where-Object { $_.id -eq $requiredTransientNode }) {
+            Pass "Transient node '$requiredTransientNode' present in topology"
+        } else {
+            Fail "Transient node '$requiredTransientNode' missing from topology"
+        }
+    }
+
+    foreach ($scenarioName in @('high-cpu', 'pending-pods', 'probe-failure', 'missing-config')) {
+        if ($topology.scenarioMappings.$scenarioName) {
+            Pass "Scenario mapping '$scenarioName' present in topology"
+        } else {
+            Fail "Scenario mapping '$scenarioName' missing from topology"
+        }
     }
 } else {
     Warn "Skipping topology content checks — JSON parse failed"
