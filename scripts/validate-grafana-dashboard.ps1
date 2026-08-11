@@ -20,8 +20,9 @@ if (-not (Test-Path $DefinitionPath)) {
 }
 
 $resolvedDefinitionPath = (Resolve-Path $DefinitionPath).Path
+$rawDefinitionContent = Get-Content -Path $resolvedDefinitionPath -Raw
 try {
-    $dashboardDefinition = Get-Content -Path $resolvedDefinitionPath -Raw | ConvertFrom-Json
+    $dashboardDefinition = $rawDefinitionContent | ConvertFrom-Json
 }
 catch {
     throw "Dashboard definition is not valid JSON: $_"
@@ -29,6 +30,14 @@ catch {
 
 if (-not $dashboardDefinition.title -or $dashboardDefinition.title -ne 'Energy Grid — Incident Overview') {
     throw "Dashboard definition must target the 'Energy Grid — Incident Overview' dashboard."
+}
+
+if ($rawDefinitionContent -match 'vector\(0\)') {
+    throw 'Dashboard definition must not use vector(0) or other phantom metric placeholders.'
+}
+
+if ($rawDefinitionContent -match 'app_requests_total|app_errors_total|app_dependency_failures_total') {
+    throw 'Dashboard definition must not reference phantom Prometheus metrics for requests/errors/dependencies.'
 }
 
 $requiredVariables = @('environment', 'namespace', 'service', 'scenario')
@@ -39,16 +48,31 @@ foreach ($requiredVariable in $requiredVariables) {
     }
 }
 
+$environmentVariable = @($dashboardDefinition.templating.list | Where-Object { $_.name -eq 'environment' }) | Select-Object -First 1
+if ($environmentVariable -and $environmentVariable.hide -ne 2) {
+    throw 'The environment variable must remain non-interactive context (hide = 2).' 
+}
+
+$scenarioVariable = @($dashboardDefinition.templating.list | Where-Object { $_.name -eq 'scenario' }) | Select-Object -First 1
+if ($scenarioVariable -and $scenarioVariable.current.value -eq $null) {
+    throw 'The scenario variable must have a current selection.'
+}
+
+$serviceVariable = @($dashboardDefinition.templating.list | Where-Object { $_.name -eq 'service' }) | Select-Object -First 1
+if ($serviceVariable -and $serviceVariable.multi -eq $true) {
+    throw 'The service variable must remain single-select so the prefix filter semantics are unambiguous.'
+}
+
 $panels = @($dashboardDefinition.panels)
 if ($panels.Count -lt 6) {
-    throw "Dashboard definition must include at least 6 panels."
+    throw 'Dashboard definition must include at least 6 panels.'
 }
 
 $requiredPanelTitles = @(
     'Incident handoff and safe links',
     'Namespace health (Running / Pending / Failed)',
-    'Requests and errors (App Insights telemetry pending)',
-    'Dependency failures (App Insights telemetry pending)',
+    'Requests and errors',
+    'Dependency failures',
     'Scenario timeline and annotations'
 )
 
@@ -61,17 +85,58 @@ foreach ($requiredPanelTitle in $requiredPanelTitles) {
 
 $namespacePanel = @($panels | Where-Object { $_.title -eq 'Namespace health (Running / Pending / Failed)' }) | Select-Object -First 1
 if ($namespacePanel -and $namespacePanel.targets[0].expr -notmatch 'pod=~"\^\(\$service\)\(\-|\$\)"') {
-    throw "Namespace health panel must use the prefix-based pod filter for the selected service."
+    throw 'Namespace health panel must use the prefix-based pod filter for the selected service.'
 }
 
-$requestPanel = @($panels | Where-Object { $_.title -eq 'Requests and errors (App Insights telemetry pending)' }) | Select-Object -First 1
-if ($requestPanel -and $requestPanel.targets[0].expr -ne 'vector(0)') {
-    throw "Requests and errors panel must remain an honest no-data panel until App Insights telemetry is available."
+$requestPanel = @($panels | Where-Object { $_.title -eq 'Requests and errors' }) | Select-Object -First 1
+if (-not $requestPanel) {
+    throw 'Requests and errors panel is missing.'
+}
+if ($requestPanel.datasource.type -ne 'grafana-azure-monitor-datasource') {
+    throw 'Requests and errors panel must use the Azure Monitor datasource.'
+}
+if (-not $requestPanel.targets[0].azureMonitor -or $requestPanel.targets[0].azureMonitor.queryType -ne 'Logs') {
+    throw 'Requests and errors panel must include Azure Monitor Logs query configuration.'
+}
+if ($requestPanel.targets[0].azureMonitor.query -notmatch 'AppRequests' -or $requestPanel.targets[0].azureMonitor.query -notmatch 'sre\.scenario') {
+    throw 'Requests and errors panel must query AppRequests and filter on the sre.scenario dimension.'
+}
+if ($requestPanel.datasource.uid -ne '__AZURE_MONITOR_DATASOURCE_UID__') {
+    throw 'Requests and errors panel must reference the Azure Monitor datasource placeholder.'
+}
+if ($requestPanel.targets[0].azureMonitor.workspaceResourceId -ne '__WORKSPACE_RESOURCE_ID__' -or $requestPanel.targets[0].azureMonitor.resourceGroup -ne '__RESOURCE_GROUP__' -or $requestPanel.targets[0].azureMonitor.subscriptionId -ne '__SUBSCRIPTION_ID__') {
+    throw 'Requests and errors panel must bind workspace, resource-group, and subscription identifiers through provisioning placeholders.'
 }
 
-$dependencyPanel = @($panels | Where-Object { $_.title -eq 'Dependency failures (App Insights telemetry pending)' }) | Select-Object -First 1
-if ($dependencyPanel -and $dependencyPanel.targets[0].expr -ne 'vector(0)') {
-    throw "Dependency failures panel must remain an honest no-data panel until App Insights telemetry is available."
+$dependencyPanel = @($panels | Where-Object { $_.title -eq 'Dependency failures' }) | Select-Object -First 1
+if (-not $dependencyPanel) {
+    throw 'Dependency failures panel is missing.'
+}
+if ($dependencyPanel.datasource.type -ne 'grafana-azure-monitor-datasource') {
+    throw 'Dependency failures panel must use the Azure Monitor datasource.'
+}
+if (-not $dependencyPanel.targets[0].azureMonitor -or $dependencyPanel.targets[0].azureMonitor.queryType -ne 'Logs') {
+    throw 'Dependency failures panel must include Azure Monitor Logs query configuration.'
+}
+if ($dependencyPanel.targets[0].azureMonitor.query -notmatch 'AppDependencies' -or $dependencyPanel.targets[0].azureMonitor.query -notmatch 'sre\.scenario') {
+    throw 'Dependency failures panel must query AppDependencies and filter on the sre.scenario dimension.'
+}
+if ($dependencyPanel.datasource.uid -ne '__AZURE_MONITOR_DATASOURCE_UID__') {
+    throw 'Dependency failures panel must reference the Azure Monitor datasource placeholder.'
+}
+if ($dependencyPanel.targets[0].azureMonitor.workspaceResourceId -ne '__WORKSPACE_RESOURCE_ID__' -or $dependencyPanel.targets[0].azureMonitor.resourceGroup -ne '__RESOURCE_GROUP__' -or $dependencyPanel.targets[0].azureMonitor.subscriptionId -ne '__SUBSCRIPTION_ID__') {
+    throw 'Dependency failures panel must bind workspace, resource-group, and subscription identifiers through provisioning placeholders.'
+}
+
+$timelinePanel = @($panels | Where-Object { $_.title -eq 'Scenario timeline and annotations' }) | Select-Object -First 1
+if (-not $timelinePanel) {
+    throw 'Scenario timeline panel is missing.'
+}
+if ($timelinePanel.datasource.type -ne 'grafana-azure-monitor-datasource') {
+    throw 'Scenario timeline panel must use the Azure Monitor datasource.'
+}
+if ($timelinePanel.targets[0].azureMonitor.query -notmatch 'AppRequests' -or $timelinePanel.targets[0].azureMonitor.query -notmatch 'sre\.scenario') {
+    throw 'Scenario timeline panel must query AppRequests and filter on the sre.scenario dimension.'
 }
 
 Write-Host "✅ Dashboard definition validated: $resolvedDefinitionPath" -ForegroundColor Green

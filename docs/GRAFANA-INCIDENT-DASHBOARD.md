@@ -8,7 +8,7 @@
 
 ## Purpose
 
-The Azure Managed Grafana incident dashboard visualises infrastructure-level signals from the Energy Grid demo — Prometheus metrics, Container Insights pod state, and AKS node health. It is a **read-only observability surface**; it does not diagnose, remediate, or invoke Azure SRE Agent.
+The Azure Managed Grafana incident dashboard visualises infrastructure- and application-level signals from the Energy Grid demo — Prometheus metrics, Container Insights pod state, AKS node health, and Azure Monitor / Log Analytics telemetry for AppRequests and AppDependencies using the repo-owned `sre.namespace`, `sre.service`, and `sre.scenario` dimensions. It is a **read-only observability surface**; it does not diagnose, remediate, or invoke Azure SRE Agent.
 
 ---
 
@@ -16,11 +16,12 @@ The Azure Managed Grafana incident dashboard visualises infrastructure-level sig
 
 | Panel | Data Source | Signal |
 |-------|-----------|--------|
-| Pod Status Heatmap | Prometheus (kube_pod_status_phase) | Running / Pending / Failed pod counts per workload |
-| Container Restart Rate | Prometheus (kube_pod_container_status_restarts_total) | Restart velocity over sliding 5 m window |
+| Namespace health | Prometheus (kube_pod_status_phase) | Running / Pending / Failed pod counts per workload |
+| Readiness / restarts | Prometheus (kube_pod_container_status_restarts_total) | Restart velocity over the selected namespace/service scope |
 | CPU & Memory Utilisation | Prometheus (container_cpu_usage_seconds_total, container_memory_working_set_bytes) | Per-pod resource consumption vs. requests/limits |
-| Node Readiness | Prometheus (kube_node_status_condition) | Node Ready/NotReady state across the cluster |
-| OOMKilled Events | Prometheus (kube_pod_container_status_last_terminated_reason) | Containers terminated with reason `OOMKilled` |
+| Requests and errors | Azure Monitor / Log Analytics (AppRequests) | Request volume and 5xx error trends filtered by the selected namespace, service, and scenario |
+| Dependency failures | Azure Monitor / Log Analytics (AppDependencies) | Dependency failure counts by dependency type and service |
+| Scenario timeline and annotations | Azure Monitor / Log Analytics (AppRequests) | Error trend over time and scenario-aware context for the selected scope |
 
 All data is scoped to the `energy` namespace unless noted otherwise.
 
@@ -28,7 +29,7 @@ All data is scoped to the `energy` namespace unless noted otherwise.
 
 ## What the Dashboard Does **Not** Show
 
-- Application-level telemetry (no App Insights custom metrics from demo services).
+- Application-level telemetry is only shown when the deployment emits AppRequests and AppDependencies with the repo-owned `sre.*` dimensions; otherwise the relevant panels remain empty rather than implying healthy zeros.
 - Azure SRE Agent conversation state, diagnosis output, or remediation proposals.
 - Alert-to-agent trigger status. No alert→agent automation is configured in this demo.
 - SLO burn-rate or error-budget panels (SLO measurement infrastructure is a future wave).
@@ -58,12 +59,12 @@ All data is scoped to the `energy` namespace unless noted otherwise.
 
 ### Before a scenario
 
-- Confirm all panels show a healthy baseline (pods Running, zero restarts, CPU/memory within requests).
+- Confirm the baseline shows healthy pod lifecycle signals and that the request/dependency panels either return data or remain explicitly empty when telemetry is unavailable.
 - Optionally capture a screenshot → `docs/evidence/screenshots/{scenario}_grafana-before.png`.
 
 ### After applying a breakable scenario
 
-- Observe signal changes: restart spikes, OOMKilled markers, Pending pods.
+- Observe signal changes: restart spikes, OOMKilled markers, Pending pods, and any request/dependency failures that appear for the selected namespace/service/scenario.
 - **Narrate what the dashboard shows, not what it diagnoses.**
 
   ✅ "The restart-rate panel shows meter-service restarts climbing after we applied the OOM scenario."
@@ -110,7 +111,7 @@ Use this checklist before referencing the incident dashboard in any customer-fac
 The Managed Grafana workspace is deployed by `infra/bicep/modules/observability.bicep`:
 
 - **Resource**: `Microsoft.Dashboard/grafana@2023-09-01`, Standard SKU, SystemAssigned identity.
-- **Data source**: Azure Monitor Workspace (Prometheus) auto-integrated via `grafanaIntegrations`.
+- **Data sources**: Azure Monitor Workspace (Prometheus) for kube-state/container metrics and a provisioned Azure Monitor datasource for `AppRequests` / `AppDependencies` queries, bound to the deployment's subscription, resource group, and Log Analytics workspace at import time.
 - **RBAC**: Grafana's managed identity receives Monitoring Reader on the subscription.
 - **Toggle**: Set `deployObservability = true` in `infra/bicep/main.bicepparam` (default).
 
@@ -120,4 +121,4 @@ The Managed Grafana workspace is deployed by `infra/bicep/modules/observability.
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
-| 2026-08-11 | 0.1 | Initial incident dashboard guide | Copilot draft for review |
+| 2026-08-11 | 0.2 | Updated guide for Azure Monitor-backed telemetry, no-data semantics, and non-interactive context variables | Copilot draft for review |

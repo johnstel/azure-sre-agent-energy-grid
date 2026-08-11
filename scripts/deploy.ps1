@@ -748,8 +748,17 @@ function Import-GrafanaDashboardDefinition {
     )
 
     $provisionScript = Join-Path $PSScriptRoot 'provision-grafana-dashboard.ps1'
+    $validatorScript = Join-Path $PSScriptRoot 'validate-grafana-dashboard.ps1'
     if (-not (Test-Path $provisionScript)) {
         throw "Grafana dashboard provisioning script not found at '$provisionScript'."
+    }
+    if (-not (Test-Path $validatorScript)) {
+        throw "Grafana dashboard validator script not found at '$validatorScript'."
+    }
+
+    & pwsh -NoLogo -NoProfile -File $validatorScript
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Grafana dashboard definition validation failed.'
     }
 
     $arguments = @('-NoLogo', '-NoProfile', '-File', $provisionScript, '-ResourceGroupName', $ResourceGroupName)

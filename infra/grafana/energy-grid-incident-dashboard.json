@@ -16,66 +16,62 @@
       {
         "builtIn": 0,
         "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
         },
-        "enable": true,
-        "hide": false,
+        "enable": false,
+        "hide": true,
         "iconColor": "rgba(255, 180, 0, 0.85)",
         "name": "Detection",
         "target": {
-          "expr": "vector(0)",
           "refId": "A"
         },
-        "type": "prometheus"
+        "type": "grafana-azure-monitor-datasource"
       },
       {
         "builtIn": 0,
         "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
         },
-        "enable": true,
-        "hide": false,
+        "enable": false,
+        "hide": true,
         "iconColor": "rgba(0, 143, 255, 0.85)",
         "name": "Diagnosis",
         "target": {
-          "expr": "vector(0)",
           "refId": "A"
         },
-        "type": "prometheus"
+        "type": "grafana-azure-monitor-datasource"
       },
       {
         "builtIn": 0,
         "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
         },
-        "enable": true,
-        "hide": false,
+        "enable": false,
+        "hide": true,
         "iconColor": "rgba(50, 172, 45, 0.85)",
         "name": "Remediation",
         "target": {
-          "expr": "vector(0)",
           "refId": "A"
         },
-        "type": "prometheus"
+        "type": "grafana-azure-monitor-datasource"
       },
       {
         "builtIn": 0,
         "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
+          "type": "grafana-azure-monitor-datasource",
+          "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
         },
-        "enable": true,
-        "hide": false,
+        "enable": false,
+        "hide": true,
         "iconColor": "rgba(96, 200, 50, 0.85)",
         "name": "Recovery",
         "target": {
-          "expr": "vector(0)",
           "refId": "A"
         },
-        "type": "prometheus"
+        "type": "grafana-azure-monitor-datasource"
       }
     ]
   },
@@ -160,7 +156,7 @@
       },
       "id": 1,
       "options": {
-        "content": "### Incident handoff\n- Environment (context): **$environment**\n- Namespace: **$namespace**\n- Service: **$service**\n- Scenario (context): **$scenario**\n- This dashboard surfaces infra telemetry and operator context for review.\n- App-level request/dependency panels stay empty until Azure Monitor/App Insights telemetry is connected for the selected namespace/service.\n- Use the links above for the runbook, safe-language guardrails, and the portal handoff.",
+        "content": "### Incident handoff\n- Environment (context): **$environment**\n- Namespace: **$namespace**\n- Service: **$service**\n- Scenario (context): **$scenario**\n- This dashboard surfaces Kubernetes and application telemetry for operator review.\n- Requests/errors and dependency-failure panels use Azure Monitor / Log Analytics data when available; otherwise they show an empty state instead of a healthy-looking zero.\n- Use the links above for the runbook, safe-language guardrails, and the portal handoff.",
         "mode": "markdown"
       },
       "pluginVersion": "10.4.3",
@@ -396,19 +392,14 @@
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "$datasource"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
           "custom": {
             "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
+            "displayMode": "auto",
             "inspect": false
           },
           "mappings": [],
@@ -418,18 +409,9 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
               }
             ]
-          },
-          "noValue": "No data"
+          }
         },
         "overrides": []
       },
@@ -445,30 +427,29 @@
       },
       "targets": [
         {
-          "expr": "vector(0)",
-          "format": "table",
-          "legendFormat": "AppRequests/AppDependencies telemetry pending",
-          "refId": "A"
+          "refId": "A",
+          "azureMonitor": {
+            "queryType": "Logs",
+            "query": "AppRequests\n| where TimeGenerated between (ago(30m) .. now())\n| extend namespace = tostring(customDimensions['sre.namespace']), service = tostring(customDimensions['sre.service']), scenario = tostring(customDimensions['sre.scenario']), resultCode = tostring(ResultCode)\n| where namespace =~ '$namespace'\n| where ('$service' == '.*' or service =~ '$service')\n| where ('$scenario' == 'all' or scenario =~ '$scenario')\n| summarize Requests = count(), Errors = countif(todouble(resultCode) >= 500) by service\n| order by Errors desc, Requests desc",
+            "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
+            "resourceGroup": "__RESOURCE_GROUP__",
+            "subscriptionId": "__SUBSCRIPTION_ID__"
+          }
         }
       ],
-      "title": "Requests and errors (App Insights telemetry pending)",
+      "title": "Requests and errors",
       "type": "table"
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "$datasource"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
           "custom": {
             "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
+            "displayMode": "auto",
             "inspect": false
           },
           "mappings": [],
@@ -478,18 +459,9 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
               }
             ]
-          },
-          "noValue": "No data"
+          }
         },
         "overrides": []
       },
@@ -505,19 +477,23 @@
       },
       "targets": [
         {
-          "expr": "vector(0)",
-          "format": "table",
-          "legendFormat": "AppDependencies telemetry pending",
-          "refId": "A"
+          "refId": "A",
+          "azureMonitor": {
+            "queryType": "Logs",
+            "query": "AppDependencies\n| where TimeGenerated between (ago(30m) .. now())\n| extend namespace = tostring(customDimensions['sre.namespace']), service = tostring(customDimensions['sre.service']), scenario = tostring(customDimensions['sre.scenario']), dependencyType = tostring(DependencyType), success = tostring(Success)\n| where namespace =~ '$namespace'\n| where ('$service' == '.*' or service =~ '$service')\n| where ('$scenario' == 'all' or scenario =~ '$scenario')\n| where success =~ 'False'\n| summarize Failures = count() by dependencyType, service\n| order by Failures desc",
+            "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
+            "resourceGroup": "__RESOURCE_GROUP__",
+            "subscriptionId": "__SUBSCRIPTION_ID__"
+          }
         }
       ],
-      "title": "Dependency failures (App Insights telemetry pending)",
+      "title": "Dependency failures",
       "type": "table"
     },
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "$datasource"
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
       },
       "fieldConfig": {
         "defaults": {
@@ -552,14 +528,19 @@
         },
         "tooltip": {
           "mode": "single",
-          "sort": "desc"
+          "sort": "none"
         }
       },
       "targets": [
         {
-          "expr": "vector(0)",
-          "legendFormat": "scenario timeline",
-          "refId": "A"
+          "refId": "A",
+          "azureMonitor": {
+            "queryType": "Logs",
+            "query": "AppRequests\n| where TimeGenerated between (ago(2h) .. now())\n| extend namespace = tostring(customDimensions['sre.namespace']), service = tostring(customDimensions['sre.service']), scenario = tostring(customDimensions['sre.scenario']), resultCode = tostring(ResultCode)\n| where namespace =~ '$namespace'\n| where ('$service' == '.*' or service =~ '$service')\n| where ('$scenario' == 'all' or scenario =~ '$scenario')\n| summarize Errors = countif(todouble(resultCode) >= 500) by bin(TimeGenerated, 15m)\n| order by TimeGenerated asc",
+            "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
+            "resourceGroup": "__RESOURCE_GROUP__",
+            "subscriptionId": "__SUBSCRIPTION_ID__"
+          }
         }
       ],
       "title": "Scenario timeline and annotations",
@@ -597,21 +578,13 @@
           "text": "sandbox",
           "value": "sandbox"
         },
-        "hide": 0,
+        "hide": 2,
         "label": "Environment (context)",
         "name": "environment",
         "options": [
           {
             "text": "sandbox",
             "value": "sandbox"
-          },
-          {
-            "text": "dev",
-            "value": "dev"
-          },
-          {
-            "text": "prod",
-            "value": "prod"
           }
         ],
         "query": "sandbox,dev,prod",
@@ -646,7 +619,7 @@
         "hide": 0,
         "includeAll": true,
         "label": "Service",
-        "multi": true,
+        "multi": false,
         "name": "service",
         "options": [
           {
@@ -671,13 +644,17 @@
       },
       {
         "current": {
-          "text": "baseline",
-          "value": "baseline"
+          "text": "all",
+          "value": "all"
         },
         "hide": 0,
         "label": "Scenario (context)",
         "name": "scenario",
         "options": [
+          {
+            "text": "All",
+            "value": "all"
+          },
           {
             "text": "baseline",
             "value": "baseline"
@@ -695,8 +672,10 @@
             "value": "service-mismatch"
           }
         ],
-        "query": "baseline,oom-killed,mongodb-down,service-mismatch",
-        "type": "custom"
+        "query": "all,baseline,oom-killed,mongodb-down,service-mismatch",
+        "type": "custom",
+        "includeAll": false,
+        "multi": false
       }
     ]
   },
