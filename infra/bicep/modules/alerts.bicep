@@ -108,7 +108,7 @@ resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   kind: 'LogAlert'
   properties: {
     displayName: 'Energy Grid - HTTP 5xx spike'
-    description: 'Triggers when 5xx request count increases in energy grid App Insights logs. May indicate cascading failures from backend dependencies.'
+    description: 'Triggers when telemetry-backed 5xx responses are observed from the repo-owned meter/asset/dispatch services in the energy namespace.'
     enabled: true
     severity: 1
     scopes: [
@@ -121,10 +121,11 @@ resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
     criteria: {
       allOf: [
         {
-          query: 'AppRequests | where TimeGenerated > ago(10m) | where toint(ResultCode) >= 500'
-          timeAggregation: 'Count'
-          operator: 'GreaterThan'
-          threshold: 20
+          query: 'AppRequests | where TimeGenerated > ago(10m) | extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"]) | where namespace == "${appNamespace}" | where service in ("meter-service", "asset-service", "dispatch-service") | where toint(ResultCode) >= 500 | summarize Errors = count()'
+          timeAggregation: 'Total'
+          metricMeasureColumn: 'Errors'
+          operator: 'GreaterThanOrEqual'
+          threshold: 3
           failingPeriods: {
             numberOfEvaluationPeriods: 1
             minFailingPeriodsToAlert: 1
@@ -136,6 +137,47 @@ resource http5xxAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
       customProperties: union(baseCustomProperties, {
         'sre.root-cause-category': 'dependency,configuration,resource-exhaustion'
         'alert.scenarios': 'mongodb-down,crash-loop,oom-killed'
+      })
+    })
+  }
+}
+
+resource dependencyFailureAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
+  name: '${namePrefix}-dependency-failures'
+  location: location
+  tags: tags
+  kind: 'LogAlert'
+  properties: {
+    displayName: 'Energy Grid - dependency failures'
+    description: 'Triggers when repo-owned services report failed MongoDB or RabbitMQ dependencies via Application Insights telemetry.'
+    enabled: true
+    severity: 1
+    scopes: [
+      logAnalyticsWorkspaceId
+    ]
+    evaluationFrequency: 'PT5M'
+    windowSize: 'PT10M'
+    autoMitigate: true
+    skipQueryValidation: true
+    criteria: {
+      allOf: [
+        {
+          query: 'AppDependencies | where TimeGenerated > ago(10m) | extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"]), dependencyType = tostring(DependencyType) | where namespace == "${appNamespace}" | where service in ("meter-service", "asset-service", "dispatch-service") | where dependencyType in~ ("RabbitMQ", "MongoDB") | where Success == false | summarize Failures = count()'
+          timeAggregation: 'Total'
+          metricMeasureColumn: 'Failures'
+          operator: 'GreaterThanOrEqual'
+          threshold: 1
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+        }
+      ]
+    }
+    actions: union(alertActions, {
+      customProperties: union(baseCustomProperties, {
+        'sre.root-cause-category': 'dependency'
+        'alert.scenarios': 'mongodb-down,service-mismatch'
       })
     })
   }
@@ -244,5 +286,6 @@ resource crashLoopOomAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' =
 
 output podRestartAlertId string = podRestartAlert.id
 output http5xxAlertId string = http5xxAlert.id
+output dependencyFailureAlertId string = dependencyFailureAlert.id
 output podFailureAlertId string = podFailureAlert.id
 output crashLoopOomAlertId string = crashLoopOomAlert.id

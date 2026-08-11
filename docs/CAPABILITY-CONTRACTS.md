@@ -166,6 +166,8 @@ Defined in `infra/bicep/modules/alerts.bicep`:
 | Sev 2 | Warning | Degraded but functional; scheduling/pull issues |
 | Sev 3 | Informational | Proactive signals, drift detection |
 
+> **Alert query semantics:** The Wave 1 HTTP 5xx and dependency-failure alerts evaluate a total count over the alert window (not a 5-minute bucket count), so their thresholds are based on the real number of 5xx responses or failed dependencies in the window.
+
 ### Custom properties
 
 Every alert must include these custom properties for query correlation:

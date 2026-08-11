@@ -1171,6 +1171,117 @@ catch {
     exit 1
 }
 
+function Publish-RepoOwnedServiceImages {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName,
+
+        [Parameter(Mandatory)]
+        [string]$AcrLoginServer,
+
+        [Parameter()]
+        [string]$ImageTag = ''
+    )
+
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    if ([string]::IsNullOrWhiteSpace($ImageTag)) {
+        $ImageTag = (& git -C $repoRoot rev-parse --short HEAD 2>$null).Trim()
+        if ([string]::IsNullOrWhiteSpace($ImageTag)) {
+            $ImageTag = (Get-Date -Format 'yyyyMMddHHmmss')
+        }
+    }
+
+    $acrName = az acr list --resource-group $ResourceGroupName --query "[0].name" --output tsv 2>$null
+    if ([string]::IsNullOrWhiteSpace($acrName)) {
+        throw "Unable to find an Azure Container Registry in resource group '$ResourceGroupName'."
+    }
+
+    $services = @(
+        [pscustomobject]@{ Name = 'meter-service'; DockerFile = 'services/meter-service/Dockerfile'; Context = 'services/meter-service' },
+        [pscustomobject]@{ Name = 'asset-service'; DockerFile = 'services/asset-service/Dockerfile'; Context = 'services/asset-service' },
+        [pscustomobject]@{ Name = 'dispatch-service'; DockerFile = 'services/dispatch-service/Dockerfile'; Context = 'services/dispatch-service' }
+    )
+
+    foreach ($service in $services) {
+        Write-Host "  🐳 Building $($service.Name) image ($ImageTag)..." -ForegroundColor Yellow
+        $imageRef = "$AcrLoginServer/$($service.Name):$ImageTag"
+        $latestRef = "$AcrLoginServer/$($service.Name):latest"
+        az acr build `
+            --registry $acrName `
+            --image "$($service.Name):$ImageTag" `
+            --image "$($service.Name):latest" `
+            --file $service.DockerFile `
+            $service.Context 2>$null | Out-Null
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to build and push image for $($service.Name) to ACR '$acrName'."
+        }
+
+        Write-Host "  ✅ Published $imageRef and $latestRef" -ForegroundColor Green
+    }
+}
+
+function Set-RepoServiceImages {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$AcrLoginServer,
+
+        [Parameter()]
+        [string]$ImageTag = ''
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ImageTag)) {
+        $ImageTag = 'latest'
+    }
+
+    $images = @(
+        [pscustomobject]@{ Deployment = 'meter-service'; Container = 'meter-service' },
+        [pscustomobject]@{ Deployment = 'asset-service'; Container = 'asset-service' },
+        [pscustomobject]@{ Deployment = 'dispatch-service'; Container = 'dispatch-service' }
+    )
+
+    foreach ($image in $images) {
+        $registryImage = "$AcrLoginServer/$($image.Deployment):$ImageTag"
+        kubectl set image "deployment/$($image.Deployment)" "$($image.Container)=$registryImage" -n energy 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  ⚠️  Could not update image for deployment $($image.Deployment)" -ForegroundColor Yellow
+        }
+    }
+}
+
+function Configure-TelemetrySecret {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName
+    )
+
+    $appInsightsName = az resource list --resource-group $ResourceGroupName --resource-type 'Microsoft.Insights/components' --query "[0].name" --output tsv 2>$null
+    if ([string]::IsNullOrWhiteSpace($appInsightsName)) {
+        Write-Host "  ⚠️  No Application Insights resource found; skipping telemetry secret injection." -ForegroundColor Yellow
+        return
+    }
+
+    $connectionString = az monitor app-insights component show --app $appInsightsName --resource-group $ResourceGroupName --query connectionString --output tsv 2>$null
+    if ([string]::IsNullOrWhiteSpace($connectionString)) {
+        Write-Host "  ⚠️  Application Insights connection string was not returned; skipping telemetry secret injection." -ForegroundColor Yellow
+        return
+    }
+
+    $secretManifest = kubectl create secret generic telemetry-credentials -n energy --from-literal=applicationinsights-connection-string=$connectionString --dry-run=client -o yaml 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($secretManifest)) {
+        Write-Host "  ⚠️  Unable to render telemetry secret manifest." -ForegroundColor Yellow
+        return
+    }
+
+    $secretManifest | kubectl apply -f - 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  ⚠️  Unable to apply telemetry secret manifest." -ForegroundColor Yellow
+    }
+}
+
 # Get AKS credentials
 Write-Host "`n🔑 Getting AKS credentials..." -ForegroundColor Yellow
 az aks get-credentials `
@@ -1221,6 +1332,9 @@ $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
 
 if (Test-Path $k8sPath) {
     kubectl apply -f $k8sPath
+    Publish-RepoOwnedServiceImages -ResourceGroupName $resourceGroupName -AcrLoginServer $outputs.acrLoginServer.value -ImageTag 'latest'
+    Configure-TelemetrySecret -ResourceGroupName $resourceGroupName
+    Set-RepoServiceImages -AcrLoginServer $outputs.acrLoginServer.value -ImageTag 'latest'
     Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
 
     Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
