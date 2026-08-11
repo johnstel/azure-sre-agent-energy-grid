@@ -33,8 +33,8 @@ if (-not $dashboardDefinition.title -or $dashboardDefinition.title -ne 'Energy G
 
 $requiredVariables = @('environment', 'namespace', 'service', 'scenario')
 foreach ($requiredVariable in $requiredVariables) {
-    $matches = @($dashboardDefinition.templating.list | Where-Object { $_.name -eq $requiredVariable })
-    if ($matches.Count -eq 0) {
+    $matchingVariables = @($dashboardDefinition.templating.list | Where-Object { $_.name -eq $requiredVariable })
+    if ($matchingVariables.Count -eq 0) {
         throw "Dashboard definition is missing the '$requiredVariable' variable."
     }
 }
@@ -47,8 +47,8 @@ if ($panels.Count -lt 6) {
 $requiredPanelTitles = @(
     'Incident handoff and safe links',
     'Namespace health (Running / Pending / Failed)',
-    'Requests and errors',
-    'Dependency failures',
+    'Requests and errors (App Insights telemetry pending)',
+    'Dependency failures (App Insights telemetry pending)',
     'Scenario timeline and annotations'
 )
 
@@ -57,6 +57,21 @@ foreach ($requiredPanelTitle in $requiredPanelTitles) {
     if (-not $panel) {
         throw "Dashboard definition is missing the '$requiredPanelTitle' panel."
     }
+}
+
+$namespacePanel = @($panels | Where-Object { $_.title -eq 'Namespace health (Running / Pending / Failed)' }) | Select-Object -First 1
+if ($namespacePanel -and $namespacePanel.targets[0].expr -notmatch 'pod=~"\^\(\$service\)\(\-|\$\)"') {
+    throw "Namespace health panel must use the prefix-based pod filter for the selected service."
+}
+
+$requestPanel = @($panels | Where-Object { $_.title -eq 'Requests and errors (App Insights telemetry pending)' }) | Select-Object -First 1
+if ($requestPanel -and $requestPanel.targets[0].expr -ne 'vector(0)') {
+    throw "Requests and errors panel must remain an honest no-data panel until App Insights telemetry is available."
+}
+
+$dependencyPanel = @($panels | Where-Object { $_.title -eq 'Dependency failures (App Insights telemetry pending)' }) | Select-Object -First 1
+if ($dependencyPanel -and $dependencyPanel.targets[0].expr -ne 'vector(0)') {
+    throw "Dependency failures panel must remain an honest no-data panel until App Insights telemetry is available."
 }
 
 Write-Host "✅ Dashboard definition validated: $resolvedDefinitionPath" -ForegroundColor Green
