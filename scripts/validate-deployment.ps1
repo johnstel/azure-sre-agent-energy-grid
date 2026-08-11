@@ -193,8 +193,10 @@ if ($grafana) {
         $passedChecks++
     }
 
+    $grafanaName = $grafana.name
+
     $dashboardTitle = 'Energy Grid — Incident Overview'
-    $dashboardListRaw = az grafana dashboard list --resource-group $ResourceGroupName --name $grafana.name --output json 2>$null
+    $dashboardListRaw = az grafana dashboard list --resource-group $ResourceGroupName --name $grafanaName --output json 2>$null
     $dashboardList = @()
     if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($dashboardListRaw)) {
         try {
@@ -208,6 +210,23 @@ if ($grafana) {
     $dashboardFound = ($dashboardList | Where-Object { $_.title -eq $dashboardTitle }).Count -gt 0
     $totalChecks++
     if (Write-Check "Managed Grafana incident dashboard provisioned" $dashboardFound "Expected dashboard: $dashboardTitle") {
+        $passedChecks++
+    }
+
+    $dataSourcesRaw = az grafana data-source list --resource-group $ResourceGroupName --name $grafanaName --output json 2>$null
+    $dataSources = @()
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($dataSourcesRaw)) {
+        try {
+            $dataSources = @($dataSourcesRaw | ConvertFrom-Json)
+        }
+        catch {
+            $dataSources = @()
+        }
+    }
+
+    $dataSourcesResolved = $dataSources.Count -gt 0
+    $totalChecks++
+    if (Write-Check "Grafana data sources resolve" $dataSourcesResolved "Found $($dataSources.Count) data source(s)") {
         $passedChecks++
     }
 }

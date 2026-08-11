@@ -35,7 +35,7 @@ param deployAlerts bool = true
 param deploySreAgent bool = true
 
 @description('Deploy default Action Group for alert notifications and incident routing')
-param deployActionGroup bool = false
+param deployActionGroup bool = true
 
 @description('Action Group short name (max 12 characters)')
 @maxLength(12)
@@ -321,6 +321,7 @@ output logAnalyticsWorkspaceId string = logAnalytics.outputs.workspaceId
 output appInsightsId string = appInsights.outputs.appInsightsId
 output appInsightsConnectionString string = appInsights.outputs.connectionString
 output keyVaultUri string = keyVault.outputs.vaultUri
+output grafanaName string = deployObservability ? observability!.outputs.grafanaName : ''
 output grafanaDashboardUrl string = deployObservability ? observability!.outputs.grafanaEndpoint : ''
 output azureMonitorWorkspaceId string = deployObservability ? observability!.outputs.azureMonitorWorkspaceId : ''
 output prometheusDataCollectionEndpointId string = deployObservability
