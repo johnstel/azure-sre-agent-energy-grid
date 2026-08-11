@@ -68,8 +68,13 @@ Issue #68 adds a governed read-only in-cluster status API (`/api/grid-status/v1`
 **Governance rules**:
 - The endpoint is **read-only** — no mutations, no write verbs, no request body.
 - The response is an **allowlist**: only nodes declared in `grid-map-topology.json` appear; no arbitrary cluster resources are exposed.
-- `lastChecked` is the server-side probe time. The client renders a staleness badge when `Date.now() - lastChecked > staleAfterMs`.
+- The payload is bounded: the server caps node count, event count, output bytes, and time window so the browser can safely render a predictable snapshot.
+- The endpoint must return explicit `unknown`/stale states instead of silently omitting a node, and it must surface `activeScenario`, `bannerMessage`, and `scenarioNodeIds` for scenario-aware rendering.
 - Error responses (`5xx`, network timeout) cause the client to retain the last-known state and overlay a "data unavailable" banner rather than clearing the map.
+
+### Security and redaction
+
+The governed API is intentionally defensive-in-depth. It only reads from the `energy` namespace and a fixed allowlist of resources, never exposes arbitrary objects, pod logs, or credentials, and redacts secret-like values before they reach the browser. Responses replace credential-like content with `[redacted]` and avoid surfacing tokens, connection strings, or other secrets in event messages or node summaries.
 
 V1 uses existing in-cluster HTTP health proxies exposed by `ops-console`:
 
