@@ -261,6 +261,35 @@ export interface PreflightCheck {
   message: string;
 }
 
+export type IncidentHandoffStatus = 'open' | 'acknowledged' | 'resolved';
+export type IncidentHandoffSeverity = 'critical' | 'warning' | 'unknown';
+export type IncidentHandoffSource = 'action-group' | 'dashboard' | 'manual';
+
+export interface IncidentHandoff {
+  id: string;
+  key: string;
+  status: IncidentHandoffStatus;
+  title: string;
+  summary: string;
+  severity: IncidentHandoffSeverity;
+  source: IncidentHandoffSource;
+  scenarioName?: string;
+  createdAt: string;
+  updatedAt: string;
+  evidence: string[];
+  operatorGuidance: string[];
+  notes?: string[];
+}
+
+export interface IncidentHandoffMutationResponse {
+  incident: IncidentHandoff;
+  deduped: boolean;
+}
+
+export interface IncidentHandoffListResponse {
+  incidents: IncidentHandoff[];
+}
+
 export interface DeployParams {
   location: string;
   workloadName?: string;

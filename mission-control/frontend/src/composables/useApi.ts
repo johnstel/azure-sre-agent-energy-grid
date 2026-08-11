@@ -6,6 +6,8 @@ import type {
   Deployment,
   DestroyParams,
   DeployParams,
+  IncidentHandoffListResponse,
+  IncidentHandoffMutationResponse,
   InventoryResponse,
   Job,
   KubeEvent,
@@ -62,6 +64,9 @@ export function useApi() {
     getPodLogs: (name: string) => api<PodLogResponse>(`/api/pods/${encodeURIComponent(name)}/logs`),
     getServiceEndpoints: (name: string) => api<ServiceEndpointsResponse>(`/api/services/${encodeURIComponent(name)}/endpoints`),
     getScenarios: () => api<{ scenarios: Scenario[] }>('/api/scenarios'),
+    getIncidentHandoffs: () => api<IncidentHandoffListResponse>('/api/incidents'),
+    acknowledgeIncident: (id: string) => api<IncidentHandoffMutationResponse>(`/api/incidents/${encodeURIComponent(id)}/acknowledge`, { method: 'POST' }),
+    resolveIncident: (id: string) => api<IncidentHandoffMutationResponse>(`/api/incidents/${encodeURIComponent(id)}/resolve`, { method: 'POST' }),
     askAssistant: (question: string, history?: AssistantConversationMessage[], clientContext?: AssistantClientContext) => api<AssistantAskResponse>('/api/assistant/ask', {
       method: 'POST',
       body: JSON.stringify({

@@ -166,6 +166,19 @@ if ($grafana) {
     if (Write-Check "Managed Grafana exists" $true $grafana.name) {
         $passedChecks++
     }
+
+    $grafanaName = $grafana.name
+
+    $dataSources = az grafana data-source list --resource-group $ResourceGroupName --name $grafanaName --output json 2>$null | ConvertFrom-Json
+    $dataSourcesResolved = $false
+    if ($dataSources -and $dataSources.Count -gt 0) {
+        $dataSourcesResolved = $true
+    }
+
+    $totalChecks++
+    if (Write-Check "Grafana data sources resolve" $dataSourcesResolved "Found $($dataSources.Count) data source(s)") {
+        $passedChecks++
+    }
 }
 
 # =============================================================================
