@@ -168,16 +168,6 @@ if ($grafana) {
     }
 
     $grafanaName = $grafana.name
-    $dashboards = az grafana dashboard list --resource-group $ResourceGroupName --name $grafanaName --output json 2>$null | ConvertFrom-Json
-    $dashboardExists = $false
-    if ($dashboards) {
-        $dashboardExists = @($dashboards | Where-Object { $_.title -eq 'Energy Grid Incident Dashboard' }).Count -gt 0
-    }
-
-    $totalChecks++
-    if (Write-Check "Grafana dashboard exists" $dashboardExists "Dashboard title: Energy Grid Incident Dashboard") {
-        $passedChecks++
-    }
 
     $dataSources = az grafana data-source list --resource-group $ResourceGroupName --name $grafanaName --output json 2>$null | ConvertFrom-Json
     $dataSourcesResolved = $false

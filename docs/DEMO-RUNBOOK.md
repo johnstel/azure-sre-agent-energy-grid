@@ -118,16 +118,13 @@ If replacing a reference PNG with a fresh live capture, redact it and update the
 
 ---
 
-## Step 3: Open the Incident Dashboard and SRE Agent Portal
+## Step 3: Open the Managed Grafana Workspace and SRE Agent Portal
 
-After deployment, the Energy Grid incident dashboard is provisioned automatically and ready to open in Managed Grafana. No manual dashboard configuration is required.
+After deployment, the Managed Grafana workspace is available in the resource group. No repo-managed dashboard import is performed as part of this branch.
 
 1. Open the Managed Grafana instance from the Azure Portal resource group or run `site` in the dev container terminal to retrieve the URL.
-2. Navigate to **Dashboards → Energy Grid Incident Dashboard**.
-3. Confirm that the dashboard shows the populated baseline panels and that the scenario variable is available.
-4. Keep the dashboard open during the demo to show the transition from healthy to degraded to critical while the operator investigates.
-
-For the demo-specific panel guide and the 5-, 10-, and 20-minute paths, see [docs/DASHBOARD-GUIDE.md](DASHBOARD-GUIDE.md).
+2. Confirm that the workspace shows the baseline panels and that the scenario variable is available.
+3. Keep the workspace open during the demo to show the transition from healthy to degraded to critical while the operator investigates.
 
 ### Demo path guidance
 
