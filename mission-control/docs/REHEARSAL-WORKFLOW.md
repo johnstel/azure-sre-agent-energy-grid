@@ -48,12 +48,18 @@ Each run carries a `RehearsalEvidencePackage` with optional repo-relative paths:
 | `alertHistoryPath` | Alert timeline |
 | `kqlExportPath` | KQL query results |
 | `recoveryCheckPath` | Post-recovery verification |
+| `summaryPath` | Operator-facing summary package |
+| `artifactDirectory` | Deterministic package root for generated files |
 | `attachmentChecksums` | `{ key: sha256 }` map for integrity |
+| `sensitivePatterns` | Configured regex-like patterns that trigger redaction checks |
 | `complete` | Boolean — operator asserts package is final |
 
 **Path rules** — all evidence paths must:
 - Be repo-relative (not absolute, not URLs)
 - Live under `docs/evidence/`
+- Be validated before they are persisted to the rehearsal package
+
+Generated artifact bundles are written under the selected `artifactDirectory` (default `docs/evidence/mission-control/<scenario>`), with a manifest and summary file emitted as part of the evidence-package phase.
 
 ---
 
@@ -88,6 +94,12 @@ A run is `customerReady = true` only when gate status is `PASS` at completion.
 
 All three operations preserve the run identity (same scenario slot is reused).
 
+## Deterministic Replay and Dry Run
+
+Replays are available through the backend replay endpoint and produce a deterministic step-by-step preview of the state machine without mutating persisted rehearsal state. Dry-run advancement is also supported for operator review before a real phase transition is committed.
+
+The replay payload exposes the current phase and a sequence of preview steps with the same phase ordering, gate evaluation, and timing markers that the live run would use.
+
 ---
 
 ## API Endpoints
@@ -104,6 +116,7 @@ Base path: `/api/rehearsals`
 | `POST` | `/api/rehearsals/resume` | Resume an interrupted rehearsal |
 | `POST` | `/api/rehearsals/:scenarioName/reset` | Reset a run to initial state |
 | `PATCH` | `/api/rehearsals/evidence` | Update evidence package fields |
+| `GET` | `/api/rehearsals/:scenarioName/replay` | Return a deterministic replay preview without mutating state |
 
 ### Request Bodies
 
