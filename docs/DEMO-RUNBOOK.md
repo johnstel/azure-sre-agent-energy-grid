@@ -118,7 +118,28 @@ If replacing a reference PNG with a fresh live capture, redact it and update the
 
 ---
 
-## Step 3: Find Your SRE Agent Portal URL
+## Step 3: Open the Incident Dashboard and SRE Agent Portal
+
+After deployment, the Energy Grid incident dashboard is provisioned automatically and ready to open in Managed Grafana. No manual dashboard configuration is required.
+
+1. Open the Managed Grafana instance from the Azure Portal resource group or run `site` in the dev container terminal to retrieve the URL.
+2. Navigate to **Dashboards → Energy Grid Incident Dashboard**.
+3. Confirm that the dashboard shows the populated baseline panels and that the scenario variable is available.
+4. Keep the dashboard open during the demo to show the transition from healthy to degraded to critical while the operator investigates.
+
+For the demo-specific panel guide and the 5-, 10-, and 20-minute paths, see [docs/DASHBOARD-GUIDE.md](DASHBOARD-GUIDE.md).
+
+### Demo path guidance
+
+- 5-minute path: show the namespace health, pod restarts, and alert-state views.
+- 10-minute path: add CPU/memory, request/error-rate, and timeline annotations.
+- 20-minute path: include dependency failures, scenario narrative, and the operator handoff panels.
+
+Use the safe-language guardrails in [docs/SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) when presenting the dashboard. Do not imply autonomous remediation; present it as evidence that the operator can review and act on.
+
+---
+
+## Step 4: Find Your SRE Agent Portal URL
 
 **Option A — Deployment output:**
 The URL is printed at the end of `deploy.ps1` output. Look for the SRE Agent resource URL.
@@ -137,11 +158,11 @@ az resource list --resource-group <rg-name> --resource-type Microsoft.App/agents
 
 ---
 
-## Step 4: Run Scenario — Break, Diagnose, Fix
+## Step 5: Run Scenario — Break, Diagnose, Fix
 
 For each scenario you plan to demo, follow this loop. Use the complete-failure bundle only after the core scenarios are understood, because it combines dependency outage, service routing failure, and network isolation in one incident.
 
-### 4a. Inject the failure
+### 5a. Inject the failure
 
 ```bash
 kubectl apply -f k8s/scenarios/<scenario>.yaml
@@ -149,7 +170,7 @@ kubectl apply -f k8s/scenarios/<scenario>.yaml
 
 **Estimated times:** OOMKilled ~30s to manifest, MongoDBDown ~60s for cascade, ServiceMismatch ~immediate
 
-### 4b. Observe the failure
+### 5b. Observe the failure
 
 ```bash
 kubectl get pods -n energy -w    # Watch pods
@@ -158,7 +179,7 @@ kubectl get events -n energy --sort-by='.lastTimestamp' | head -20
 
 - [ ] Failure is visible in kubectl output
 
-### 4c. MongoDBDown manual path (live contrast)
+### 5c. MongoDBDown manual path (live contrast)
 
 Use this only for the MongoDBDown scenario before asking SRE Agent. The goal is to let the audience watch the manual investigation path, not to make a quantitative MTTR claim.
 
@@ -191,7 +212,7 @@ kubectl get endpoints mongodb -n energy
 
 Expected snippets: `mongodb   1/1` and `mongodb   <pod-ip>:27017`.
 
-### 4d. Ask SRE Agent to diagnose
+### 5d. Ask SRE Agent to diagnose
 
 Open the SRE Agent portal. Start with an open-ended prompt, then escalate to scenario-specific prompts:
 
@@ -256,7 +277,7 @@ For the SRE Agent portal capture steps, see the per-scenario checklists:
 
 If you just ran the MongoDBDown manual path, say: "Now we'll ask SRE Agent the same question and compare the investigation path it recommends." Do not script or paraphrase a diagnosis as if it happened live; show the portal response or clearly label any prior screenshot as previous-run evidence.
 
-### 4e. Remediate
+### 5e. Remediate
 
 If SRE Agent recommends a fix in Review mode:
 - [ ] Screenshot the recommendation/proposal exactly as shown → `docs/evidence/screenshots/<scenario>_proposal.png`
@@ -268,7 +289,7 @@ Or restore manually:
 kubectl apply -f k8s/base/application.yaml
 ```
 
-### 4f. Verify recovery
+### 5f. Verify recovery
 
 ```bash
 kubectl get pods -n energy
@@ -277,7 +298,7 @@ kubectl get pods -n energy
 - [ ] All pods back to Running/Ready
 - [ ] Screenshot recovery state → `docs/evidence/screenshots/<scenario>_after-fix.png`
 
-### 4g. Record timestamps
+### 5g. Record timestamps
 
 In `docs/evidence/scenarios/<scenario>/run-notes.md`, record:
 | Timestamp | Event |
@@ -293,7 +314,7 @@ See [docs/CAPABILITY-CONTRACTS.md](CAPABILITY-CONTRACTS.md) §7 for the MTTR mod
 
 ---
 
-## Step 5: Restore Healthy State
+## Step 6: Restore Healthy State
 
 ```bash
 # Portable command — works anywhere with kubectl access:
@@ -310,7 +331,7 @@ fix-all
 
 ---
 
-## Step 6: Teardown (Post-Demo)
+## Step 7: Teardown (Post-Demo)
 
 ```powershell
 .\scripts\destroy.ps1 -ResourceGroupName <rg-name>
@@ -339,13 +360,14 @@ All evidence artifacts go under `docs/evidence/`. See [docs/evidence/README.md](
 Azure SRE Agent is **GA**. If the portal is unresponsive during a live demo:
 
 1. **Acknowledge it**: "SRE Agent is available, and this lab keeps operator control — let me show you the diagnosis path manually while we wait."
-2. **Use kubectl diagnosis**: Walk through the `What to observe` commands in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md) for the active scenario. For MongoDBDown, use the manual path in Step 4c above.
+2. **Use kubectl diagnosis**: Walk through the `What to observe` commands in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md) for the active scenario. For MongoDBDown, use the manual path in Step 5c above.
 3. **Show the prompt library**: Open [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) and explain the prompt progression — "These are the prompts we'd use when the portal is available." Do not describe a live SRE Agent result unless it is visible in the portal or captured as previous-run evidence.
+4. **Reference the incident handoff flow**: When the Mission Control backend is in use, the incident queue follows an explicit `open` → `acknowledged` → `resolved` lifecycle so the operator remains in control of remediation decisions.
 4. **Show prior evidence**: If you have screenshots from a previous run in `docs/evidence/screenshots/`, use those.
 5. **Pivot to architecture**: Use the trust model diagram in README to discuss Review vs. Auto mode and RBAC controls.
 6. **Resume when available**: Keep the portal tab open and continue once service responsiveness returns.
 
-**Do NOT**: claim the service is GA, promise specific uptime, or skip the scenario entirely.
+**Do NOT**: promise specific uptime SLAs, or skip the scenario entirely.
 
 ---
 

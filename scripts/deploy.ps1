@@ -1136,6 +1136,27 @@ try {
         Write-Host "  • Grafana:          $($outputs.grafanaDashboardUrl.value)" -ForegroundColor White
         Write-Host "  • AMW ID:           $($outputs.azureMonitorWorkspaceId.value)" -ForegroundColor White
         Write-Host "  • Prometheus DCR:   $($outputs.prometheusDataCollectionRuleId.value)" -ForegroundColor White
+
+        $grafanaName = ''
+        if ($outputs.PSObject.Properties.Name -contains 'grafanaName' -and $outputs.grafanaName.value) {
+            $grafanaName = $outputs.grafanaName.value
+        }
+
+        $dashboardScript = Join-Path $PSScriptRoot 'provision-grafana-dashboard.ps1'
+        if (Test-Path $dashboardScript) {
+            try {
+                if ($grafanaName) {
+                    & $dashboardScript -ResourceGroupName $resourceGroupName -GrafanaName $grafanaName
+                }
+                else {
+                    & $dashboardScript -ResourceGroupName $resourceGroupName
+                }
+                Write-Host "  ✅ Dashboard provisioning step completed" -ForegroundColor Green
+            }
+            catch {
+                Write-Host "  ⚠️  Dashboard provisioning skipped: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+        }
     }
 
     if ($outputs.podRestartAlertId.value) {
