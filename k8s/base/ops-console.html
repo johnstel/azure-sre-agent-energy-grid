@@ -419,6 +419,7 @@ const DISPATCH_TYPES = ['Load Balance', 'Frequency Adj', 'Capacity Shift', 'Emer
 };
 
 const API_STATUS_PATH = '/api/grid-status/v1';
+const STATUS_API_PATH = API_STATUS_PATH;
 
 const MAP_NODE = { width: 176, height: 76 };
   const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -428,7 +429,7 @@ const MAP_NODE = { width: 176, height: 76 };
   const MAX_EVENT_STRIP_ITEMS = 5;
   const EVENT_MESSAGE_LIMIT = 120;
   const SEVERITY_RANK = { healthy: 0, warning: 1, critical: 2 };
-   const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0, dragMoved: false, healthById: {}, lastSuccessfulHealthPoll: null, healthPollInFlight: false, selectedNodeId: null, selectedEdgeKey: null, activeFilter: 'all', events: [], eventDataAvailable: false, statusBannerMessage: '' };
+   const mapState = { x: 0, y: 0, k: 1, rendered: false, dragging: false, dragX: 0, dragY: 0, dragMoved: false, healthById: {}, lastSuccessfulHealthPoll: null, healthPollInFlight: false, selectedNodeId: null, selectedEdgeKey: null, activeFilter: 'all', events: [], eventDataAvailable: false, statusBannerMessage: '', bannerMessage: '', activeScenario: null, governedDataAvailable: false };
  var _drawerLastFocus = null;
  var _drawerLastFocusNodeId = null;
 
@@ -536,6 +537,7 @@ function addLogEntry() {
 
       function normalizeStatusSeverity(value) {
         if (value === 'healthy' || value === 'warning' || value === 'critical' || value === 'unknown') return value;
+        if (value === 'degraded') return 'warning';
         return 'unknown';
       }
 
@@ -603,7 +605,7 @@ function addLogEntry() {
 
       function fetchStatusSnapshot() {
         const checkedAt = Date.now();
-        return fetch(STATUS_API_PATH, { method: 'GET', cache: 'no-store', signal: createTimeoutSignal(LIVE_HEALTH_TIMEOUT_MS) })
+        return fetch(API_STATUS_PATH, { method: 'GET', cache: 'no-store', signal: createTimeoutSignal(LIVE_HEALTH_TIMEOUT_MS) })
           .then(response => {
             if (!response.ok) {
               return response.text().then(text => {
@@ -644,7 +646,7 @@ function addLogEntry() {
           const card = document.createElement('div');
           card.className = 'card';
           const result = item.node ? mapState.healthById[item.node.id] : null;
-          const severity = result ? result.severity : 'unknown';
+          const severity = result ? normalizeStatusSeverity(result.severity || result.status || 'unknown') : 'unknown';
           const dotClass = statusDotClass(severity);
           const label = result ? healthTextForResult(result) : (item.node && item.node.healthSource === 'status' ? 'Checking governed status snapshot...' : 'Checking approved health endpoint...');
           card.innerHTML = '<h3>' + item.name + '</h3><div style="color:var(--' + (severity === 'warning' ? 'amber' : severity === 'critical' ? 'red' : severity === 'healthy' ? 'green' : 'muted') + ')"><span class="dot ' + dotClass + '"></span> ' + label + '</div>';
@@ -657,10 +659,12 @@ function addLogEntry() {
         if (!banner) return;
         const now = Date.now();
         const last = mapState.lastSuccessfulHealthPoll;
-        if (mapState.statusBannerMessage) {
+        const scenarioSuffix = mapState.activeScenario ? ' Scenario ' + mapState.activeScenario + ' is active.' : '';
+        const bannerText = mapState.bannerMessage || mapState.statusBannerMessage;
+        if (bannerText) {
           banner.hidden = false;
-          banner.className = 'map-health-banner warning';
-          banner.textContent = mapState.statusBannerMessage;
+          banner.className = 'map-health-banner' + (mapState.activeScenario ? ' warning' : '');
+          banner.textContent = bannerText + scenarioSuffix;
           return;
         }
         if (!last) {
@@ -711,11 +715,17 @@ function addLogEntry() {
               });
               mapState.events = Array.isArray(statusResponse.events) ? statusResponse.events : [];
               mapState.eventDataAvailable = mapState.events.length > 0;
-              mapState.statusBannerMessage = statusResponse.payload && statusResponse.payload.bannerMessage ? statusResponse.payload.bannerMessage : '';
+              mapState.bannerMessage = statusResponse.payload && statusResponse.payload.bannerMessage ? statusResponse.payload.bannerMessage : '';
+              mapState.statusBannerMessage = mapState.bannerMessage;
+              mapState.activeScenario = statusResponse.payload && statusResponse.payload.activeScenario ? statusResponse.payload.activeScenario : null;
+              mapState.governedDataAvailable = true;
             } else {
               mapState.events = [];
               mapState.eventDataAvailable = false;
+              mapState.bannerMessage = '';
               mapState.statusBannerMessage = '';
+              mapState.activeScenario = null;
+              mapState.governedDataAvailable = false;
             }
             mapState.lastSuccessfulHealthPoll = newestSuccess || mapState.lastSuccessfulHealthPoll;
           })
@@ -754,8 +764,9 @@ function addLogEntry() {
         if (node.healthSource === 'status') {
           const result = mapState.healthById[node.id];
           if (!result) return { text: 'checking governed status snapshot', className: 'unknown', severity: 'unknown', symbol: '?' };
-          const symbol = result.severity === 'healthy' ? '✓' : result.severity === 'warning' ? '!' : result.severity === 'critical' ? '×' : '?';
-          return { text: gridStateTextForResult(result), className: result.severity, severity: result.severity, symbol };
+          const severity = normalizeStatusSeverity(result.severity || result.status || 'unknown');
+          const symbol = severity === 'healthy' ? '✓' : severity === 'warning' ? '!' : severity === 'critical' ? '×' : '?';
+          return { text: gridStateTextForResult(result), className: severity, severity, symbol };
         }
         if (node.nominal) return { text: 'grid normal', className: 'healthy', severity: 'healthy', symbol: '✓' };
         return { text: 'static demo context', className: 'static', severity: 'unknown', symbol: 'S' };
