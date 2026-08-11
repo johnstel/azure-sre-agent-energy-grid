@@ -334,6 +334,7 @@ output defaultActionGroupId string = deployActionGroup ? defaultActionGroup!.out
 output defaultActionGroupHasWebhook bool = deployActionGroup ? defaultActionGroup!.outputs.hasWebhookReceiver : false
 output podRestartAlertId string = deployAlerts ? alerts!.outputs.podRestartAlertId : ''
 output http5xxAlertId string = deployAlerts ? alerts!.outputs.http5xxAlertId : ''
+output dependencyFailureAlertId string = deployAlerts ? alerts!.outputs.dependencyFailureAlertId : ''
 output podFailureAlertId string = deployAlerts ? alerts!.outputs.podFailureAlertId : ''
 output crashLoopOomAlertId string = deployAlerts ? alerts!.outputs.crashLoopOomAlertId : ''
 output sreAgentId string = deploySreAgent ? sreAgent!.outputs.agentId : ''
