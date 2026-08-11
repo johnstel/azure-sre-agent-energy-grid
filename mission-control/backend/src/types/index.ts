@@ -593,3 +593,124 @@ export interface ConfirmPortalValidationRequest {
   operatorInitials: string;
   accuracy?: PortalValidationAccuracy;
 }
+
+export type RehearsalScenarioName = PortalValidationScenarioName;
+export type RehearsalPhase = 'preflight' | 'baseline' | 'injection' | 'detection' | 'prompt_gate' | 'diagnosis_gate' | 'restore' | 'recovery_verification' | 'evidence_package' | 'completed';
+export type RehearsalStatus = 'pending' | 'in_progress' | 'interrupted' | 'completed' | 'reset';
+export type RehearsalGateStatus = 'PASS_WITH_PENDING_HUMAN_PORTAL' | 'PASS' | 'REDACTION_BLOCKED';
+
+export interface RehearsalTimestamps {
+  t0?: string;
+  t1?: string;
+  t2?: string;
+  t3?: string;
+  t4?: string;
+  t5?: string;
+}
+
+export interface RehearsalEvidencePackage {
+  evidencePath?: string;
+  manifestPath?: string;
+  configDiffPath?: string;
+  inventoryPath?: string;
+  eventsPath?: string;
+  logsPath?: string;
+  alertHistoryPath?: string;
+  kqlExportPath?: string;
+  recoveryCheckPath?: string;
+  summaryPath?: string;
+  artifactDirectory?: string;
+  attachmentChecksums: Record<string, string>;
+  redactionFindings: string[];
+  sensitivePatterns: string[];
+  complete: boolean;
+}
+
+export interface RehearsalRun {
+  scenarioName: RehearsalScenarioName;
+  phase: RehearsalPhase;
+  status: RehearsalStatus;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string;
+  interruptedAt?: string;
+  completedAt?: string;
+  prompt: string;
+  diagnosisSummary?: string;
+  timestamps: RehearsalTimestamps;
+  automatedScenarioDurationMs?: number;
+  humanTimingMs?: number;
+  sreAgentAssistedTimingMs?: number;
+  evidencePackage: RehearsalEvidencePackage;
+  customerReady: boolean;
+  gateStatus: RehearsalGateStatus;
+  runManifest: {
+    scenarioName: RehearsalScenarioName;
+    generatedAt: string;
+    phases: RehearsalPhase[];
+    evidencePaths: string[];
+  };
+  incidentHandoffId?: string;
+  notes?: string;
+}
+
+export interface RehearsalState {
+  runs: RehearsalRun[];
+  updatedAt: string;
+}
+
+export interface RehearsalReplayStep {
+  phase: RehearsalPhase;
+  status: RehearsalStatus;
+  gateStatus: RehearsalGateStatus;
+  timestamps: RehearsalTimestamps;
+  notes?: string;
+}
+
+export interface RehearsalReplayResponse {
+  scenarioName: RehearsalScenarioName;
+  generatedAt: string;
+  currentPhase: RehearsalPhase;
+  steps: RehearsalReplayStep[];
+}
+
+export interface CreateRehearsalRunRequest {
+  scenarioName: RehearsalScenarioName;
+  prompt?: string;
+  diagnosisSummary?: string;
+  dryRun?: boolean;
+}
+
+export interface AdvanceRehearsalRunRequest {
+  notes?: string;
+  dryRun?: boolean;
+}
+
+export interface UpdateRehearsalEvidenceRequest {
+  scenarioName: RehearsalScenarioName;
+  evidencePath?: string;
+  manifestPath?: string;
+  configDiffPath?: string;
+  inventoryPath?: string;
+  eventsPath?: string;
+  logsPath?: string;
+  alertHistoryPath?: string;
+  kqlExportPath?: string;
+  recoveryCheckPath?: string;
+  summaryPath?: string;
+  artifactDirectory?: string;
+  attachmentChecksums?: Record<string, string>;
+  redactionFindings?: string[];
+  sensitivePatterns?: string[];
+  complete?: boolean;
+  notes?: string;
+}
+
+export interface InterruptRehearsalRunRequest {
+  scenarioName: RehearsalScenarioName;
+  reason?: string;
+}
+
+export interface ResumeRehearsalRunRequest {
+  scenarioName: RehearsalScenarioName;
+}
