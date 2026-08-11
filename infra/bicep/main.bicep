@@ -35,7 +35,7 @@ param deployAlerts bool = true
 param deploySreAgent bool = true
 
 @description('Deploy default Action Group for alert notifications and incident routing')
-param deployActionGroup bool = false
+param deployActionGroup bool = true
 
 @description('Action Group short name (max 12 characters)')
 @maxLength(12)
@@ -321,6 +321,7 @@ output logAnalyticsWorkspaceId string = logAnalytics.outputs.workspaceId
 output appInsightsId string = appInsights.outputs.appInsightsId
 output appInsightsConnectionString string = appInsights.outputs.connectionString
 output keyVaultUri string = keyVault.outputs.vaultUri
+output grafanaName string = deployObservability ? observability!.outputs.grafanaName : ''
 output grafanaDashboardUrl string = deployObservability ? observability!.outputs.grafanaEndpoint : ''
 output azureMonitorWorkspaceId string = deployObservability ? observability!.outputs.azureMonitorWorkspaceId : ''
 output prometheusDataCollectionEndpointId string = deployObservability
@@ -334,6 +335,7 @@ output defaultActionGroupId string = deployActionGroup ? defaultActionGroup!.out
 output defaultActionGroupHasWebhook bool = deployActionGroup ? defaultActionGroup!.outputs.hasWebhookReceiver : false
 output podRestartAlertId string = deployAlerts ? alerts!.outputs.podRestartAlertId : ''
 output http5xxAlertId string = deployAlerts ? alerts!.outputs.http5xxAlertId : ''
+output dependencyFailureAlertId string = deployAlerts ? alerts!.outputs.dependencyFailureAlertId : ''
 output podFailureAlertId string = deployAlerts ? alerts!.outputs.podFailureAlertId : ''
 output crashLoopOomAlertId string = deployAlerts ? alerts!.outputs.crashLoopOomAlertId : ''
 output sreAgentId string = deploySreAgent ? sreAgent!.outputs.agentId : ''

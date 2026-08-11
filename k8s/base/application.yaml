@@ -62,6 +62,27 @@ stringData:
   rabbitmq-amqp-uri: "amqp://energy-grid-mq:energy-grid-mq-demo@rabbitmq:5672/"
 
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: energy-service-config
+  namespace: energy
+  labels:
+    app: energy-grid
+    sre-demo: breakable
+data:
+  RABBITMQ_QUEUE: meter-events
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: "5672"
+  MONGODB_URI: mongodb://mongodb:27017
+  MONGODB_DB: energydb
+  MONGODB_COLLECTION: meter_readings
+  SRE_NAMESPACE: energy
+  SRE_SCENARIO: baseline
+  SRE_COMPONENT: api
+  SRE_VERSION: "2026-04-25"
+  OTEL_SERVICE_NAME: ""
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -255,7 +276,7 @@ spec:
         nodepool-type: user
       containers:
         - name: asset-service
-          image: ghcr.io/azure-samples/aks-store-demo/product-service:latest
+          image: ghcr.io/johnstel/azure-sre-agent-energy-grid/asset-service:latest
           ports:
             - containerPort: 3002
           resources:
@@ -266,8 +287,42 @@ spec:
               memory: "128Mi"
               cpu: "100m"
           env:
-            - name: AI_SERVICE_URL
-              value: "http://forecast-service:5001/"
+            - name: PORT
+              value: "3002"
+            - name: SRE_SERVICE
+              value: asset-service
+            - name: SRE_NAMESPACE
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_NAMESPACE
+            - name: SRE_SCENARIO
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_SCENARIO
+            - name: SRE_COMPONENT
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_COMPONENT
+            - name: SRE_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_VERSION
+            - name: OTEL_SERVICE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: OTEL_SERVICE_NAME
+                  optional: true
+            - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry-credentials
+                  key: applicationinsights-connection-string
+                  optional: true
           livenessProbe:
             httpGet:
               path: /health
@@ -319,7 +374,7 @@ spec:
         nodepool-type: user
       containers:
         - name: meter-service
-          image: ghcr.io/azure-samples/aks-store-demo/order-service:latest
+          image: ghcr.io/johnstel/azure-sre-agent-energy-grid/meter-service:latest
           ports:
             - containerPort: 3000
           resources:
@@ -330,24 +385,69 @@ spec:
               memory: "256Mi"
               cpu: "200m"
           env:
-            - name: ORDER_QUEUE_HOSTNAME
-              value: "rabbitmq"
-            - name: ORDER_QUEUE_PORT
-              value: "5672"
-            - name: ORDER_QUEUE_USERNAME
+            - name: PORT
+              value: "3000"
+            - name: HOST
+              value: "0.0.0.0"
+            - name: RABBITMQ_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: RABBITMQ_HOST
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: RABBITMQ_PORT
+            - name: RABBITMQ_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: rabbitmq-credentials
                   key: rabbitmq-username
-            - name: ORDER_QUEUE_PASSWORD
+            - name: RABBITMQ_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: rabbitmq-credentials
                   key: rabbitmq-password
-            - name: ORDER_QUEUE_NAME
-              value: "meter-events"
-            - name: FASTIFY_ADDRESS
-              value: "0.0.0.0"
+            - name: RABBITMQ_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: RABBITMQ_QUEUE
+            - name: SRE_SERVICE
+              value: meter-service
+            - name: SRE_NAMESPACE
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_NAMESPACE
+            - name: SRE_SCENARIO
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_SCENARIO
+            - name: SRE_COMPONENT
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_COMPONENT
+            - name: SRE_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_VERSION
+            - name: OTEL_SERVICE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: OTEL_SERVICE_NAME
+                  optional: true
+            - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry-credentials
+                  key: applicationinsights-connection-string
+                  optional: true
           livenessProbe:
             httpGet:
               path: /health
@@ -399,7 +499,7 @@ spec:
         nodepool-type: user
       containers:
         - name: dispatch-service
-          image: ghcr.io/azure-samples/aks-store-demo/makeline-service:latest
+          image: ghcr.io/johnstel/azure-sre-agent-energy-grid/dispatch-service:latest
           ports:
             - containerPort: 3001
           resources:
@@ -410,29 +510,82 @@ spec:
               memory: "128Mi"
               cpu: "100m"
           env:
-            - name: ORDER_QUEUE_URI
+            - name: PORT
+              value: "3001"
+            - name: RABBITMQ_HOST
               valueFrom:
-                secretKeyRef:
-                  name: rabbitmq-credentials
-                  key: rabbitmq-amqp-uri
-            - name: ORDER_QUEUE_USERNAME
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: RABBITMQ_HOST
+            - name: RABBITMQ_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: RABBITMQ_PORT
+            - name: RABBITMQ_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: rabbitmq-credentials
                   key: rabbitmq-username
-            - name: ORDER_QUEUE_PASSWORD
+            - name: RABBITMQ_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: rabbitmq-credentials
                   key: rabbitmq-password
-            - name: ORDER_QUEUE_NAME
-              value: "meter-events"
-            - name: ORDER_DB_URI
-              value: "mongodb://mongodb:27017"
-            - name: ORDER_DB_NAME
-              value: "energydb"
-            - name: ORDER_DB_COLLECTION_NAME
-              value: "meter_readings"
+            - name: RABBITMQ_QUEUE
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: RABBITMQ_QUEUE
+            - name: MONGODB_URI
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: MONGODB_URI
+            - name: MONGODB_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: MONGODB_DB
+            - name: MONGODB_COLLECTION
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: MONGODB_COLLECTION
+            - name: SRE_SERVICE
+              value: dispatch-service
+            - name: SRE_NAMESPACE
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_NAMESPACE
+            - name: SRE_SCENARIO
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_SCENARIO
+            - name: SRE_COMPONENT
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_COMPONENT
+            - name: SRE_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: SRE_VERSION
+            - name: OTEL_SERVICE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: energy-service-config
+                  key: OTEL_SERVICE_NAME
+                  optional: true
+            - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry-credentials
+                  key: applicationinsights-connection-string
+                  optional: true
           livenessProbe:
             httpGet:
               path: /health
