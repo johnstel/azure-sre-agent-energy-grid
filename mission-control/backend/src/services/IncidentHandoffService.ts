@@ -1,6 +1,6 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export type IncidentHandoffStatus = 'open' | 'acknowledged' | 'resolved';
@@ -50,6 +50,8 @@ const DEFAULT_OPERATOR_GUIDANCE = [
   'Review the Grafana timeline and evidence before changing the environment.',
   'Operator confirmation is required before applying remediations.',
 ];
+
+let stateMutationQueue: Promise<void> = Promise.resolve();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -122,6 +124,33 @@ async function ensureStateFile(path: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
 }
 
+async function withIncidentMutationLock<T>(operation: () => Promise<T>): Promise<T> {
+  const previous = stateMutationQueue;
+  let release!: () => void;
+  stateMutationQueue = new Promise<void>(resolve => {
+    release = resolve;
+  });
+  await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+  }
+}
+
+async function writeIncidentStateAtomically(state: IncidentHandoffState): Promise<void> {
+  const statePath = getStatePath();
+  await ensureStateFile(statePath);
+  const tempPath = join(dirname(statePath), `${basename(statePath)}.${randomUUID()}.tmp`);
+  try {
+    await writeFile(tempPath, JSON.stringify({ ...state, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
+    await rename(tempPath, statePath);
+  } catch (error) {
+    await rm(tempPath, { force: true });
+    throw error;
+  }
+}
+
 export async function readIncidentState(): Promise<IncidentHandoffState> {
   const statePath = getStatePath();
   try {
@@ -143,9 +172,7 @@ export async function readIncidentState(): Promise<IncidentHandoffState> {
 }
 
 export async function writeIncidentState(state: IncidentHandoffState): Promise<void> {
-  const statePath = getStatePath();
-  await ensureStateFile(statePath);
-  await writeFile(statePath, JSON.stringify({ ...state, updatedAt: new Date().toISOString() }, null, 2), 'utf8');
+  await writeIncidentStateAtomically(state);
 }
 
 function mergeEvidence(existing: string[], incoming: string[]): string[] {
@@ -192,59 +219,61 @@ export function parseActionGroupWebhook(payload: unknown): IncidentHandoffCreate
 }
 
 export async function submitIncident(request: IncidentHandoffCreateRequest): Promise<IncidentHandoffMutationResult> {
-  const normalized = {
-    title: buildTitle(request),
-    summary: buildSummary(request),
-    severity: request.severity ?? 'unknown',
-    source: request.source ?? 'manual',
-    scenarioName: request.scenarioName?.trim(),
-    evidence: normalizeEvidence(request.evidence),
-    operatorGuidance: normalizeGuidance(request.operatorGuidance),
-    alertName: request.alertName?.trim(),
-    alertRule: request.alertRule?.trim(),
-    rawPayload: request.rawPayload,
-  };
+  return withIncidentMutationLock(async () => {
+    const normalized = {
+      title: buildTitle(request),
+      summary: buildSummary(request),
+      severity: request.severity ?? 'unknown',
+      source: request.source ?? 'manual',
+      scenarioName: request.scenarioName?.trim(),
+      evidence: normalizeEvidence(request.evidence),
+      operatorGuidance: normalizeGuidance(request.operatorGuidance),
+      alertName: request.alertName?.trim(),
+      alertRule: request.alertRule?.trim(),
+      rawPayload: request.rawPayload,
+    };
 
-  const state = await readIncidentState();
-  const key = buildKey(normalized);
-  const now = new Date().toISOString();
-  const existing = state.incidents.find(candidate => candidate.key === key && candidate.status !== 'resolved');
+    const state = await readIncidentState();
+    const key = buildKey(normalized);
+    const now = new Date().toISOString();
+    const existing = state.incidents.find(candidate => candidate.key === key && candidate.status !== 'resolved');
 
-  if (existing) {
-    existing.title = normalized.title;
-    existing.summary = normalized.summary;
-    existing.severity = normalized.severity;
-    existing.source = normalized.source;
-    existing.scenarioName = normalized.scenarioName;
-    existing.evidence = mergeEvidence(existing.evidence, normalized.evidence);
-    existing.operatorGuidance = mergeGuidance(existing.operatorGuidance, normalized.operatorGuidance);
-    existing.updatedAt = now;
-    existing.notes = [...(existing.notes ?? []), ...(normalized.evidence.length > 0 ? [`Updated from ${normalized.source}`] : [])].slice(-4);
+    if (existing) {
+      existing.title = normalized.title;
+      existing.summary = normalized.summary;
+      existing.severity = normalized.severity;
+      existing.source = normalized.source;
+      existing.scenarioName = normalized.scenarioName;
+      existing.evidence = mergeEvidence(existing.evidence, normalized.evidence);
+      existing.operatorGuidance = mergeGuidance(existing.operatorGuidance, normalized.operatorGuidance);
+      existing.updatedAt = now;
+      existing.notes = [...(existing.notes ?? []), ...(normalized.evidence.length > 0 ? [`Updated from ${normalized.source}`] : [])].slice(-4);
+      state.updatedAt = now;
+      await writeIncidentState(state);
+      return { incident: existing, deduped: true };
+    }
+
+    const incident: IncidentHandoff = {
+      id: randomUUID(),
+      key,
+      status: 'open',
+      title: normalized.title,
+      summary: normalized.summary,
+      severity: normalized.severity,
+      source: normalized.source,
+      scenarioName: normalized.scenarioName,
+      createdAt: now,
+      updatedAt: now,
+      evidence: normalized.evidence,
+      operatorGuidance: normalized.operatorGuidance,
+      notes: normalized.evidence.length > 0 ? [`Captured from ${normalized.source}`] : [],
+    };
+
+    state.incidents.push(incident);
     state.updatedAt = now;
     await writeIncidentState(state);
-    return { incident: existing, deduped: true };
-  }
-
-  const incident: IncidentHandoff = {
-    id: randomUUID(),
-    key,
-    status: 'open',
-    title: normalized.title,
-    summary: normalized.summary,
-    severity: normalized.severity,
-    source: normalized.source,
-    scenarioName: normalized.scenarioName,
-    createdAt: now,
-    updatedAt: now,
-    evidence: normalized.evidence,
-    operatorGuidance: normalized.operatorGuidance,
-    notes: normalized.evidence.length > 0 ? [`Captured from ${normalized.source}`] : [],
-  };
-
-  state.incidents.push(incident);
-  state.updatedAt = now;
-  await writeIncidentState(state);
-  return { incident, deduped: false };
+    return { incident, deduped: false };
+  });
 }
 
 export async function getIncidents(): Promise<IncidentHandoff[]> {
@@ -256,29 +285,35 @@ export async function getIncidents(): Promise<IncidentHandoff[]> {
 }
 
 export async function acknowledgeIncident(id: string): Promise<IncidentHandoff | undefined> {
-  const state = await readIncidentState();
-  const incident = state.incidents.find(candidate => candidate.id === id);
-  if (!incident) return undefined;
-  incident.status = 'acknowledged';
-  incident.updatedAt = new Date().toISOString();
-  state.updatedAt = incident.updatedAt;
-  await writeIncidentState(state);
-  return incident;
+  return withIncidentMutationLock(async () => {
+    const state = await readIncidentState();
+    const incident = state.incidents.find(candidate => candidate.id === id);
+    if (!incident) return undefined;
+    incident.status = 'acknowledged';
+    incident.updatedAt = new Date().toISOString();
+    state.updatedAt = incident.updatedAt;
+    await writeIncidentState(state);
+    return incident;
+  });
 }
 
 export async function resolveIncident(id: string): Promise<IncidentHandoff | undefined> {
-  const state = await readIncidentState();
-  const incident = state.incidents.find(candidate => candidate.id === id);
-  if (!incident) return undefined;
-  incident.status = 'resolved';
-  incident.updatedAt = new Date().toISOString();
-  state.updatedAt = incident.updatedAt;
-  await writeIncidentState(state);
-  return incident;
+  return withIncidentMutationLock(async () => {
+    const state = await readIncidentState();
+    const incident = state.incidents.find(candidate => candidate.id === id);
+    if (!incident) return undefined;
+    incident.status = 'resolved';
+    incident.updatedAt = new Date().toISOString();
+    state.updatedAt = incident.updatedAt;
+    await writeIncidentState(state);
+    return incident;
+  });
 }
 
 export async function resetIncidentState(): Promise<IncidentHandoffState> {
-  const initialState: IncidentHandoffState = { incidents: [], updatedAt: new Date().toISOString() };
-  await writeIncidentState(initialState);
-  return initialState;
+  return withIncidentMutationLock(async () => {
+    const initialState: IncidentHandoffState = { incidents: [], updatedAt: new Date().toISOString() };
+    await writeIncidentState(initialState);
+    return initialState;
+  });
 }
