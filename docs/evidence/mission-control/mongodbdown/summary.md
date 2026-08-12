@@ -14,7 +14,7 @@
 - Redaction findings: tenant-id
 
 ## Timing
-- T0: 2026-08-12T21:30:48.279Z
+- T0: 2026-08-11T16:49:03.738Z
 - T1: pending
 - T2: pending
 - T3: pending
