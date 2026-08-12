@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   advanceRehearsalRun,
+  attachRehearsalMitigationEvidence,
   createRehearsalRun,
   getRehearsalScenarioNames,
   getRehearsalState,
@@ -10,6 +11,8 @@ import {
   resumeRehearsalRun,
   updateRehearsalEvidence,
 } from '../services/RehearsalWorkflowService.js';
+import { getReviewModeMitigationService } from './mitigation.js';
+import { normalizeMitigationRequest, ReviewModeMitigationRequestError } from '../services/ReviewModeMitigationService.js';
 import type {
   AdvanceRehearsalRunRequest,
   CreateRehearsalRunRequest,
@@ -47,6 +50,22 @@ export function registerRehearsalRoutes(app: FastifyInstance): void {
       return reply.send({ run });
     } catch (error) {
       return reply.status(400).send({ error: getErrorMessage(error) });
+    }
+  });
+
+  // Captures Review-mode mitigation evidence onto a rehearsal run (issue #80).
+  // The body may only carry OBSERVED correlation identifiers: the evidence itself is re-derived
+  // here from audit telemetry, so a caller can never write a fabricated approval or recovery into
+  // the rehearsal package.
+  app.post<{ Params: { scenarioName: string }; Body: unknown }>('/api/rehearsals/:scenarioName/mitigation-evidence', async (req, reply) => {
+    try {
+      const request = normalizeMitigationRequest(req.body ?? {});
+      const derived = await getReviewModeMitigationService().getMitigationEvidence(request);
+      const run = await attachRehearsalMitigationEvidence(req.params.scenarioName as never, derived.evidence);
+      return reply.send({ run, guardrails: derived.guardrails, evidenceSources: derived.evidenceSources });
+    } catch (error) {
+      const status = error instanceof ReviewModeMitigationRequestError ? error.statusCode : 400;
+      return reply.status(status).send({ error: getErrorMessage(error) });
     }
   });
 

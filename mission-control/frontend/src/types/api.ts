@@ -667,6 +667,9 @@ export interface RehearsalRun {
   };
   incidentHandoffId?: string;
   notes?: string;
+  // Issue #80: re-derived from observed audit telemetry at attach time, never caller-asserted.
+  mitigationEvidence?: ReviewModeMitigationEvidence;
+  mitigationEvidenceCapturedAt?: string;
 }
 
 export interface RehearsalReplayStep {
@@ -884,4 +887,152 @@ export interface SreAgentActiveThreadRecord {
   updatedAt: string;
   lastStatus: SreAgentInvestigationStatus;
   correlationId: string;
+}
+
+// ---------------------------------------------------------------------------
+// Review-mode mitigation lifecycle (issue #80)
+//
+// This union MUST stay in lock-step with `ReviewModeMitigationState` in
+// mission-control/backend/src/services/sre-agent/mitigationLifecycle.ts.
+// `mission-control/frontend/src/utils/reviewModeMitigation.test.ts` fails the build if the two
+// drift apart, so an unhandled backend state can never fall through to a silent default label.
+// ---------------------------------------------------------------------------
+
+export type ReviewModeMitigationState =
+  | 'no-evidence'
+  | 'blocked-run-mode'
+  | 'ambiguous'
+  | 'proposed'
+  | 'denied'
+  | 'denied-with-unverified-state'
+  | 'deny-violation'
+  | 'approved'
+  | 'executing'
+  | 'execution-blocked'
+  | 'execution-failed'
+  | 'verification-passed'
+  | 'verification-failed'
+  | 'rolled-back';
+
+export type MitigationRunMode = 'review' | 'autonomous' | 'unknown';
+export type MitigationApprovalOutcome = 'approved' | 'rejected' | 'unknown';
+export type MitigationMutationState = 'unchanged' | 'applied' | 'unknown';
+export type VerificationProbeName = 'kubernetes-readiness' | 'service-endpoint-health' | 'golden-transaction';
+export type VerificationProbeStatus = 'pass' | 'fail' | 'no-data' | 'stale' | 'error';
+
+export interface VerificationProbeEvidence {
+  probe: VerificationProbeName;
+  status: VerificationProbeStatus;
+  source: string;
+  observedValue: string;
+  observedAt?: string;
+  freshnessSeconds?: number;
+  threshold?: string;
+  evidencePointer: string;
+  correlationId?: string;
+  detail?: string;
+}
+
+export interface ResourceStateObservation {
+  source: string;
+  resource: string;
+  observedAt: string;
+  specReplicas?: number;
+  readyReplicas?: number;
+  observedGeneration?: number;
+  evidencePointer: string;
+}
+
+export interface MitigationApprovalEvidence {
+  outcome: MitigationApprovalOutcome;
+  observedAt: string;
+  outcomeSource?: string;
+  threadId?: string;
+  correlationId?: string;
+  incidentId?: string;
+  traceId?: string;
+  freshnessSeconds: number;
+  stale: boolean;
+}
+
+export interface MitigationExecutionEvidence {
+  toolName: string;
+  command?: string;
+  startedAt?: string;
+  completedAt?: string;
+  callId?: string;
+  threadId?: string;
+  correlationId?: string;
+  traceId?: string;
+  allowlisted: boolean;
+  blocked: boolean;
+  failed: boolean;
+  azCliCorrelated: boolean;
+  freshnessSeconds: number;
+  stale: boolean;
+}
+
+export interface MitigationResourceStateEvidence {
+  before?: ResourceStateObservation;
+  after?: ResourceStateObservation;
+  mutation: MitigationMutationState;
+  reason: string;
+}
+
+export interface MitigationVerificationEvidence {
+  probes: VerificationProbeEvidence[];
+  missingProbes: VerificationProbeName[];
+  allProbesPassed: boolean;
+  earliestProbeAt?: string;
+  postDatesExecution: boolean;
+}
+
+export interface MitigationGuidance {
+  rollbackCommand?: string;
+  rollbackRationale?: string;
+  escalation?: string;
+}
+
+export interface ReviewModeMitigationEvidence {
+  state: ReviewModeMitigationState;
+  incidentResolved: boolean;
+  effectiveRunMode: MitigationRunMode;
+  runModeBlocked: boolean;
+  scenario: 'MongoDBDown';
+  targetResource: string;
+  proposedCommand: string;
+  correlation: {
+    threadId?: string;
+    correlationId?: string;
+    incidentId?: string;
+    traceId?: string;
+  };
+  approval?: MitigationApprovalEvidence;
+  execution?: MitigationExecutionEvidence;
+  resourceState?: MitigationResourceStateEvidence;
+  verification: MitigationVerificationEvidence;
+  guidance: MitigationGuidance;
+  observedAt?: string;
+  stale: boolean;
+  schemaMismatch: boolean;
+  securityFindings: string[];
+  rejectedEvidence: string[];
+  limitations: string[];
+}
+
+export interface ReviewModeMitigationGuardrails {
+  policyDocument: string;
+  allowlistedCommands: string[];
+  rollbackCommand: string;
+  targetResource: string;
+  disclosures: string[];
+  references: string[];
+}
+
+export interface ReviewModeMitigationResponse {
+  scenario: 'MongoDBDown';
+  evidence: ReviewModeMitigationEvidence;
+  guardrails: ReviewModeMitigationGuardrails;
+  evidenceSources: string[];
+  collectedAt: string;
 }

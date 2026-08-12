@@ -233,6 +233,11 @@
 
       <aside class="ops-panel" aria-label="Active incidents and pod board">
         <CustomerImpactPanel :impact="customerImpact" :error="customerImpactError" />
+        <ReviewModeMitigationPanel
+          :evidence="mitigationEvidence"
+          :guardrails="mitigationGuardrails"
+          :error="mitigationError"
+        />
         <section class="wallboard-card incident-handoff-card">
         <div class="wallboard-panel__heading">
           <div>
@@ -538,12 +543,15 @@ import SreAgentPanel from './SreAgentPanel.vue';
 import ScenarioNarrationPanel from './ScenarioNarrationPanel.vue';
 import Terminal from './Terminal.vue';
 import CustomerImpactPanel from './CustomerImpactPanel.vue';
+import ReviewModeMitigationPanel from './ReviewModeMitigationPanel.vue';
 import type {
   Deployment,
   AssistantAskResponse,
   AssistantClientContext,
   AssistantConversationMessage,
   CustomerImpactResponse,
+  ReviewModeMitigationEvidence,
+  ReviewModeMitigationGuardrails,
   IncidentHandoff,
   InventoryItem,
   InventorySeverity,
@@ -588,6 +596,7 @@ const {
   fixAll,
   getDeployments,
   getCustomerImpact,
+  getMitigationEvidence,
   getEvents,
   getIncidentHandoffs,
   getInventory,
@@ -612,6 +621,9 @@ const preflightChecks = ref<PreflightCheck[]>([]);
 const incidentHandoffs = ref<IncidentHandoff[]>([]);
 const customerImpact = ref<CustomerImpactResponse>();
 const customerImpactError = ref('');
+const mitigationEvidence = ref<ReviewModeMitigationEvidence>();
+const mitigationGuardrails = ref<ReviewModeMitigationGuardrails>();
+const mitigationError = ref('');
 
 const inventoryLoading = ref(false);
 const inventoryError = ref('');
@@ -772,6 +784,7 @@ const analystTranscriptStatus = computed(() => {
 async function refreshAll() {
   inventoryLoading.value = true;
   await Promise.all([loadInventory(), loadRuntime(), loadScenarios(), loadIncidentHandoffs(), loadCustomerImpact()]);
+  await loadMitigationEvidence();
   inventoryLoading.value = false;
 }
 
@@ -832,6 +845,24 @@ async function loadCustomerImpact() {
   } catch (error) {
     customerImpact.value = undefined;
     customerImpactError.value = `Customer-impact API unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+async function loadMitigationEvidence() {
+  mitigationError.value = '';
+  // Correlate with the newest observed native thread/incident, if Mission Control has one.
+  // Never invent an identifier: with none, the backend reports `ambiguous` rather than guessing.
+  const correlated = incidentHandoffs.value.find(incident => incident.nativeEvidence?.threadId || incident.nativeEvidence?.incidentId);
+  try {
+    const response = await getMitigationEvidence({
+      threadId: correlated?.nativeEvidence?.threadId,
+      incidentId: correlated?.nativeEvidence?.incidentId,
+    });
+    mitigationEvidence.value = response.evidence;
+    mitigationGuardrails.value = response.guardrails;
+  } catch (error) {
+    mitigationEvidence.value = undefined;
+    mitigationError.value = `Mitigation evidence API unavailable: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
 

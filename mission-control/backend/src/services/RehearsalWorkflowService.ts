@@ -5,6 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { fileURLToPath } from 'node:url';
 import { submitIncident } from './IncidentHandoffService.js';
 import type {
+  ReviewModeMitigationEvidence,
   AdvanceRehearsalRunRequest,
   CreateRehearsalRunRequest,
   InterruptRehearsalRunRequest,
@@ -791,6 +792,42 @@ export async function updateRehearsalEvidence(request: UpdateRehearsalEvidenceRe
     run.notes = request.notes ?? run.notes;
     run.updatedAt = new Date().toISOString();
     await persistEvidenceArtifacts(run);
+    run.gateStatus = calculateGateStatus(run);
+    run.customerReady = run.gateStatus === 'PASS';
+    run.runManifest = buildRunManifest(run);
+    await saveState(state);
+    return run;
+  });
+}
+
+/**
+ * Persists Review-mode mitigation evidence onto a rehearsal run (issue #80).
+ *
+ * The caller MUST pass evidence that was derived from observed telemetry by
+ * ReviewModeMitigationService. This function refuses to persist evidence that claims an unproven
+ * recovery, so a rehearsal package can never contain a fabricated `verification-passed`.
+ */
+export async function attachRehearsalMitigationEvidence(
+  scenarioName: RehearsalScenarioName,
+  evidence: ReviewModeMitigationEvidence,
+): Promise<RehearsalRun> {
+  if (evidence.incidentResolved && evidence.state !== 'verification-passed') {
+    throw new Error('Refusing to persist mitigation evidence that reports a resolved incident without a verification-passed state.');
+  }
+  if (evidence.state === 'verification-passed' && !evidence.verification.allProbesPassed) {
+    throw new Error('Refusing to persist verification-passed evidence whose probes did not all pass.');
+  }
+
+  return withRehearsalMutationLock(async () => {
+    const state = await readState();
+    const normalized = normalizeScenarioName(scenarioName);
+    const run = state.runs.find((candidate: RehearsalRun) => candidate.scenarioName === normalized);
+    if (!run) {
+      throw new Error(`Rehearsal run not found: ${normalized}`);
+    }
+    run.mitigationEvidence = evidence;
+    run.mitigationEvidenceCapturedAt = new Date().toISOString();
+    run.updatedAt = run.mitigationEvidenceCapturedAt;
     run.gateStatus = calculateGateStatus(run);
     run.customerReady = run.gateStatus === 'PASS';
     run.runManifest = buildRunManifest(run);

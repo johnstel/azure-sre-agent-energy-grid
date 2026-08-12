@@ -9,7 +9,10 @@
  */
 
 /** Ordered so that broader patterns cannot mask narrower, higher-value ones. */
-const REDACTION_RULES: ReadonlyArray<{ pattern: RegExp; replacement: string }> = Object.freeze([
+const REDACTION_RULES: ReadonlyArray<{
+  pattern: RegExp;
+  replacement: string | ((substring: string, ...args: string[]) => string);
+}> = Object.freeze([
   // Bearer / auth headers
   { pattern: /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/gi, replacement: '$1 [REDACTED]' },
   // JWTs anywhere in free text
@@ -19,6 +22,19 @@ const REDACTION_RULES: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
     pattern:
       /\b(password|passwd|pwd|token|access[_-]?token|id[_-]?token|refresh[_-]?token|secret|client[_-]?secret|api[_-]?key|apikey|subscription[_-]?key|sas[_-]?token|authorization|connectionstring)(\s*[:=]\s*)(["']?)[^\s"',;}]+/gi,
     replacement: '$1$2$3[REDACTED]',
+  },
+  // Space-separated CLI secret flags, e.g. `az login --password hunter2` or `--client-secret abc`.
+  // The key=value rule above cannot see these because there is no `:` or `=` separator, and agent
+  // telemetry (AgentAzCliExecution / AgentToolExecution ToolInput) carries exactly this shape.
+  // A quoted value is consumed to its matching closing quote, so a secret containing spaces
+  // (`--password "Winter 2026 Grid!"`) is redacted whole rather than only up to the first space.
+  {
+    pattern:
+      /(--?(?:password|passwd|pwd|token|access[_-]?token|id[_-]?token|refresh[_-]?token|secret|client[_-]?secret|api[_-]?key|apikey|subscription[_-]?key|sas[_-]?token|account[_-]?key|admin[_-]?password|certificate[_-]?password|connection[_-]?string)\b)(\s+)("[^"]*"|'[^']*'|[^\s"']+)/gi,
+    replacement: (_match: string, flag: string, gap: string, value: string) => {
+      const quote = value.startsWith('"') ? '"' : value.startsWith("'") ? "'" : '';
+      return `${flag}${gap}${quote}[REDACTED]${quote}`;
+    },
   },
   // Storage / service connection string fragments
   { pattern: /\b(AccountKey|SharedAccessSignature|SharedAccessKey)=[^;\s"']+/gi, replacement: '$1=[REDACTED]' },
@@ -35,7 +51,9 @@ const REDACTION_RULES: ReadonlyArray<{ pattern: RegExp; replacement: string }> =
 export function redactSensitiveText(value: string): string {
   let output = value;
   for (const { pattern, replacement } of REDACTION_RULES) {
-    output = output.replace(pattern, replacement);
+    output = typeof replacement === 'string'
+      ? output.replace(pattern, replacement)
+      : output.replace(pattern, replacement);
   }
   return output;
 }

@@ -23,6 +23,7 @@ azureconfig.json
 # Compiled ARM templates (can regenerate from Bicep)
 *.json
 !infra/grafana/energy-grid-incident-dashboard.json
+!infra/sre-agent/tool-access-policy.json
 !package.json
 !devcontainer.json
 !launch.json

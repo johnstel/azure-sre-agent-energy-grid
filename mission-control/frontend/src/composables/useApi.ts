@@ -5,6 +5,7 @@ import type {
   AssistantClientContext,
   AssistantConversationMessage,
   CustomerImpactResponse,
+  ReviewModeMitigationResponse,
   CreateRehearsalRunRequest,
   Deployment,
   DestroyParams,
@@ -96,6 +97,15 @@ export function useApi() {
   return {
     getHealth: () => api<{ status: string }>('/api/health'),
     getCustomerImpact: () => api<CustomerImpactResponse>('/api/customer-impact'),
+    // Read-only. Mission Control observes the Review-mode mitigation lifecycle; it never approves.
+    getMitigationEvidence: (params: { threadId?: string; incidentId?: string; correlationId?: string; traceId?: string } = {}) => {
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        if (value) query.set(key, value);
+      }
+      const suffix = query.toString();
+      return api<ReviewModeMitigationResponse>(`/api/mitigation/evidence${suffix ? `?${suffix}` : ''}`);
+    },
     getPreflight: () => api<{ checks: PreflightCheck[] }>('/api/preflight'),
     getPods: () => api<{ pods: Pod[] }>('/api/pods'),
     getServices: () => api<{ services: Service[] }>('/api/services'),
