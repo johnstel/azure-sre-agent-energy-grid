@@ -17,7 +17,13 @@
 //   cooldown window (default 3h, https://learn.microsoft.com/azure/sre-agent/response-plan). The
 //   real merge decision is made by Azure SRE Agent itself; Mission Control does not claim to
 //   control or guarantee it.
-import type { NativeApprovalDecisionState, NativeIncidentEvidence, NativeIncidentEvidenceState } from '../types/index.js';
+import type {
+  NativeApprovalDecisionState,
+  NativeIncidentEvidence,
+  NativeIncidentEvidenceState,
+  ReviewModeMitigationState,
+  ReviewModeVerificationSignal,
+} from '../types/index.js';
 
 export const DEFAULT_REINVESTIGATION_COOLDOWN_HOURS = 3; // Documented Azure Monitor response-plan default.
 export const DEFAULT_STALE_MINUTES = 30;
@@ -55,6 +61,8 @@ export interface ReconcileNativeEvidenceOptions {
   strongCorrelation?: boolean;
   /** Raw ApprovalDecision rows correlated to the same thread/incident, if queried. */
   approvalRows?: Record<string, unknown>[];
+  /** Review-mode mitigation state captured by Mission Control or an upstream workflow. */
+  reviewModeMitigation?: ReviewModeMitigationState;
 }
 
 function toBoolean(value: unknown): boolean {
@@ -176,6 +184,55 @@ function resolveApprovalDecision(approvalRows: Record<string, unknown>[] | undef
   return 'unknown';
 }
 
+function normalizeReviewModeMitigation(
+  mitigation: ReviewModeMitigationState | undefined,
+  verification: ReviewModeVerificationSignal | undefined,
+  correlationReady: boolean,
+): ReviewModeMitigationState | undefined {
+  if (!mitigation) return undefined;
+
+  const normalized: ReviewModeMitigationState = {
+    ...mitigation,
+    observedAt: mitigation.observedAt ?? new Date().toISOString(),
+    verification: mitigation.verification ?? verification,
+  };
+
+  if (normalized.stage === 'denied') {
+    normalized.stateMutation = 'unchanged';
+    normalized.liveProofStatus = 'blocked';
+    return normalized;
+  }
+
+  if (
+    (normalized.stage === 'approved' || normalized.stage === 'executing' || normalized.stage === 'verification-passed' || normalized.stage === 'verification-failed' || normalized.stage === 'rollback' || normalized.stage === 'escalation') &&
+    !correlationReady
+  ) {
+    normalized.stage = 'unknown';
+    normalized.reason = normalized.reason ?? 'Review-mode execution states require a real correlationId/threadId; Mission Control keeps the lifecycle unknown instead of fabricating a match.';
+    normalized.stateMutation = normalized.stateMutation === 'applied' ? 'unknown' : normalized.stateMutation;
+    normalized.liveProofStatus = 'blocked';
+    return normalized;
+  }
+
+  if (normalized.stage === 'verification-passed' || normalized.stage === 'verification-failed') {
+    const verificationSignals = normalized.verification ?? verification;
+    if (!verificationSignals || !verificationSignals.kubernetesHealthy || !verificationSignals.functionalSignalObserved) {
+      normalized.stage = 'verification-failed';
+      normalized.reason = normalized.reason ?? 'Verification requires both Kubernetes health and a scenario-relevant functional signal.';
+      normalized.liveProofStatus = 'blocked';
+      normalized.stateMutation = normalized.stateMutation === 'applied' ? 'unknown' : normalized.stateMutation;
+      return normalized;
+    }
+  }
+
+  if (normalized.stage === 'stale') {
+    normalized.liveProofStatus = 'blocked';
+    normalized.stateMutation = normalized.stateMutation === 'applied' ? 'unknown' : normalized.stateMutation;
+  }
+
+  return normalized;
+}
+
 /**
  * Reconciles the freshest matching native evidence into a typed, honest Mission Control state.
  * `rawRows` should already be correlated (via SreAgentEvidenceService threadId/incidentId/
@@ -270,8 +327,17 @@ export function reconcileNativeIncidentEvidence(
 
   const approvalDecision = resolveApprovalDecision(options.approvalRows);
 
+  const correlationReady = strongCorrelation || Boolean(latest.threadId || latest.correlationId);
+  const reviewModeMitigation = normalizeReviewModeMitigation(
+    options.reviewModeMitigation,
+    undefined,
+    correlationReady,
+  );
+
   let state: NativeIncidentEvidenceState;
-  if (latest.incidentMitigatedByAgent) {
+  if (reviewModeMitigation) {
+    state = reviewModeMitigation.stage as NativeIncidentEvidenceState;
+  } else if (latest.incidentMitigatedByAgent) {
     state = 'native-mitigated';
   } else if ((latest.agentAutonomyLevel ?? '').toLowerCase() === 'review' && approvalDecision === 'pending') {
     state = 'native-approval-required';
@@ -292,6 +358,9 @@ export function reconcileNativeIncidentEvidence(
     limitations.push('No ApprovalDecision event was correlated; approval state is inferred only from AgentAutonomyLevel and IncidentMitigatedByAgent, not from a confirmed approval/rejection record.');
   } else {
     limitations.push('An ApprovalDecision event was observed, but its specific outcome fields are SCHEMA_TBD (docs/CAPABILITY-CONTRACTS.md SS8); only its presence is used here.');
+  }
+  if (reviewModeMitigation) {
+    limitations.push(`Review-mode mitigation state is ${reviewModeMitigation.stage} with live-proof status ${reviewModeMitigation.liveProofStatus}.`);
   }
   limitations.push('withinCooldown is a client-side estimate of the documented reinvestigation cooldown window, not a value read from the response plan itself.');
 
@@ -315,6 +384,7 @@ export function reconcileNativeIncidentEvidence(
     handledOn: latest.incidentHandledOn,
     mitigatedOn: latest.incidentMitigatedOn,
     approvalDecision,
+    reviewModeMitigation,
     cooldownHours,
     withinCooldown,
     limitations,

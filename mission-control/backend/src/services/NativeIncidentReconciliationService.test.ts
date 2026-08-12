@@ -107,6 +107,58 @@ test('an observed ApprovalDecision event moves autonomy-review incidents out of 
   assert.equal(evidence.approvalDecision, 'unknown');
 });
 
+test('review-mode denied mitigation is surfaced as a deny state with no mutation', () => {
+  const evidence = reconcileNativeIncidentEvidence([snapshotRow()], {
+    hasLocalFallback: true,
+    now: new Date('2026-01-01T00:02:00Z'),
+    reviewModeMitigation: {
+      stage: 'denied',
+      stateMutation: 'unchanged',
+      liveProofStatus: 'blocked',
+      reason: 'Operator denied the proposed action before execution.',
+    },
+  });
+
+  assert.equal(evidence.state, 'denied');
+  assert.equal(evidence.reviewModeMitigation?.stateMutation, 'unchanged');
+  assert.equal(evidence.reviewModeMitigation?.liveProofStatus, 'blocked');
+});
+
+test('review-mode approval stages without real correlation remain unknown instead of being fabricated', () => {
+  const evidence = reconcileNativeIncidentEvidence([snapshotRow({ ThreadId: undefined, CorrelationId: undefined })], {
+    hasLocalFallback: true,
+    now: new Date('2026-01-01T00:02:00Z'),
+    reviewModeMitigation: {
+      stage: 'approved',
+      stateMutation: 'applied',
+      liveProofStatus: 'pending',
+      reason: 'Approval is pending a correlated execution event.',
+    },
+  });
+
+  assert.equal(evidence.state, 'unknown');
+  assert.equal(evidence.reviewModeMitigation?.liveProofStatus, 'blocked');
+});
+
+test('verification requires both Kubernetes health and a functional signal', () => {
+  const evidence = reconcileNativeIncidentEvidence([snapshotRow()], {
+    hasLocalFallback: true,
+    now: new Date('2026-01-01T00:02:00Z'),
+    reviewModeMitigation: {
+      stage: 'verification-passed',
+      stateMutation: 'applied',
+      liveProofStatus: 'pending',
+      verification: {
+        kubernetesHealthy: false,
+        functionalSignalObserved: true,
+      },
+    },
+  });
+
+  assert.equal(evidence.state, 'verification-failed');
+  assert.equal(evidence.reviewModeMitigation?.liveProofStatus, 'blocked');
+});
+
 test('mitigated incidents report native-mitigated regardless of autonomy level', () => {
   const evidence = reconcileNativeIncidentEvidence(
     [snapshotRow({ IncidentMitigatedByAgent: 'True', IncidentMitigatedOn: '2026-01-01T00:10:00Z' })],

@@ -384,9 +384,67 @@ export type NativeIncidentEvidenceState =
   | 'native-observed'
   | 'native-approval-required'
   | 'native-mitigated'
+  | 'proposed'
+  | 'denied'
+  | 'approved'
+  | 'executing'
+  | 'verification-passed'
+  | 'verification-failed'
+  | 'rollback'
+  | 'escalation'
+  | 'unknown'
+  | 'stale'
   | 'evidence-unavailable';
 
 export type NativeApprovalDecisionState = 'approved' | 'rejected' | 'pending' | 'unknown';
+
+export type ReviewModeMitigationLifecycleStage =
+  | 'proposed'
+  | 'denied'
+  | 'approved'
+  | 'executing'
+  | 'verification-passed'
+  | 'verification-failed'
+  | 'rollback'
+  | 'escalation'
+  | 'unknown'
+  | 'stale';
+
+export interface ReviewModeVerificationSignal {
+  kubernetesHealthy: boolean;
+  functionalSignalObserved: boolean;
+  signal?: string;
+}
+
+export interface ReviewModeActionDesign {
+  scenarioName: RehearsalScenarioName;
+  operation: string;
+  preconditions: string[];
+  risk: string;
+  affectedScope: string;
+  leastPrivilege: string;
+  allowlist: string[];
+  policyHook: string;
+  timeoutSeconds: number;
+  rollback: string;
+  verification: ReviewModeVerificationSignal & {
+    requiredSignals: string[];
+  };
+  approvalMode: 'review';
+  notes?: string;
+}
+
+export interface ReviewModeMitigationState {
+  stage: ReviewModeMitigationLifecycleStage;
+  observedAt?: string;
+  correlationId?: string;
+  threadId?: string;
+  stateMutation: 'unchanged' | 'applied' | 'not-applicable' | 'unknown';
+  reason?: string;
+  verification?: ReviewModeVerificationSignal;
+  actionDesign?: ReviewModeActionDesign;
+  liveProofStatus: 'pending' | 'verified' | 'blocked';
+}
 
 // Reconciled, honest evidence for a single incident. `state` MUST default to
 // 'evidence-unavailable' when no observed telemetry exists -- never infer health from absence.
@@ -410,6 +468,7 @@ export interface NativeIncidentEvidence {
   handledOn?: string;
   mitigatedOn?: string;
   approvalDecision?: NativeApprovalDecisionState;
+  reviewModeMitigation?: ReviewModeMitigationState;
   cooldownHours: number;
   withinCooldown: boolean;
   limitations: string[];
@@ -737,6 +796,7 @@ export interface RehearsalEvidencePackage {
   attachmentChecksums: RehearsalAttachmentChecksum[];
   redactionFindings: string[];
   sensitivePatterns: string[];
+  reviewModeMitigation?: ReviewModeMitigationState;
   complete: boolean;
 }
 
@@ -816,6 +876,7 @@ export interface UpdateRehearsalEvidenceRequest {
   attachmentChecksums?: RehearsalAttachmentChecksum[];
   redactionFindings?: string[];
   sensitivePatterns?: string[];
+  reviewModeMitigation?: ReviewModeMitigationState;
   complete?: boolean;
   notes?: string;
 }
