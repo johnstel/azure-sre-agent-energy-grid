@@ -185,11 +185,13 @@ SRE Agent investigation thread without a presenter composing a prompt, while the
 Group → Mission Control webhook keeps working as a fallback.
 
 1. **Bicep (default, automated)**: `infra/bicep/main.bicepparam` sets `sreAgentIncidentPlatform =
-   'AzureMonitor'` by default. When `deploySreAgent = true`, `scripts/deploy.ps1` sets the
-   documented `Microsoft.App/agents` ARM property `properties.incidentManagementConfiguration.type
-   = 'AzureMonitor'` and grants the agent's managed identity **Monitoring Contributor** on the
-   resource group (required for the agent to see Azure Monitor alerts:
-   https://learn.microsoft.com/azure/sre-agent/azure-monitor-alerts). Set
+   'AzureMonitor'` by default (this repo's own selector name). When `deploySreAgent = true`,
+   `scripts/deploy.ps1` sets the documented `Microsoft.App/agents` ARM property
+   `properties.incidentManagementConfiguration.type = 'AzMonitor'` (the literal Azure Monitor value
+   documented in the [Azure SRE Agent API reference](https://learn.microsoft.com/azure/sre-agent/api-reference#agent-properties):
+   `PagerDuty`, `AzMonitor`, `ServiceNow`, or `None`) and grants the agent's managed identity
+   **Monitoring Contributor** on the resource group (required for the agent to see Azure Monitor
+   alerts: https://learn.microsoft.com/azure/sre-agent/azure-monitor-alerts). Set
    `sreAgentIncidentPlatform = 'None'` to opt out.
 
    > ⚠️ **Immediately after connecting**: Microsoft Learn documents that connecting an incident

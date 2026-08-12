@@ -60,18 +60,34 @@ properties.incidentManagementConfiguration: {
 This property was already referenced (as unused/empty) in this repo's `docs/SRE-AGENT-API-RESEARCH.md`
 line 47 ("`incidentManagementConfiguration`... Useful for provisioning/configuration research
 only"). This spike confirms it is a real, documented, stable ARM property and wires it:
-`infra/bicep/modules/sre-agent.bicep` now sets `incidentManagementConfiguration.type = 'AzureMonitor'`
-when `incidentPlatform = 'AzureMonitor'` (the new default). Azure Monitor does not need
-`connectionKey`/`connectionUrl` (unlike the PagerDuty/ServiceNow connectors documented for the
-Azure MCP Server, which do carry credentials) because it authenticates through the agent's own
-managed identity — consistent with the Azure Monitor alerts doc: "It uses the same managed
-identity you already scoped for the agent."
+`infra/bicep/modules/sre-agent.bicep` now sets `incidentManagementConfiguration.type = 'AzMonitor'`
+when `incidentPlatform = 'AzureMonitor'` (this repo's own selector param; the new default). Azure
+Monitor does not need `connectionKey`/`connectionUrl` (unlike the PagerDuty/ServiceNow connectors
+documented for the Azure MCP Server, which do carry credentials) because it authenticates through
+the agent's own managed identity — consistent with the Azure Monitor alerts doc: "It uses the same
+managed identity you already scoped for the agent."
 
-**Confidence**: Medium-high. The ARM property and its shape are documented first-party. The exact
-literal expected in `type` is not enumerated by Microsoft Learn (it documents the field as a bare
-`string`), so `sre-agent.bicep` exposes it as an overridable parameter
-(`incidentManagementConfigurationType`, default `'AzureMonitor'`) and the setup script reads the
-value back from the deployed resource so a mismatch is visible rather than silently assumed.
+**Confidence**: High. The generic ARM template reference for `Microsoft.App/agents@2026-01-01`
+documents `type` only as a bare `string` with no enumerated values. However, the dedicated
+[API reference for Azure SRE Agent](https://learn.microsoft.com/azure/sre-agent/api-reference#agent-properties)
+page — a more specific, product-level (not auto-generated ARM-schema-only) reference — explicitly
+enumerates the accepted literals:
+
+> `incidentManagementConfiguration.type` | string | `PagerDuty`, `AzMonitor`, `ServiceNow`, or `None`
+
+Azure Monitor's literal is **`AzMonitor`**, not `AzureMonitor`. An earlier version of this spike and
+the corresponding Bicep/script defaults incorrectly used `AzureMonitor` before this was caught by
+independent review and corrected. Because ARM does not enforce an allowed-values constraint on this
+free-form string property, a wrong literal would not fail deployment — it would deploy successfully
+while the SRE Agent backend silently ignored the unrecognized incident-platform type, which is why
+this repo now also has automated static/regression checks (see `scripts/validate-alert-queries.ps1`-style
+static checks referenced from the test suite) asserting the emitted value is `AzMonitor`.
+
+Note also a page-level discrepancy: the `api-reference` page pins control-plane API version
+`2025-05-01-preview`, while this repo's Bicep pins `Microsoft.App/agents@2026-01-01`. The
+`incidentManagementConfiguration.type` enum is a stable product concept (which external incident
+platform is connected) rather than a schema-version-specific detail, so this spike treats the enum
+values as applicable across both API versions, but flags the version mismatch here for visibility.
 
 ### 2. Required RBAC
 
@@ -236,4 +252,5 @@ close" list — none of these are claimed here):
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
+| 2026-08-12 | 0.2 | Corrected `incidentManagementConfiguration.type` literal to documented `AzMonitor` per the Azure SRE Agent API reference (was incorrectly `AzureMonitor`); corrected the "not enumerated" confidence claim | Copilot draft for review |
 | 2026-08-12 | 0.1 | Initial capability spike and implementation record for issue #76 | Copilot draft for review |

@@ -80,9 +80,10 @@
 
 .PARAMETER ExpectedIncidentPlatformType
     Expected value of `incidentManagementConfiguration.type` once connected. Must match the
-    `incidentManagementConfigurationType` Bicep parameter (default 'AzureMonitor'). Kept as a
-    parameter because Microsoft Learn documents this ARM field as a free-form string without
-    enumerating the exact literal.
+    `incidentManagementConfigurationType` Bicep parameter (default 'AzMonitor'). The Azure SRE
+    Agent API reference (https://learn.microsoft.com/azure/sre-agent/api-reference#agent-properties)
+    documents this as an enum: PagerDuty, AzMonitor, ServiceNow, or None. Kept as a parameter, not
+    hardcoded, in case a future API revision changes the literal.
 
 .PARAMETER WhatIf
     Reports capability status and prints what would be created without creating or modifying the
@@ -144,7 +145,8 @@ param(
     [string]$MonitoringContributorScope = 'ResourceGroup',
 
     [Parameter()]
-    [string]$ExpectedIncidentPlatformType = 'AzureMonitor',
+    [ValidateSet('AzMonitor', 'PagerDuty', 'ServiceNow', 'None')]
+    [string]$ExpectedIncidentPlatformType = 'AzMonitor',
 
     [Parameter()]
     [switch]$WhatIf

@@ -561,6 +561,22 @@ Per the §8 `SCHEMA_TBD` rule, any query or dashboard referencing `AgentExecutio
 `ApprovalDecision` fields beyond the shared correlation fields must be tagged `// SCHEMA_TBD` and
 must not be treated as a stable production contract.
 
+### Incident platform literal (`incidentManagementConfiguration.type`)
+
+Source: [API reference for Azure SRE Agent](https://learn.microsoft.com/azure/sre-agent/api-reference#agent-properties),
+which enumerates this field as: `PagerDuty`, `AzMonitor`, `ServiceNow`, or `None`. **Azure Monitor's
+literal is `AzMonitor`**, not `AzureMonitor` — `sre-agent.bicep`'s `incidentManagementConfigurationType`
+parameter and `scripts/configure-sre-agent-incident-response.ps1`'s `-ExpectedIncidentPlatformType`
+both default to `AzMonitor` and are `@allowed`/`ValidateSet`-constrained to the four documented
+literals. This repo's own Bicep/script *selector* param (`incidentPlatform`/`sreAgentIncidentPlatform`,
+allowed `AzureMonitor`/`None`) is a separate, internal name and intentionally does not need to match
+the ARM literal — only the value actually written to `incidentManagementConfiguration.type` does.
+Because ARM does not enforce an allowed-values constraint on this property (it is typed as a bare
+`string` in the generic ARM template schema), a wrong literal deploys successfully while the SRE
+Agent backend silently ignores the unrecognized platform type — do not rely on deployment success
+alone to confirm the platform connected; read back `incidentManagementConfiguration.type` and
+compare it to the documented enum, exactly as the setup script does.
+
 ### Reinvestigation cooldown
 
 Documented default (Azure Monitor response plans only): **3 hours**, configurable 1–24h in the
@@ -629,6 +645,7 @@ different incident's thread/plan/mitigation status to the wrong local card.
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
+| 2026-08-12 | 0.4 | Corrected `incidentManagementConfiguration.type` literal to documented `AzMonitor` (was incorrectly `AzureMonitor`); added literal enum subsection (issue #76 review fix) | Copilot draft for review |
 | 2026-08-12 | 0.3 | Added §16 Native Incident Platform Evidence Contract (issue #76) | Copilot draft for review |
 | 2026-04-26 | 0.2 | Wave 0 fix pass — S0-1..S0-5 security blockers, accessLevel terminology fix | Lambert (QA/Docs) |
 | 2026-04-26 | 0.2 | Alert deployment status, RBAC source-of-truth, retention prerequisites (Wave 0 infra precision) | Ripley (Infra Dev) |

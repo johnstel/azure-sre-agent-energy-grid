@@ -28,12 +28,13 @@ param appInsightsConnectionString string
 @description('Unique suffix for resource naming')
 param uniqueSuffix string
 
-@description('Connect Azure Monitor as the agent incident platform via the documented Microsoft.App/agents incidentManagementConfiguration ARM property (issue #76). Set to "None" to leave the agent unconnected to any incident platform (the repo Action Group -> Mission Control webhook fallback keeps working either way).')
+@description('Connect Azure Monitor as the agent incident platform via the documented Microsoft.App/agents incidentManagementConfiguration ARM property (issue #76). This is this repo\'s own selector name -- see incidentManagementConfigurationType for the literal ARM value it maps to. Set to "None" to leave the agent unconnected to any incident platform (the repo Action Group -> Mission Control webhook fallback keeps working either way).')
 @allowed(['AzureMonitor', 'None'])
 param incidentPlatform string = 'AzureMonitor'
 
-@description('Value written to incidentManagementConfiguration.type when incidentPlatform is "AzureMonitor". The ARM schema documents this field as a free-form string; Microsoft Learn tutorials do not enumerate the exact literal, so this is exposed as an override in case live tenant validation (issue #76 capability spike) finds a different expected value.')
-param incidentManagementConfigurationType string = 'AzureMonitor'
+@description('Value written to incidentManagementConfiguration.type when incidentPlatform is "AzureMonitor". The Azure SRE Agent API reference (https://learn.microsoft.com/azure/sre-agent/api-reference#agent-properties) documents this field as an enum: PagerDuty, AzMonitor, ServiceNow, or None. Azure Monitor\'s literal is "AzMonitor", not "AzureMonitor" -- do not change this default without updating that reference.')
+@allowed(['AzMonitor', 'PagerDuty', 'ServiceNow', 'None'])
+param incidentManagementConfigurationType string = 'AzMonitor'
 
 // =============================================================================
 // VARIABLES
