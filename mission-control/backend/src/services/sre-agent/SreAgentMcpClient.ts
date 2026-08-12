@@ -16,7 +16,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { buildChildEnv, type SreAgentConfig } from './config.js';
 import { assertToolAllowed, type SreAgentToolName } from './operations.js';
-import { redactSensitiveText } from './redaction.js';
+import { RedactedStreamBuffer, redactSensitiveText } from './redaction.js';
 import { logger } from '../../utils/logger.js';
 
 export type McpTransportFactory = (config: SreAgentConfig) => Promise<Transport> | Transport;
@@ -81,7 +81,12 @@ export class SreAgentMcpClient {
   private idleTimer?: NodeJS.Timeout;
   private inFlight = 0;
   private disposed = false;
-  private lastStderr = '';
+  /**
+   * Child stderr is accumulated through a redaction-safe streaming buffer rather than a
+   * raw rolling window: a raw window can evict a `-----BEGIN … PRIVATE KEY-----` marker
+   * while key body survives, defeating a later single redaction pass.
+   */
+  private readonly stderrBuffer = new RedactedStreamBuffer();
 
   constructor(
     private readonly config: SreAgentConfig,
@@ -207,19 +212,17 @@ export class SreAgentMcpClient {
     return client;
   }
 
-  /** Buffers a bounded tail of child stderr to explain startup failures. */
+  /** Buffers a bounded, redaction-safe tail of child stderr to explain startup failures. */
   private captureStderr(transport: Transport): void {
     // Reset per transport so stale output from a previous failed process is never
     // attributed to a later, unrelated failure.
-    this.lastStderr = '';
+    this.stderrBuffer.reset();
 
     const stderr = (transport as StdioClientTransport).stderr;
     if (!stderr || typeof stderr.on !== 'function') return;
 
     stderr.on('data', (chunk: Buffer | string) => {
-      // Buffer raw and redact once on read, so a secret straddling a chunk boundary is
-      // still matched by the redaction rules.
-      this.lastStderr = `${this.lastStderr}${String(chunk)}`.slice(-2_000);
+      this.stderrBuffer.append(String(chunk));
     });
   }
 
@@ -276,7 +279,7 @@ export class SreAgentMcpClient {
     const errorCode: string | number | undefined = (error as { code?: string | number })?.code;
     const message = redactSensitiveText(rawMessage);
     const normalized = message.toLowerCase();
-    const stderrHint = redactSensitiveText(this.lastStderr).trim();
+    const stderrHint = this.stderrBuffer.snapshot();
 
     if (options?.signal?.aborted || err?.name === 'AbortError' || normalized.includes('aborted')) {
       return new SreAgentMcpError(

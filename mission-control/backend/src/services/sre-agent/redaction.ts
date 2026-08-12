@@ -157,3 +157,141 @@ export function redactForAudit(value: unknown, depth = 0): unknown {
 
   return '[unsupported]';
 }
+
+// ---------------------------------------------------------------------------
+// Streaming redaction for child-process stderr
+// ---------------------------------------------------------------------------
+
+const PRIVATE_KEY_BEGIN = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/;
+const PRIVATE_KEY_END = /-----END [A-Z0-9 ]*PRIVATE KEY-----/;
+
+/**
+ * Longest secret start-marker we must never split across a commit boundary.
+ * `-----BEGIN OPENSSH PRIVATE KEY-----` is 35 characters; 96 gives ample headroom.
+ */
+const MARKER_GUARD = 96;
+
+/**
+ * Bounded, redaction-safe accumulator for a child process's stderr.
+ *
+ * A naive `raw = (raw + chunk).slice(-N)` rolling buffer is unsafe: for a secret
+ * longer than N (a PEM private key is typically 1.7–3.2 KB) the `-----BEGIN …-----`
+ * marker is evicted while key body survives. A later single `redactSensitiveText`
+ * pass then has no marker to match, so raw key material can reach an error message
+ * and the UI.
+ *
+ * This buffer removes that class of bug by construction:
+ *
+ *  1. **Redact before bounding.** `tail` only ever holds already-redacted text, so
+ *     evicting from it can never expose a secret — the secret is already a
+ *     placeholder.
+ *  2. **Never split a marker.** Only whole lines are committed (secret markers and
+ *     single-line secrets contain no newline). A pathological newline-free run is
+ *     force-committed only up to a `MARKER_GUARD` raw window that is retained, so a
+ *     marker straddling that boundary is still seen intact on the next chunk.
+ *  3. **Carry state across segments.** An unterminated `BEGIN … PRIVATE KEY` sets a
+ *     sticky "inside secret" flag, so continuation lines are dropped even after the
+ *     marker itself has been committed and evicted — the case regex-per-pass misses.
+ */
+export class RedactedStreamBuffer {
+  /** Always-redacted, bounded output. */
+  private tail = '';
+  /** Raw bytes not yet safe to commit (incomplete line / marker guard). */
+  private carry = '';
+  /** True while inside a private-key block whose END marker has not been seen. */
+  private insideSecret = false;
+
+  constructor(
+    private readonly maxChars = 2_000,
+    private readonly maxCarry = 4_096,
+  ) {}
+
+  append(chunk: string): void {
+    const combined = this.carry + chunk;
+    const lastNewline = combined.lastIndexOf('\n');
+
+    let rest: string;
+    if (lastNewline >= 0) {
+      this.commit(combined.slice(0, lastNewline + 1));
+      rest = combined.slice(lastNewline + 1);
+    } else {
+      rest = combined;
+    }
+
+    // A very long newline-free run still has to be bounded. Retain a marker-sized raw
+    // window so a start marker cannot be split across this forced commit.
+    if (rest.length > this.maxCarry) {
+      this.commit(rest.slice(0, rest.length - MARKER_GUARD));
+      rest = rest.slice(rest.length - MARKER_GUARD);
+    }
+
+    this.carry = rest;
+  }
+
+  /** Redacted, bounded view including the uncommitted carry. Does not mutate state. */
+  snapshot(): string {
+    const { text } = redactSegment(this.carry, this.insideSecret);
+    return `${this.tail}${text}`.slice(-this.maxChars).trim();
+  }
+
+  reset(): void {
+    this.tail = '';
+    this.carry = '';
+    this.insideSecret = false;
+  }
+
+  private commit(segment: string): void {
+    if (!segment) return;
+    const { text, insideSecret } = redactSegment(segment, this.insideSecret);
+    this.insideSecret = insideSecret;
+    // `tail` is already redacted, so bounding it here cannot reveal a secret.
+    this.tail = `${this.tail}${text}`.slice(-this.maxChars);
+  }
+}
+
+/**
+ * Redacts one segment, honouring and returning the sticky private-key state.
+ * Exported for direct testing of the state machine.
+ */
+export function redactSegment(
+  segment: string,
+  insideSecret: boolean,
+): { text: string; insideSecret: boolean } {
+  if (!segment) return { text: '', insideSecret };
+
+  let working = segment;
+  let state = insideSecret;
+
+  if (state) {
+    const end = PRIVATE_KEY_END.exec(working);
+    // Still inside the key: drop the whole segment rather than emit body material.
+    if (!end) return { text: '', insideSecret: true };
+    working = working.slice(end.index + end[0].length);
+    state = false;
+  }
+
+  // If the LAST begin marker has no matching end, suppress from there and stay sticky.
+  const lastBegin = lastIndexOfPattern(working, PRIVATE_KEY_BEGIN);
+  if (lastBegin >= 0) {
+    const afterBegin = working.slice(lastBegin);
+    const beginMatch = PRIVATE_KEY_BEGIN.exec(afterBegin);
+    const afterMarker = beginMatch ? afterBegin.slice(beginMatch[0].length) : afterBegin;
+    if (!PRIVATE_KEY_END.test(afterMarker)) {
+      working = `${working.slice(0, lastBegin)}[REDACTED-PRIVATE-KEY]`;
+      state = true;
+    }
+  }
+
+  return { text: redactSensitiveText(working), insideSecret: state };
+}
+
+function lastIndexOfPattern(value: string, pattern: RegExp): number {
+  const global = new RegExp(pattern.source, `${pattern.flags.replace('g', '')}g`);
+  let index = -1;
+  let match: RegExpExecArray | null;
+  while ((match = global.exec(value)) !== null) {
+    index = match.index;
+    if (match.index === global.lastIndex) global.lastIndex += 1;
+  }
+  return index;
+}

@@ -11,7 +11,7 @@ import {
   resolveOperationTool,
 } from './operations.js';
 import { loadSreAgentConfig, buildChildEnv, isSreAgentUsable } from './config.js';
-import { boundText, maskArmId, maskGuid, maskIdentifiers, redactForAudit, redactSensitiveText } from './redaction.js';
+import { boundText, maskArmId, maskGuid, maskIdentifiers, redactForAudit, redactSegment, redactSensitiveText, RedactedStreamBuffer } from './redaction.js';
 
 // --- investigate_yolo / auto-approval must be impossible ---------------------
 
@@ -291,4 +291,127 @@ test('identifier masking handles an unknown subscription in an ARM path', () => 
   const masked = maskIdentifiers('/subscriptions/abcdef12-3456-7890-abcd-ef1234567890/resourceGroups/rg');
   assert.ok(!masked.includes('abcdef12-3456-7890-abcd-ef1234567890'));
   assert.ok(masked.includes('/resourceGroups/rg'));
+});
+
+// --- streaming stderr redaction (regression: raw rolling-buffer secret leak) ---
+//
+// The previous implementation accumulated RAW stderr with `.slice(-2_000)` and redacted
+// once on read. A PEM private key longer than the window had its BEGIN marker evicted
+// while key body survived, so the final redaction pass had no marker to match and raw
+// key material reached the error message and the UI.
+
+/** Builds a PEM block whose body alone exceeds the 2,000-character retention window. */
+function buildLongPem(bodyLines = 60): string {
+  const body = Array.from(
+    { length: bodyLines },
+    (_, i) => `SECRETLINE${String(i).padStart(3, '0')}0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`,
+  ).join('\n');
+  return `-----BEGIN RSA PRIVATE KEY-----\n${body}\n-----END RSA PRIVATE KEY-----\n`;
+}
+
+test('streaming stderr buffer keeps no key material when the BEGIN marker is evicted', () => {
+  const pem = buildLongPem();
+  assert.ok(pem.length > 2_000, 'the PEM must exceed the retention window for this regression');
+
+  const buffer = new RedactedStreamBuffer();
+  buffer.append(pem);
+  // Enough ordinary diagnostics to push the marker out of a 2,000-char raw window.
+  buffer.append('INFO: continuing startup diagnostics...\n'.repeat(80));
+
+  const snapshot = buffer.snapshot();
+  assert.ok(!snapshot.includes('SECRETLINE'), 'private key body reached the stderr hint');
+  assert.ok(!snapshot.includes('-----BEGIN RSA PRIVATE KEY-----'));
+  assert.ok(snapshot.includes('INFO: continuing startup diagnostics'), 'diagnostics should survive');
+});
+
+test('streaming stderr buffer drops key body split across many chunks', () => {
+  const buffer = new RedactedStreamBuffer();
+  // Marker and body arrive in separate writes, as a real pipe delivers them.
+  buffer.append('-----BEGIN OPENSSH PRIVATE KEY-----\n');
+  for (let i = 0; i < 60; i += 1) {
+    buffer.append(`SECRETLINE${String(i).padStart(3, '0')}0123456789abcdefghijklmnopqrstuvwxyz\n`);
+  }
+  buffer.append('-----END OPENSSH PRIVATE KEY-----\n');
+  buffer.append('npm warn deprecated something@1.0.0\n');
+
+  const snapshot = buffer.snapshot();
+  assert.ok(!snapshot.includes('SECRETLINE'), 'key body leaked across chunk boundaries');
+  assert.ok(snapshot.includes('npm warn deprecated'));
+});
+
+test('streaming stderr buffer suppresses an unterminated key that is still streaming', () => {
+  const buffer = new RedactedStreamBuffer();
+  buffer.append('-----BEGIN EC PRIVATE KEY-----\n');
+  buffer.append('SECRETLINE000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n'.repeat(50));
+
+  const snapshot = buffer.snapshot();
+  assert.ok(!snapshot.includes('SECRETLINE'));
+  assert.ok(snapshot.includes('[REDACTED-PRIVATE-KEY]'));
+});
+
+test('streaming stderr buffer resumes normal output after the key ends', () => {
+  const buffer = new RedactedStreamBuffer();
+  buffer.append(buildLongPem(10));
+  buffer.append('ERROR: agent endpoint unreachable\n');
+
+  const snapshot = buffer.snapshot();
+  assert.ok(!snapshot.includes('SECRETLINE'));
+  assert.ok(snapshot.includes('ERROR: agent endpoint unreachable'));
+});
+
+test('streaming stderr buffer bounds a newline-free flood without splitting a marker', () => {
+  const buffer = new RedactedStreamBuffer();
+  // No newlines at all, then a marker arriving in two separate writes across the
+  // forced-commit boundary.
+  buffer.append('x'.repeat(9_000));
+  buffer.append('-----BEGIN RSA PRI');
+  buffer.append('VATE KEY-----SECRETBODYMATERIAL');
+
+  const snapshot = buffer.snapshot();
+  assert.ok(!snapshot.includes('SECRETBODYMATERIAL'), 'marker split across writes let body through');
+  assert.ok(snapshot.length <= 2_000);
+});
+
+test('streaming stderr buffer still redacts ordinary single-line secrets', () => {
+  const buffer = new RedactedStreamBuffer();
+  buffer.append('config loaded password=hunter2seekrit\n');
+  buffer.append('Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345\n');
+
+  const snapshot = buffer.snapshot();
+  assert.ok(!snapshot.includes('hunter2seekrit'));
+  assert.ok(!snapshot.includes('abcdefghijklmnopqrstuvwxyz012345'));
+  assert.ok(snapshot.includes('[REDACTED]'));
+});
+
+test('streaming stderr buffer redacts a secret split across a chunk boundary', () => {
+  const buffer = new RedactedStreamBuffer();
+  buffer.append('starting up password=hunt');
+  buffer.append('er2seekrit trailing\n');
+
+  const snapshot = buffer.snapshot();
+  assert.ok(!snapshot.includes('hunter2seekrit'), 'secret straddling two chunks leaked');
+});
+
+test('streaming stderr buffer output stays bounded and resets between transports', () => {
+  const buffer = new RedactedStreamBuffer();
+  buffer.append('noise line that is reasonably long\n'.repeat(500));
+  assert.ok(buffer.snapshot().length <= 2_000);
+
+  buffer.reset();
+  assert.equal(buffer.snapshot(), '');
+});
+
+test('redactSegment carries private-key state across segments', () => {
+  const first = redactSegment('-----BEGIN RSA PRIVATE KEY-----\nSECRETLINE000\n', false);
+  assert.equal(first.insideSecret, true);
+  assert.ok(!first.text.includes('SECRETLINE'));
+
+  const second = redactSegment('SECRETLINE001\nSECRETLINE002\n', first.insideSecret);
+  assert.equal(second.insideSecret, true);
+  assert.equal(second.text, '');
+
+  const third = redactSegment('SECRETLINE003\n-----END RSA PRIVATE KEY-----\nready\n', second.insideSecret);
+  assert.equal(third.insideSecret, false);
+  assert.ok(!third.text.includes('SECRETLINE'));
+  assert.ok(third.text.includes('ready'));
 });

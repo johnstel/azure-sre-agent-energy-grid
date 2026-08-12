@@ -10,6 +10,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { PassThrough } from 'node:stream';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { McpTransportFactory } from './SreAgentMcpClient.js';
 import { ALLOWED_SRE_AGENT_TOOLS } from './operations.js';
@@ -30,6 +31,12 @@ export interface FakeMcpServerOptions {
   readonly hangMs?: number;
   /** Fails `connect()`, to exercise transport startup failure. */
   readonly failConnect?: Error;
+  /**
+   * Attaches a `stderr` stream to the transport (as StdioClientTransport does) and
+   * writes these chunks to it in order as soon as the transport is created. Used to
+   * exercise the real stderr accumulation path that feeds error messages.
+   */
+  readonly stderrChunks?: readonly string[];
 }
 
 export class FakeMcpServer {
@@ -56,6 +63,17 @@ export class FakeMcpServer {
       const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
       const server = this.buildServer();
       await server.connect(serverTransport);
+
+      // Mirror StdioClientTransport's `stderr` so the client's real stderr
+      // accumulation path is exercised end to end.
+      if (this.options.stderrChunks) {
+        const stderr = new PassThrough();
+        Object.defineProperty(clientTransport, 'stderr', { value: stderr, configurable: true });
+        // Emit synchronously after the client attaches its listener.
+        queueMicrotask(() => {
+          for (const chunk of this.options.stderrChunks ?? []) stderr.write(chunk);
+        });
+      }
 
       this.servers.push(server);
       this.transports.push(serverTransport);

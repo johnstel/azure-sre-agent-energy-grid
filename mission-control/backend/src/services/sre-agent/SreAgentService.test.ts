@@ -10,6 +10,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import Fastify from 'fastify';
+import { registerSreAgentRoutes } from '../../routes/sre-agent.js';
 import { loadSreAgentConfig, type SreAgentConfig } from './config.js';
 import { FakeMcpServer, fakeAgentPayload, fakeInvestigationPayload } from './fakeMcpServer.js';
 import { SreAgentMcpClient, SreAgentMcpError } from './SreAgentMcpClient.js';
@@ -702,3 +704,154 @@ async function waitUntil(predicate: () => boolean, timeoutMs: number): Promise<v
   }
   throw new Error('Condition was not met before the timeout');
 }
+
+// --- stderr leak regression (end to end through the real error path) ----------
+//
+// Exercises the real chain: child stderr stream -> SreAgentMcpClient stderr
+// accumulation -> normalizeError -> SreAgentMcpError.message -> HTTP body.
+//
+// Reproduces the verified leak in which a >2,000-character PEM had its
+// `-----BEGIN …-----` marker evicted from the raw rolling buffer while key body
+// survived, so the final single redaction pass had no marker to match.
+//
+// Each test also asserts that BENIGN stderr text *does* reach the message, which
+// proves the assertion is not vacuous: the hint path really is carrying stderr.
+
+const STDERR_TAIL_MARKER = 'INFO: continuing startup diagnostics';
+
+function longPemChunk(bodyLines = 60): string {
+  const body = Array.from(
+    { length: bodyLines },
+    (_, i) => `SECRETLINE${String(i).padStart(3, '0')}0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ`,
+  ).join('\n');
+  return `-----BEGIN RSA PRIVATE KEY-----\n${body}\n-----END RSA PRIVATE KEY-----\n`;
+}
+
+function stderrLeakFake(stderrChunks: readonly string[]): FakeMcpServer {
+  return new FakeMcpServer({
+    handlers: {
+      sreagent_agents_get: () => fakeAgentPayload(),
+      // Generic failure so normalizeError falls through to the branch that appends
+      // the stderr hint to the operator-visible message.
+      sreagent_agents_list: () => {
+        throw new Error('agent listing exploded');
+      },
+    },
+    stderrChunks,
+  });
+}
+
+/** Establishes the transport and lets buffered stderr flow before the failing call. */
+async function primeStderr(service: SreAgentService): Promise<void> {
+  await service.getConfiguredAgent();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+}
+
+test('a >2000-char PEM on child stderr never reaches the normalized error message', async () => {
+  await withThreadState(async () => {
+    const pem = longPemChunk();
+    assert.ok(pem.length > 2_000, 'PEM must exceed the retention window to reproduce the leak');
+
+    const fake = stderrLeakFake([pem, `${STDERR_TAIL_MARKER}...\n`.repeat(80)]);
+    const service = new SreAgentService(testConfig(), fake.factory());
+
+    try {
+      await primeStderr(service);
+      await assert.rejects(
+        () => service.discoverAgents(),
+        (error: unknown) => {
+          assert.ok(error instanceof SreAgentMcpError);
+          const text = `${error.message} ${error.remediation}`;
+          assert.ok(!text.includes('SECRETLINE'), `private key body leaked into the error: ${text}`);
+          assert.ok(!text.includes('-----BEGIN RSA PRIVATE KEY-----'));
+          // Non-vacuity: stderr really did reach the message.
+          assert.ok(text.includes(STDERR_TAIL_MARKER), 'stderr hint was not exercised at all');
+          return true;
+        },
+      );
+    } finally {
+      await service.shutdown();
+      await fake.close();
+    }
+  });
+});
+
+test('a >2000-char PEM on child stderr never reaches the HTTP error body', async () => {
+  const pem = longPemChunk();
+  const fake = stderrLeakFake([pem, `${STDERR_TAIL_MARKER}...\n`.repeat(80)]);
+  const service = new SreAgentService(testConfig(), fake.factory());
+  const dir = await mkdtemp(join(tmpdir(), 'sre-stderr-http-'));
+  const previous = process.env['SRE_AGENT_THREAD_STATE_PATH'];
+  process.env['SRE_AGENT_THREAD_STATE_PATH'] = join(dir, 'threads.json');
+
+  const app = Fastify({ logger: false });
+  registerSreAgentRoutes(app, service);
+  await app.ready();
+
+  try {
+    await primeStderr(service);
+    const response = await app.inject({ method: 'GET', url: '/api/sre-agent/agents' });
+    const body = response.body;
+
+    assert.ok(!body.includes('SECRETLINE'), `private key body reached the HTTP response: ${body}`);
+    assert.ok(!body.includes('-----BEGIN RSA PRIVATE KEY-----'));
+    assert.ok(body.includes(STDERR_TAIL_MARKER), 'stderr hint was not exercised at all');
+    assert.equal(response.json().localAnalystSubstituted, false);
+  } finally {
+    await app.close();
+    await service.shutdown();
+    await fake.close();
+    if (previous === undefined) delete process.env['SRE_AGENT_THREAD_STATE_PATH'];
+    else process.env['SRE_AGENT_THREAD_STATE_PATH'] = previous;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('an unterminated PEM still streaming on stderr never reaches the error message', async () => {
+  await withThreadState(async () => {
+    const fake = stderrLeakFake([
+      `${STDERR_TAIL_MARKER}...\n`,
+      '-----BEGIN OPENSSH PRIVATE KEY-----\n',
+      'SECRETLINE000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n'.repeat(60),
+    ]);
+    const service = new SreAgentService(testConfig(), fake.factory());
+
+    try {
+      await primeStderr(service);
+      await assert.rejects(
+        () => service.discoverAgents(),
+        (error: unknown) => {
+          assert.ok(error instanceof SreAgentMcpError);
+          assert.ok(!error.message.includes('SECRETLINE'), 'streaming key body leaked');
+          assert.ok(error.message.includes('[REDACTED-PRIVATE-KEY]'), 'stderr hint was not exercised at all');
+          return true;
+        },
+      );
+    } finally {
+      await service.shutdown();
+      await fake.close();
+    }
+  });
+});
+
+test('benign stderr diagnostics still reach the error message', async () => {
+  await withThreadState(async () => {
+    const fake = stderrLeakFake(['npm warn deprecated example@1.0.0: please upgrade\n']);
+    const service = new SreAgentService(testConfig(), fake.factory());
+
+    try {
+      await primeStderr(service);
+      await assert.rejects(
+        () => service.discoverAgents(),
+        (error: unknown) => {
+          assert.ok(error instanceof SreAgentMcpError);
+          assert.match(error.message, /npm warn deprecated/);
+          return true;
+        },
+      );
+    } finally {
+      await service.shutdown();
+      await fake.close();
+    }
+  });
+});

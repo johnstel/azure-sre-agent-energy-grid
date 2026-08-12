@@ -93,7 +93,7 @@ Standard mode pauses at approval gates. Mission Control surfaces the paused stat
 | Credential handling | Host Azure identity only. Mission Control never reads, stores, forwards, or logs a token. No client secret is injected into the child environment. |
 | Browser exposure | The browser receives only typed contracts. Subscription/tenant GUIDs are masked (`11111111-****-****-****-555555`) in identity fields **and in the agent's response prose, citation labels, and approval detail**, because the agent routinely quotes ARM resource IDs. ARM IDs keep their resource group / resource name so the answer stays diagnostic. Citation **URLs** are left navigable so the cited evidence can be opened, so a portal link may still contain a resource path. |
 | Raw tool payloads | Never returned to the browser and never logged. Only parsed, redacted, bounded fields leave the backend. |
-| Redaction | Bearer/Basic headers, JWTs, `key=value` secrets, storage account keys, SAS query parameters, and PEM private keys are stripped from every string that leaves the adapter. |
+| Redaction | Bearer/Basic headers, JWTs, `key=value` secrets, storage account keys, SAS query parameters, and PEM private keys are stripped from every string that leaves the adapter. Child-process stderr uses a **streaming** redactor (`RedactedStreamBuffer`): output is redacted *before* it is length-bounded, only whole lines are committed so a secret marker can never be split, and an unterminated `BEGIN … PRIVATE KEY` sets a sticky suppression state. A naive raw rolling buffer would evict the `-----BEGIN-----` marker of a multi-kilobyte key while its body survived, defeating a later single redaction pass. |
 | Output bounding | Responses are truncated at `SRE_AGENT_MAX_RESPONSE_CHARS` (default 24,000) with explicit truncation marking. Citations capped at 25, prompts at 8,000 characters. |
 | Input validation | Prompts and thread IDs are validated before any dispatch; scenario starters are limited to the three approved validation scenarios. |
 | Audit | Every request/response/failure emits a structured record with `requester`, `tool`, `target`, `timestamp`, `resultStatus`, `correlationId`, and `redactionNotes`, matching [Local Analyst Governance](LOCAL-ANALYST-GOVERNANCE.md#audit-trail-requirements). Arguments are redacted before logging. |
@@ -239,7 +239,7 @@ All tests are deterministic and require no Azure access. `FakeMcpServer` is a **
 
 ```bash
 cd mission-control
-npm test -w backend      # 100 tests
+npm test -w backend      # 113 tests
 npm test -w frontend
 npm run lint             # vue-tsc + tsc
 npm run build
@@ -257,6 +257,11 @@ Coverage of the safety-critical behaviour:
 - timeout, cancellation mid-operation, and shutdown-aborts-in-flight;
 - auth / permission / network / not-found / runtime-missing mapped to actionable remediations;
 - raw subscription GUID absent from client payloads; prompts absent from persisted state;
+- child stderr containing a >2,000-character PEM private key never reaches the normalized
+  error message or the HTTP error body — asserted end to end through the real stderr
+  accumulation path, including the case where the `BEGIN` marker is evicted by later
+  output and the case where the key is still streaming (each test also asserts benign
+  stderr *does* reach the message, so the check cannot pass vacuously);
 - backend restart re-attach.
 
 ---
