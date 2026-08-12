@@ -264,12 +264,31 @@ For symptom-first diagnosis and setup validation, use these links:
 |------|------|
 | Full troubleshooting guide | [Troubleshooting Guide](TROUBLESHOOTING.md) |
 | SRE Agent setup issues | [Troubleshooting → SRE Agent Issues](TROUBLESHOOTING.md#sre-agent-issues) |
+| Mission Control MCP investigations | [Troubleshooting → Mission Control → Azure SRE Agent (MCP)](TROUBLESHOOTING.md#mission-control--azure-sre-agent-mcp-issues) |
 | Public LoadBalancer not responding | [Troubleshooting → Public LoadBalancer](TROUBLESHOOTING.md#public-loadbalancer-not-responding) |
 | Kubernetes service diagnostics | [Kubernetes Service Troubleshooting](KUBERNETES-SERVICE-TROUBLESHOOTING.md) |
 | Cost planning | [Cost Breakdown](COSTS.md) |
 
+## Step 5 (optional): Investigate from Mission Control
+
+Mission Control can start and continue a **real** SRE Agent investigation in-dashboard through the supported Azure MCP Server path, so a presenter does not have to switch to the portal to run a prompt.
+
+```bash
+export SRE_AGENT_NAME=<agentName>
+export SRE_AGENT_SUBSCRIPTION_ID=<subscriptionId>
+export SRE_AGENT_RESOURCE_GROUP=<resourceGroup>   # optional but recommended
+```
+
+Then open the **Investigate with Azure SRE Agent** panel under Controls. It requires **Reader** and **SRE Agent Administrator** on the agent resource (Step 2), Node.js LTS, and outbound access to `*.azuresre.ai`.
+
+Standard, approval-gated mode only: auto-approval (`investigate_yolo`) is blocked in code and absent from the MCP server surface. If MCP is unavailable the panel fails honestly and hands off to the portal — it never substitutes Local Analyst output.
+
+Full details, configuration, safety model, and the live validation runbook: [SRE Agent MCP Integration](SRE-AGENT-MCP-INTEGRATION.md).
+
 ## Additional Resources
 
 - [Azure SRE Agent Documentation](https://learn.microsoft.com/azure/sre-agent/)
+- [SRE Agent MCP server](https://learn.microsoft.com/azure/sre-agent/mcp-server)
+- [Set up the SRE Agent MCP server](https://learn.microsoft.com/azure/sre-agent/setup-mcp-server)
 - [SRE Agent FAQs](https://learn.microsoft.com/azure/sre-agent/faq)
 - [Supported Azure Services](https://learn.microsoft.com/azure/sre-agent/overview#supported-services)

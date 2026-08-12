@@ -606,3 +606,201 @@ export interface RehearsalState {
   runs: RehearsalRun[];
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Azure SRE Agent MCP integration (issue #77)
+//
+// These contracts describe REAL Azure SRE Agent output obtained through the
+// supported Azure MCP Server `sreagent_*` tools. They are deliberately distinct
+// from the Assistant* (Local Analyst) contracts: Local Analyst output must never
+// be presented through these types, and `provenance` is always 'azure-sre-agent'.
+// ---------------------------------------------------------------------------
+
+/** Discriminator proving which system produced a response. */
+export type SreAgentProvenance = 'azure-sre-agent';
+
+export type SreAgentInvestigationStatus =
+  | 'completed'
+  | 'awaiting-approval'
+  | 'running'
+  | 'cancelled'
+  | 'timeout'
+  | 'failed';
+
+export type SreAgentFailureKind =
+  | 'not-configured'
+  | 'auth'
+  | 'permission'
+  | 'not-found'
+  | 'network'
+  | 'timeout'
+  | 'cancelled'
+  | 'runtime-missing'
+  | 'protocol'
+  | 'denied'
+  | 'unknown';
+
+export type SreAgentPreflightStatus = 'pass' | 'warn' | 'fail' | 'skipped';
+
+export interface SreAgentPreflightCheck {
+  name: string;
+  status: SreAgentPreflightStatus;
+  message: string;
+  /** Operator-actionable next step when the check is not passing. */
+  remediation?: string;
+}
+
+export interface SreAgentPreflightResult {
+  ready: boolean;
+  configured: boolean;
+  enabled: boolean;
+  checks: SreAgentPreflightCheck[];
+  /** Masked identifiers safe for screen-sharing and evidence packs. */
+  target: SreAgentTargetSummary;
+  collectedAt: string;
+  /** Portal handoff used whenever the MCP path is unavailable. */
+  portalHandoff: SreAgentPortalHandoff;
+}
+
+export interface SreAgentTargetSummary {
+  agentName?: string;
+  /** Subscription GUID, masked for display. */
+  subscriptionIdMasked?: string;
+  resourceGroup?: string;
+  tenantIdMasked?: string;
+  /** npm spec of the Azure MCP Server used, for supportability. */
+  serverPackage: string;
+  /** Exact set of MCP tools Mission Control may call. */
+  allowedTools: string[];
+  /** Tools that are permanently blocked, including auto-approval modes. */
+  blockedTools: string[];
+}
+
+export interface SreAgentPortalHandoff {
+  label: string;
+  href: string;
+  description: string;
+  /** Prompt the operator should paste when running the investigation manually. */
+  prompt?: string;
+}
+
+export interface SreAgentIdentity {
+  name: string;
+  /** ARM resource ID with the subscription segment masked. */
+  armIdMasked?: string;
+  resourceGroup?: string;
+  subscriptionIdMasked?: string;
+  location?: string;
+  provisioningState?: string;
+  /** Data-plane host only (never a full URL with query material). */
+  endpointHost?: string;
+}
+
+export interface SreAgentThreadIdentity {
+  id: string;
+  createdAt: string;
+  /** Portal link for the agent; thread-level deep links are not documented. */
+  portalUrl?: string;
+}
+
+export interface SreAgentCitation {
+  label: string;
+  url?: string;
+  source?: string;
+}
+
+export interface SreAgentApprovalState {
+  required: boolean;
+  detail?: string;
+  /**
+   * Always false. Mission Control never auto-approves; standard investigation mode
+   * pauses at approval gates and the operator resolves them in the SRE Agent portal.
+   */
+  autoApproved: false;
+}
+
+export interface SreAgentResponseMetadata {
+  /** Which allowlisted operation produced this response. */
+  operation: string;
+  /** Exact Azure MCP Server tool invoked. */
+  tool: string;
+  startedAt: string;
+  completedAt: string;
+  elapsedMs: number;
+  truncated: boolean;
+  /** How confidently the response shape was interpreted; schema is not contractual. */
+  schemaConfidence: 'structured' | 'inferred' | 'text-only';
+  serverPackage: string;
+  /** Correlates Mission Control audit records with SRE Agent audit events. */
+  correlationId: string;
+  limitations: string[];
+}
+
+export interface SreAgentInvestigation {
+  provenance: SreAgentProvenance;
+  status: SreAgentInvestigationStatus;
+  agent: SreAgentIdentity;
+  thread: SreAgentThreadIdentity;
+  response: string;
+  citations: SreAgentCitation[];
+  /** False means the agent returned none; Mission Control never invents citations. */
+  citationsPresent: boolean;
+  approval: SreAgentApprovalState;
+  metadata: SreAgentResponseMetadata;
+}
+
+export interface SreAgentErrorResponse {
+  error: string;
+  kind: SreAgentFailureKind;
+  remediation: string;
+  /** Always false: a failed MCP call is never presented as a successful investigation. */
+  investigationStarted: boolean;
+  /** Explicitly records that Local Analyst was not substituted. */
+  localAnalystSubstituted: false;
+  portalHandoff: SreAgentPortalHandoff;
+  correlationId: string;
+  timestamp: string;
+}
+
+export interface SreAgentDiscoveryResponse {
+  configured: boolean;
+  agents: SreAgentIdentity[];
+  selected?: SreAgentIdentity;
+  target: SreAgentTargetSummary;
+  collectedAt: string;
+}
+
+export interface StartSreAgentInvestigationRequest {
+  /** Approved scenario supplying the starter prompt, when starting from a scenario. */
+  scenarioName?: PortalValidationScenarioName;
+  /** Explicit operator prompt; required when no scenario is supplied. */
+  prompt?: string;
+  /** Optional client-supplied correlation id for audit stitching. */
+  correlationId?: string;
+}
+
+export interface ContinueSreAgentInvestigationRequest {
+  threadId: string;
+  prompt: string;
+  correlationId?: string;
+}
+
+export interface SreAgentThreadStatusRequest {
+  threadId: string;
+}
+
+export interface SreAgentScenarioPrompt {
+  scenarioName: PortalValidationScenarioName;
+  title: string;
+  prompt: string;
+}
+
+export interface SreAgentActiveThreadRecord {
+  threadId: string;
+  agentName: string;
+  scenarioName?: PortalValidationScenarioName;
+  startedAt: string;
+  updatedAt: string;
+  lastStatus: SreAgentInvestigationStatus;
+  correlationId: string;
+}
