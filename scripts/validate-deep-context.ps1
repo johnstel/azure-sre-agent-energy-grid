@@ -167,25 +167,26 @@ if ($All -or $CheckSecrets) {
         if (-not (Test-Path $fullPath)) { continue }
         $content = Get-Content $fullPath -Raw -ErrorAction SilentlyContinue
         if (-not $content) { continue }
+        $lines = $content -split "`n"
         foreach ($pattern in $secretPatterns) {
-            if ($content -match $pattern) {
-                # Check demo allowlist
-                $allowed = $false
-                foreach ($demo in $demoAllowlist) {
-                    if ($content -match [regex]::Escape($demo)) {
-                        $matchLine = ($content -split "`n") | Where-Object { $_ -match $pattern } | Select-Object -First 1
-                        if ($matchLine -and $matchLine -match [regex]::Escape($demo)) {
-                            $allowed = $true
+            foreach ($line in $lines) {
+                if ($line -match $pattern) {
+                    # Each matching line must independently be allowlisted
+                    $lineAllowed = $false
+                    foreach ($demo in $demoAllowlist) {
+                        if ($line -match [regex]::Escape($demo)) {
+                            $lineAllowed = $true
                             break
                         }
                     }
+                    if (-not $lineAllowed) {
+                        $trimmed = $line.Trim()
+                        if ($trimmed.Length -gt 80) { $trimmed = $trimmed.Substring(0, 80) + '...' }
+                        Write-Check 'fail' "$($src.Id): potential secret on line — pattern: $pattern — $trimmed"
+                        $secretsFound++
+                        $exitCode = 1
+                    }
                 }
-                if (-not $allowed) {
-                    Write-Check 'fail' "$($src.Id): potential secret match — pattern: $pattern"
-                    $secretsFound++
-                    $exitCode = 1
-                }
-                break
             }
         }
     }
