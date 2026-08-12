@@ -24,6 +24,7 @@ export const SRE_AGENT_EVENT_NAMES = {
   agentExecution: 'AgentExecution',
   agentToolExecution: 'AgentToolExecution',
   approvalDecision: 'ApprovalDecision',
+  agentAzCliExecution: 'AgentAzCliExecution',
 } as const;
 
 export const SRE_AGENT_EVIDENCE_TEMPLATES = [
@@ -31,6 +32,7 @@ export const SRE_AGENT_EVIDENCE_TEMPLATES = [
   'agent-execution-lifecycle',
   'agent-tool-execution',
   'approval-decisions',
+  'agent-az-cli-execution',
   'incident-thread-timeline',
 ] as const satisfies readonly SreAgentEvidenceTemplateName[];
 
@@ -119,8 +121,8 @@ function evidenceLimitations(templateName: SreAgentEvidenceTemplateName, rowCoun
     'Rows are bounded, redacted, and time-window limited before returning to Mission Control.',
     'Zero rows means no native telemetry was observed in this window -- this is reported as unknown/pending evidence, never as a healthy or mitigated incident.',
   ];
-  if (templateName === 'agent-execution-lifecycle' || templateName === 'approval-decisions') {
-    limitations.push('SCHEMA_TBD: AgentExecution and ApprovalDecision field names beyond the shared correlation fields are not individually enumerated in Microsoft Learn as of this implementation; only documented shared fields plus a raw customDimensions projection are returned. See docs/CAPABILITY-CONTRACTS.md SS8.');
+  if (templateName === 'agent-execution-lifecycle' || templateName === 'approval-decisions' || templateName === 'agent-az-cli-execution') {
+    limitations.push('SCHEMA_TBD: AgentExecution, ApprovalDecision, and AgentAzCliExecution field names beyond the shared correlation fields are not individually enumerated in Microsoft Learn as of this implementation; only documented shared fields plus a raw customDimensions projection are returned. See docs/CAPABILITY-CONTRACTS.md SS8.');
   }
   if (rowCount === 0) {
     limitations.push('No rows may mean the response plan has not fired yet, the agent is not connected to Azure Monitor as an incident platform, or the correlation filter (threadId/incidentId/impactedService) did not match -- not that the agent is idle or healthy.');
@@ -210,6 +212,9 @@ export function buildSreAgentEvidenceKql(request: SreAgentEvidenceQueryRequest, 
         '    SubAgentName = tostring(customDimensions.SubAgentName),',
         '    CallId = tostring(customDimensions.CallId),',
         '    ThreadId = tostring(customDimensions.ThreadId),',
+        '    IncidentId = tostring(customDimensions.IncidentId),',
+        '    TraceId = tostring(customDimensions.TraceId),',
+        '    SpanId = tostring(customDimensions.SpanId),',
         '    CorrelationId = tostring(customDimensions.CorrelationId)',
         '| order by timestamp desc',
         `| take ${limit}`,
@@ -239,8 +244,12 @@ export function buildSreAgentEvidenceKql(request: SreAgentEvidenceQueryRequest, 
     case 'approval-decisions': {
       // SCHEMA_TBD: Microsoft Learn shows only `project timestamp, customDimensions` for
       // ApprovalDecision without an itemized field table (docs/CAPABILITY-CONTRACTS.md SS8).
+      // The shared correlation fields ARE documented, so they are projected explicitly and the
+      // raw bag is preserved so the runtime parser can scan for the outcome without us inventing
+      // a field name. See services/sre-agent/mitigationLifecycle.ts.
       const filters = [`name == "${SRE_AGENT_EVENT_NAMES.approvalDecision}"`];
       if (request.threadId) filters.push(`tostring(customDimensions.ThreadId) == ${kqlString(request.threadId)}`);
+      if (request.incidentId) filters.push(`tostring(customDimensions.IncidentId) == ${kqlString(request.incidentId)}`);
       return [
         'customEvents',
         `| where ${filters.join(' and ')}`,
@@ -248,6 +257,32 @@ export function buildSreAgentEvidenceKql(request: SreAgentEvidenceQueryRequest, 
         '| project timestamp,',
         '    ThreadId = tostring(customDimensions.ThreadId),',
         '    CorrelationId = tostring(customDimensions.CorrelationId),',
+        '    IncidentId = tostring(customDimensions.IncidentId),',
+        '    TraceId = tostring(customDimensions.TraceId),',
+        '    SpanId = tostring(customDimensions.SpanId),',
+        '    RawDimensions = customDimensions',
+        '| order by timestamp desc',
+        `| take ${limit}`,
+      ].join('\n');
+    }
+    case 'agent-az-cli-execution': {
+      // SCHEMA_TBD: Microsoft Learn names AgentAzCliExecution ("Azure CLI commands run by the
+      // agent") but does not itemize its dimensions. Shared correlation fields are documented and
+      // projected explicitly; everything else stays in the raw bag for the runtime parser.
+      const filters = [`name == "${SRE_AGENT_EVENT_NAMES.agentAzCliExecution}"`];
+      if (request.threadId) filters.push(`tostring(customDimensions.ThreadId) == ${kqlString(request.threadId)}`);
+      if (request.incidentId) filters.push(`tostring(customDimensions.IncidentId) == ${kqlString(request.incidentId)}`);
+      return [
+        'customEvents',
+        `| where ${filters.join(' and ')}`,
+        windowFilter,
+        '| project timestamp,',
+        '    ThreadId = tostring(customDimensions.ThreadId),',
+        '    CorrelationId = tostring(customDimensions.CorrelationId),',
+        '    IncidentId = tostring(customDimensions.IncidentId),',
+        '    TraceId = tostring(customDimensions.TraceId),',
+        '    SpanId = tostring(customDimensions.SpanId),',
+        '    CallId = tostring(customDimensions.CallId),',
         '    RawDimensions = customDimensions',
         '| order by timestamp desc',
         `| take ${limit}`,
@@ -343,7 +378,8 @@ function rejectUnknownParams(templateName: SreAgentEvidenceTemplateName, rawPara
     'incident-activity-snapshot': new Set([...base, 'incidentId', 'impactedService']),
     'agent-execution-lifecycle': new Set([...base, 'threadId']),
     'agent-tool-execution': new Set([...base, 'threadId']),
-    'approval-decisions': new Set([...base, 'threadId']),
+    'approval-decisions': new Set([...base, 'threadId', 'incidentId']),
+    'agent-az-cli-execution': new Set([...base, 'threadId', 'incidentId']),
     'incident-thread-timeline': new Set([...base, 'threadId']),
   };
   for (const key of Object.keys(rawParams)) {

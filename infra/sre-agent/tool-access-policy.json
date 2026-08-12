@@ -1,0 +1,59 @@
+{
+  "$schema": "https://learn.microsoft.com/azure/sre-agent/tool-access-policies",
+  "_comment": [
+    "Global tool access policy for the Energy Grid lab's Review-mode mitigation path (issue #80).",
+    "Apply with scripts/configure-sre-agent-mitigation-guardrails.ps1, which PUTs the `permissions`",
+    "object to /api/v2/agent/settings/global as documented at",
+    "https://learn.microsoft.com/azure/sre-agent/tool-access-policies#global-policies.",
+    "",
+    "Evaluation order is deny -> allow -> ask -> default (Microsoft Learn, same page). Only the",
+    "global scope may deny, so these deny rules cannot be widened by a custom-agent or thread-level",
+    "allow. The single ask pattern pair is the ONLY write action this lab permits, and it is pinned",
+    "to one deployment in one namespace.",
+    "",
+    "Design rationale, blast radius, rollback and verification contract: docs/REVIEW-MODE-MITIGATION.md"
+  ],
+  "permissions": {
+    "deny": [
+      "RunKubectlWriteCommand(kubectl delete *)",
+      "RunKubectlWriteCommand(kubectl exec *)",
+      "RunKubectlWriteCommand(kubectl port-forward *)",
+      "RunKubectlWriteCommand(kubectl cp *)",
+      "RunKubectlWriteCommand(kubectl attach *)",
+      "RunKubectlWriteCommand(kubectl proxy *)",
+      "RunKubectlWriteCommand(kubectl drain *)",
+      "RunKubectlWriteCommand(kubectl cordon *)",
+      "RunKubectlWriteCommand(kubectl taint *)",
+      "RunKubectlWriteCommand(kubectl replace *)",
+      "RunKubectlWriteCommand(kubectl patch *)",
+      "RunKubectlWriteCommand(kubectl apply *)",
+      "RunKubectlWriteCommand(kubectl create *)",
+      "RunKubectlWriteCommand(kubectl edit *)",
+      "RunKubectlWriteCommand(* --all-namespaces *)",
+      "RunKubectlWriteCommand(* -A *)",
+      "RunAzCliWriteCommands",
+      "bash(az * delete *)",
+      "bash(az * remove *)",
+      "bash(az keyvault *)",
+      "bash(az aks command invoke *)",
+      "bash(az role assignment *)",
+      "bash(kubectl delete *)",
+      "bash(kubectl exec *)",
+      "ExecutePythonCode",
+      "RunInTerminal",
+      "RunShellCommand",
+      "GeneratePdfReport"
+    ],
+    "ask": [
+      "RunKubectlWriteCommand(kubectl scale deployment/mongodb -n energy --replicas=1)",
+      "RunKubectlWriteCommand(kubectl scale deployment/mongodb -n energy --replicas=0)"
+    ],
+    "allow": [
+      "RunAzCliReadCommands",
+      "RunKubectlReadCommand(kubectl get *)",
+      "RunKubectlReadCommand(kubectl describe *)",
+      "RunKubectlReadCommand(kubectl logs *)",
+      "RunKubectlReadCommand(kubectl top *)"
+    ]
+  }
+}

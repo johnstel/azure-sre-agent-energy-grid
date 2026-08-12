@@ -11,7 +11,9 @@ import {
   resetRehearsalRun,
   resumeRehearsalRun,
   updateRehearsalEvidence,
+  attachRehearsalMitigationEvidence,
 } from './RehearsalWorkflowService.js';
+import type { ReviewModeMitigationEvidence } from './sre-agent/mitigationLifecycle.js';
 
 async function withTempState<T>(operation: (stateDir: string) => Promise<T>): Promise<T> {
   const tempDir = await mkdtemp(join(tmpdir(), 'rehearsal-workflow-'));
@@ -165,5 +167,73 @@ test('ServiceMismatch supports interruption, resume, and reset while keeping por
     assert.equal(reset.status, 'reset');
     assert.equal(reset.phase, 'preflight');
     assert.equal(reset.gateStatus, 'PASS_WITH_PENDING_HUMAN_PORTAL');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Review-mode mitigation evidence persistence (issue #80)
+// ---------------------------------------------------------------------------
+
+function mitigationEvidence(overrides: Partial<ReviewModeMitigationEvidence> = {}): ReviewModeMitigationEvidence {
+  return {
+    state: 'proposed',
+    incidentResolved: false,
+    effectiveRunMode: 'review',
+    runModeBlocked: false,
+    scenario: 'MongoDBDown',
+    targetResource: 'energy/mongodb',
+    proposedCommand: 'kubectl scale deployment/mongodb -n energy --replicas=1',
+    correlation: { threadId: 'thread-1' },
+    verification: { probes: [], missingProbes: [], allProbesPassed: false, postDatesExecution: false },
+    guidance: {},
+    stale: false,
+    schemaMismatch: false,
+    securityFindings: [],
+    rejectedEvidence: [],
+    limitations: [],
+    ...overrides,
+  };
+}
+
+test('rehearsal persists derived mitigation evidence with its capture timestamp', async () => {
+  await withTempState(async () => {
+    await createRehearsalRun({ scenarioName: 'MongoDBDown' });
+    const run = await attachRehearsalMitigationEvidence('MongoDBDown', mitigationEvidence({ state: 'denied' }));
+    assert.equal(run.mitigationEvidence?.state, 'denied');
+    assert.ok(run.mitigationEvidenceCapturedAt);
+    assert.equal(run.mitigationEvidence?.incidentResolved, false);
+  });
+});
+
+test('rehearsal refuses to persist a resolved incident without verification-passed', async () => {
+  await withTempState(async () => {
+    await createRehearsalRun({ scenarioName: 'MongoDBDown' });
+    await assert.rejects(
+      () => attachRehearsalMitigationEvidence('MongoDBDown', mitigationEvidence({ state: 'proposed', incidentResolved: true })),
+      /without a verification-passed state/,
+    );
+  });
+});
+
+test('rehearsal refuses to persist verification-passed whose probes did not pass', async () => {
+  await withTempState(async () => {
+    await createRehearsalRun({ scenarioName: 'MongoDBDown' });
+    await assert.rejects(
+      () => attachRehearsalMitigationEvidence('MongoDBDown', mitigationEvidence({
+        state: 'verification-passed',
+        incidentResolved: true,
+        verification: { probes: [], missingProbes: ['golden-transaction'], allProbesPassed: false, postDatesExecution: true },
+      })),
+      /probes did not all pass/,
+    );
+  });
+});
+
+test('rehearsal mitigation evidence requires an existing run', async () => {
+  await withTempState(async () => {
+    await assert.rejects(
+      () => attachRehearsalMitigationEvidence('MongoDBDown', mitigationEvidence()),
+      /Rehearsal run not found/,
+    );
   });
 });

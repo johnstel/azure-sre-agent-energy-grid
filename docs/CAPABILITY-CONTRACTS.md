@@ -377,7 +377,22 @@ traces
 
 This demo proves **Review mode only**. Auto mode exists but is out of scope for this wave.
 
-No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'` and `accessLevel: 'High'`, which means the agent may recommend remediation but a human operator remains responsible for executing write actions. If the Azure SRE Agent portal exposes a specific approval/denial UX in this environment, capture it as evidence before mentioning it; otherwise use “agent recommends, operator executes.”
+No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'`, which means the agent may propose remediation but a human decision is required before any write executes.
+
+**Scoped exception (issue #80, `MongoDBDown` only).** One reversible scenario has a documented,
+guardrailed Review-mode mitigation path — see [`REVIEW-MODE-MITIGATION.md`](REVIEW-MODE-MITIGATION.md).
+For every other scenario, keep the conservative “agent recommends, operator executes” wording.
+Even for `MongoDBDown`, Mission Control derives the lifecycle from observed `IncidentActivitySnapshot`,
+`ApprovalDecision`, `AgentToolExecution` and `AgentAzCliExecution` telemetry and reports
+`verification-passed` **only** when approval, execution, and three post-execution probes were all
+observed and correlated by exact identifier. Live deny/approve proof is recorded as **pending**
+until captured against a real environment (`REVIEW-MODE-MITIGATION.md` §10) — do not present it as
+proven before then.
+
+A Kubernetes write does **not** trigger the native Review-mode Approve/Deny button on its own
+([run modes](https://learn.microsoft.com/azure/sre-agent/run-modes) scopes that gate to Azure
+infrastructure operations). The approval gate for this path is a global Tool Access Policy `ask`
+rule combined with response-plan run mode Review.
 
 Any future Auto mode demo requires a separate security review with evidence of:
 
@@ -402,7 +417,8 @@ The current demo profile intentionally grants broad roles through `scripts/confi
 | Key Vault Secrets Officer | Key Vault | ⚠️ DEMO ONLY | ❌ Remove or Key Vault Secrets User | Agent doesn't manage secrets |
 | AcrPull | ACR | ✅ | ✅ Keep if image metadata/pull access is needed | No scenario requires image push |
 | Reader | Subscription | ⚠️ DEMO ONLY | Reader (Resource Group scope) | Limit enumeration surface |
-| Contributor | Resource Group | ⚠️ DEMO ONLY (`accessLevel: 'High'`) | ❌ Remove (`accessLevel: 'Low'`) | Use Low for read-only diagnosis |
+| Contributor | Resource Group | ⚠️ DEMO ONLY (`accessLevel: 'High'`) | ❌ Remove (`accessLevel: 'Low'` or `'Mitigation'`) | Use Low for read-only diagnosis; use `Mitigation` for the issue #80 remediation path, which grants **no** Contributor |
+| SRE Agent Energy Grid Mitigation Operator (custom) | AKS resource | ✅ `accessLevel: 'Mitigation'` | ✅ Keep | Only `managedClusters/read` + `listClusterUserCredential/action`; no admin credential, no `runCommand`, no wildcard |
 
 `accessLevel: 'Low'` gives Reader + Log Analytics Reader. `accessLevel: 'High'` adds Contributor. The Bicep source of truth allows only `High` and `Low` for `accessLevel`; do not use other values.
 
@@ -556,7 +572,8 @@ telemetry — see `infra/bicep/modules/app-insights.bicep` and `sre-agent.bicep`
 | `IncidentActivitySnapshot` | Documented: `IncidentId`, `IncidentTitle`, `IncidentSeverity`, `IncidentStatus`, `IncidentPlatform`, `IncidentMitigatedByAgent`, `IncidentAssistedByAgent`, `AgentAutonomyLevel`, `ResponsePlanId`, `ResponsePlanCustom`, `IncidentImpactedService`, `IncidentCreatedOn`, `IncidentHandledOn`, `IncidentMitigatedOn` |
 | `AgentExecution` | `SCHEMA_TBD` — Microsoft Learn documents only "session start/end lifecycle" without an itemized field table |
 | `AgentToolExecution` | Documented: `EventType`, `ToolName`, `ToolInput`, `ToolOutput`, `SubAgentName`, `CallId` |
-| `ApprovalDecision` | `SCHEMA_TBD` — Microsoft Learn shows only a raw `customDimensions` projection, no itemized field table |
+| `ApprovalDecision` | `SCHEMA_TBD` — Microsoft Learn shows only a raw `customDimensions` projection, no itemized field table. `mitigationLifecycle.ts` scans a bounded candidate-key list for the outcome and resolves to `unknown` when none matches; it never defaults to `approved`. |
+| `AgentAzCliExecution` | Name documented ("Azure CLI commands run by the agent"); fields `SCHEMA_TBD`. Correlated when present, but never required for the kubectl mitigation path. |
 
 Shared correlation fields on every event (all four): `gen_ai.agent.id`, `gen_ai.agent.name`,
 `TraceId`, `SpanId`, `ParentSpanId`, `ThreadId`, `LogTimestamp`, `CorrelationId`.

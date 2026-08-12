@@ -15,8 +15,8 @@ param location string
 @description('Tags to apply to resources')
 param tags object
 
-@description('The access level for the SRE Agent (High = Reader + Contributor + Log Analytics Reader, Low = Reader + Log Analytics Reader)')
-@allowed(['High', 'Low'])
+@description('The access level for the SRE Agent. High = Reader + Contributor + Log Analytics Reader (broad, legacy lab flows). Low = Reader + Log Analytics Reader (diagnosis only). Mitigation = Reader + Log Analytics Reader ONLY at resource-group scope, with the narrow AKS-scoped custom role supplied separately by modules/sre-agent-mitigation-role.bicep (issue #80, docs/REVIEW-MODE-MITIGATION.md §3 Layer 3). Mitigation deliberately grants NO Contributor.')
+@allowed(['High', 'Low', 'Mitigation'])
 param accessLevel string = 'High'
 
 @description('Application Insights App ID')
@@ -48,12 +48,25 @@ var roleDefinitions = {
     '92aaf0da-9dab-42b6-94a3-d43ce8d16293' // Log Analytics Reader
     'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Reader
   ]
+  // Issue #80: the Review-mode mitigation path must NOT hold Contributor. The single write it
+  // needs is granted by the AKS-scoped custom role in modules/sre-agent-mitigation-role.bicep.
+  Mitigation: [
+    '92aaf0da-9dab-42b6-94a3-d43ce8d16293' // Log Analytics Reader
+    'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Reader
+  ]
   High: [
     '92aaf0da-9dab-42b6-94a3-d43ce8d16293' // Log Analytics Reader
     'acdd72a7-3385-48ef-bd42-f606fba81ae7' // Reader
     'b24988ac-6180-42a0-ab88-20f7382dd24c' // Contributor
   ]
 }
+
+// The ARM actionConfiguration.accessLevel enum only accepts High/Low. 'Mitigation' is this repo's
+// own selector for a least-privilege Azure RBAC posture; the agent is still permitted to ATTEMPT
+// write actions (accessLevel High) because what it can actually do is bounded by its assigned
+// roles -- "The agent's actions are constrained only by the permissions assigned to its managed
+// identity" (https://learn.microsoft.com/azure/sre-agent/execute-mitigations).
+var actionAccessLevel = accessLevel == 'Low' ? 'Low' : 'High'
 
 // Monitoring Contributor is required in addition to the accessLevel matrix above so the agent's
 // managed identity can see and acknowledge Azure Monitor alerts once incidentPlatform = 'AzureMonitor'.
@@ -107,7 +120,7 @@ var baseAgentProperties = {
     managedResources: []
   }
   actionConfiguration: {
-    accessLevel: accessLevel
+    accessLevel: actionAccessLevel
     identity: managedIdentity.id
     mode: 'Review'
   }
@@ -171,3 +184,9 @@ output managedIdentityId string = managedIdentity.id
 output managedIdentityPrincipalId string = managedIdentity.properties.principalId
 output incidentPlatformType string = incidentPlatform
 output incidentPlatformConfigured bool = incidentPlatform == 'AzureMonitor'
+output accessLevelSelector string = accessLevel
+output contributorAssigned bool = accessLevel == 'High'
+// Agent-level default run mode. Issue #80 requires this to remain 'Review'; per-response-plan
+// autonomy still has to be observed at runtime, because Microsoft documents the response-plan
+// default as Autonomous (https://learn.microsoft.com/azure/sre-agent/run-modes).
+output actionConfigurationMode string = 'Review'

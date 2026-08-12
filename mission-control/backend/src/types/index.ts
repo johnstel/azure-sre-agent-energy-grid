@@ -1,3 +1,30 @@
+// Review-mode mitigation lifecycle contracts (issue #80).
+// The canonical definitions live next to the runtime parsers that enforce them, in
+// services/sre-agent/mitigationLifecycle.ts, so the types and their validation cannot drift apart.
+// They are re-exported here because this module is Mission Control's shared API contract surface,
+// and mission-control/frontend/src/types/api.ts mirrors it (parity is asserted by
+// frontend/src/utils/reviewModeMitigation.test.ts).
+export type {
+  MitigationApprovalEvidence,
+  MitigationApprovalOutcome,
+  MitigationCorrelationKey,
+  MitigationExecutionEvidence,
+  MitigationGuidance,
+  MitigationMutationState,
+  MitigationResourceStateEvidence,
+  MitigationRunMode,
+  MitigationVerificationEvidence,
+  ResourceStateObservation,
+  ReviewModeMitigationEvidence,
+  ReviewModeMitigationState,
+  VerificationProbeEvidence,
+  VerificationProbeName,
+  VerificationProbeStatus,
+} from '../services/sre-agent/mitigationLifecycle.js';
+
+// Also imported locally because a re-export does not bring the name into this module's scope.
+import type { ReviewModeMitigationEvidence } from '../services/sre-agent/mitigationLifecycle.js';
+
 export type KubeSeverity = 'healthy' | 'warning' | 'critical' | 'unknown';
 
 export interface KubeObjectRef {
@@ -355,6 +382,7 @@ export type SreAgentEvidenceTemplateName =
   | 'agent-execution-lifecycle'
   | 'agent-tool-execution'
   | 'approval-decisions'
+  | 'agent-az-cli-execution'
   | 'incident-thread-timeline';
 
 export interface SreAgentEvidenceQueryRequest {
@@ -805,6 +833,13 @@ export interface RehearsalRun {
   };
   incidentHandoffId?: string;
   notes?: string;
+  /**
+   * Review-mode mitigation evidence (issue #80), captured by RE-DERIVING it from observed audit
+   * telemetry at attach time. It is never accepted from a request body, so a rehearsal package can
+   * not be made to claim an approval, execution, or recovery that was not observed.
+   */
+  mitigationEvidence?: ReviewModeMitigationEvidence;
+  mitigationEvidenceCapturedAt?: string;
 }
 
 export interface RehearsalState {
