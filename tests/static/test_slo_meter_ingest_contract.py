@@ -36,13 +36,26 @@ class SloMeterIngestStaticContractTests(unittest.TestCase):
         self.assertIn('AppRequests', query)
         self.assertIn('arg_max(TimeGenerated, Success, DurationMs', query)
         self.assertIn('percentile(DurationMs, 95)', query)
-        self.assertIn('LatestCriticalFailure', query)
         self.assertIn('FailureReason', query)
         self.assertIn('FailureStage in ("persistence", "ingress")', query)
         self.assertIn('arg_max(CriticalFailureAt, CriticalFailureStage, CriticalFailureReason)', query)
         self.assertIn('RunCount == 0, "NO_DATA"', query)
         self.assertIn('now() - LastSuccess > freshnessLimit', query)
         self.assertNotIn('coalesce(SuccessRatePct, 100', query)
+        self.assert_valid_critical_failure_alias_order(query)
+
+    def assert_valid_critical_failure_alias_order(self, query):
+        final_project = query.index('\n| project\n    TimeBucket')
+        demo_status = query.index('DemoStatus = case(')
+        critical_failure_source = query.index('arg_max(CriticalFailureAt, CriticalFailureStage, CriticalFailureReason)')
+        demo_status_block = query[demo_status:final_project]
+        final_projection = query[final_project:]
+
+        self.assertLess(critical_failure_source, demo_status)
+        self.assertLess(demo_status, final_project)
+        self.assertIn('CriticalFailureAt', demo_status_block)
+        self.assertNotIn('LatestCriticalFailure', demo_status_block)
+        self.assertIn('LatestCriticalFailure = CriticalFailureAt', final_projection)
 
     def test_alerts_and_dashboard_expose_non_green_customer_impact(self):
         alerts = (ROOT / 'infra/bicep/modules/alerts.bicep').read_text(encoding='utf-8')
@@ -74,6 +87,21 @@ class SloMeterIngestStaticContractTests(unittest.TestCase):
         failure_panel = next(panel for panel in dashboard['panels'] if panel.get('title') == 'Failure stage and burn rate')
         failure_query = failure_panel['targets'][0]['azureMonitor']['query']
         self.assertIn('arg_max(LatestFailureAt, LatestFailureStage, LatestFailureReason)', failure_query)
+        state_panel = next(panel for panel in dashboard['panels'] if panel.get('title') == 'Synthetic customer-impact state')
+        state_query = state_panel['targets'][0]['azureMonitor']['query']
+        self.assertLess(state_query.index('LatestCriticalFailure = maxif'), state_query.index('extend State = case'))
+
+        backend_query = (ROOT / 'mission-control/backend/src/services/LogAnalyticsQueryService.ts').read_text(encoding='utf-8')
+        self.assertLess(
+            backend_query.index('CriticalFailureAt=iff'),
+            backend_query.index('arg_max(CriticalFailureAt, CriticalFailureStage, CriticalFailureReason)'),
+        )
+
+        alert_query = alerts[alerts.index("resource sloMeterIngestCustomerImpactAlert"):]
+        self.assertLess(
+            alert_query.index("LatestCriticalFailure = maxif"),
+            alert_query.index("CustomerImpactSignal = iff"),
+        )
 
     def test_docs_keep_demo_and_scheduled_task_claims_evidence_safe(self):
         slo_doc = (ROOT / 'docs/SLO-METER-INGEST.md').read_text(encoding='utf-8')

@@ -49,7 +49,7 @@ logicalRuns
         "DATA"),
     DemoStatus = case(
         RunCount == 0, "NO_DATA",
-        not(isnull(LatestCriticalFailure)) and (isnull(LastSuccess) or LastSuccess <= LatestCriticalFailure), "CRITICAL",
+        not(isnull(CriticalFailureAt)) and (isnull(LastSuccess) or LastSuccess <= CriticalFailureAt), "CRITICAL",
         SuccessCount == 0, "CRITICAL",
         isnull(LastSuccess) or now() - LastSuccess > freshnessLimit, "CRITICAL",
         SuccessRatePct < 95.0 or P95LatencyMs > 30000.0, "DEGRADED",
