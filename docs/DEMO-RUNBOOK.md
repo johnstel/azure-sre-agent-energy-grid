@@ -638,6 +638,18 @@ Ready for Wave 2 scenario validation: ☐ Yes ☐ No
    ```
    The first command must exit 0. The second must not report Contributor on the agent identity.
 
+   With `enableAgentKubernetesRbac=true`, the `-Apply` run also creates the Layer 2 assignment at
+   exactly `<aksResourceId>/namespaces/energy` (Bicep cannot express that extension-resource scope —
+   see [`REVIEW-MODE-MITIGATION.md` §3](REVIEW-MODE-MITIGATION.md)) and reads it back to verify.
+   Expected output:
+   ```text
+   [PASS   ] Created and verified namespace-scoped assignment. Returned scope:
+             /subscriptions/…/managedClusters/<aks>/namespaces/energy
+   ```
+   A `CLUSTER-WIDE GRANT` or `OUT-OF-SCOPE GRANT` line is a **failure**, not a warning: the script
+   prints the exact `az role assignment delete --ids …` command to remove it. Namespace enforcement
+   is never reported from the mere existence of an assignment.
+
 3. **Set the response plan to Review.** Microsoft documents the *response plan* default as
    Autonomous even though the agent-level default is Review
    ([run modes](https://learn.microsoft.com/azure/sre-agent/run-modes)). In the agent portal, edit

@@ -198,8 +198,12 @@ export function buildSreAgentEvidenceKql(request: SreAgentEvidenceQueryRequest, 
       ].join('\n');
     }
     case 'agent-tool-execution': {
+      // Filter by BOTH identifiers when available. The primary Mission Control path can have an
+      // incidentId without a threadId; filtering on threadId alone would then fall back to a
+      // workspace-wide top-N query whose `take` could drop this incident's tool rows entirely.
       const filters = [`name == "${SRE_AGENT_EVENT_NAMES.agentToolExecution}"`];
       if (request.threadId) filters.push(`tostring(customDimensions.ThreadId) == ${kqlString(request.threadId)}`);
+      if (request.incidentId) filters.push(`tostring(customDimensions.IncidentId) == ${kqlString(request.incidentId)}`);
       return [
         'customEvents',
         `| where ${filters.join(' and ')}`,
@@ -377,7 +381,7 @@ function rejectUnknownParams(templateName: SreAgentEvidenceTemplateName, rawPara
   const allowedByTemplate: Record<SreAgentEvidenceTemplateName, Set<string>> = {
     'incident-activity-snapshot': new Set([...base, 'incidentId', 'impactedService']),
     'agent-execution-lifecycle': new Set([...base, 'threadId']),
-    'agent-tool-execution': new Set([...base, 'threadId']),
+    'agent-tool-execution': new Set([...base, 'threadId', 'incidentId']),
     'approval-decisions': new Set([...base, 'threadId', 'incidentId']),
     'agent-az-cli-execution': new Set([...base, 'threadId', 'incidentId']),
     'incident-thread-timeline': new Set([...base, 'threadId']),

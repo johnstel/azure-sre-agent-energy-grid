@@ -75,12 +75,30 @@ resource mitigationRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-
 
 // -----------------------------------------------------------------------------
 // Layer 2 (opt-in): namespace-scoped Kubernetes dataActions enforced by the API server.
+//
+// IMPORTANT -- why the role DEFINITION is here but the role ASSIGNMENT is not.
+//
+// Azure RBAC for Kubernetes Authorization scopes a namespace grant to the extension-resource path
+// `<aksResourceId>/namespaces/<namespace>` (https://learn.microsoft.com/azure/aks/manage-azure-rbac).
+// That path is NOT an ARM resource this module can target: Bicep's `scope:` accepts a resource
+// symbolic reference or an existing-resource reference, and `Microsoft.ContainerService/
+// managedClusters/namespaces` is not a deployable ARM resource type, so there is no symbolic
+// reference to point at. Writing `scope: aks` instead silently produces a CLUSTER-WIDE grant.
+//
+// A cluster-wide dataActions grant labelled "namespace-scoped" is worse than no Layer 2 at all,
+// because the operator is told the API server is enforcing a boundary that does not exist. So this
+// module deliberately creates ONLY the role definition, and
+// scripts/configure-sre-agent-mitigation-guardrails.ps1 creates the assignment at the exact
+// namespace scope via `az role assignment create --scope <aksId>/namespaces/energy`, then reads the
+// assignment back and asserts the returned scope matches exactly.
+//
+// See docs/REVIEW-MODE-MITIGATION.md section 3 (Layer 2).
 // -----------------------------------------------------------------------------
 resource namespaceRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = if (enableKubernetesDataActions) {
   name: guid(aks.id, 'sre-agent-mitigation-k8s', uniqueSuffix)
   properties: {
     roleName: 'SRE Agent Energy Grid Deployment Scaler (${uniqueSuffix})'
-    description: 'Namespace-scoped Kubernetes dataActions permitting the agent to read and scale Deployments in a single namespace. Grants no pod exec, no secret access, and no delete.'
+    description: 'Kubernetes dataActions permitting the agent to read and scale Deployments. Intended to be ASSIGNED ONLY at <aksResourceId>/namespaces/${namespaceName} by scripts/configure-sre-agent-mitigation-guardrails.ps1. Grants no pod exec, no secret access, and no delete.'
     type: 'CustomRole'
     permissions: [
       {
@@ -99,25 +117,18 @@ resource namespaceRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = if
         ]
       }
     ]
+    // Assignable at the cluster so the namespace child scope beneath it is assignable. The
+    // ASSIGNMENT itself is created at the namespace path, never here.
     assignableScopes: [
       aks.id
     ]
   }
 }
 
-resource namespaceRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (enableKubernetesDataActions) {
-  name: guid(aks.id, principalId, 'sre-agent-mitigation-k8s', namespaceName)
-  scope: aks
-  properties: {
-    // Namespace scoping is expressed via the assignment scope path documented for Azure RBAC
-    // for Kubernetes Authorization. The deployment script narrows this to
-    // <aksResourceId>/namespaces/<namespaceName>; see configure-sre-agent-mitigation-guardrails.ps1.
-    roleDefinitionId: namespaceRole!.id
-    principalId: principalId
-    principalType: 'ServicePrincipal'
-    description: 'Namespace-scoped to ${namespaceName} by scripts/configure-sre-agent-mitigation-guardrails.ps1.'
-  }
-}
+// NOTE: there is intentionally NO Microsoft.Authorization/roleAssignments resource for
+// `namespaceRole`. See the comment block above. Do not add one at `scope: aks` -- that is a
+// cluster-wide grant, and validate-sre-agent-mitigation-guardrails.ps1 fails the build if one
+// reappears.
 
 // =============================================================================
 // OUTPUTS
@@ -127,3 +138,12 @@ output mitigationRoleDefinitionId string = mitigationRole.id
 output mitigationRoleName string = mitigationRole.properties.roleName
 output kubernetesDataActionsEnabled bool = enableKubernetesDataActions
 output namespaceRoleDefinitionId string = enableKubernetesDataActions ? namespaceRole!.id : ''
+output namespaceRoleName string = enableKubernetesDataActions ? namespaceRole!.properties.roleName : ''
+
+// The EXACT scope at which the namespace role must be assigned. Emitted so the configure script
+// and the validator both compare against one authoritative value instead of rebuilding the path.
+output namespaceAssignmentScope string = enableKubernetesDataActions ? '${aks.id}/namespaces/${namespaceName}' : ''
+
+// Explicit, machine-readable statement that this module does NOT create the Layer 2 assignment.
+// docs/REVIEW-MODE-MITIGATION.md section 3 explains why, and the configure script creates it.
+output namespaceRoleAssignmentCreatedByTemplate bool = false

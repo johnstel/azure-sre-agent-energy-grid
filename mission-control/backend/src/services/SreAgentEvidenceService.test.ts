@@ -166,3 +166,42 @@ test('SRE Agent evidence denied/unavailable error responses keep honest, empty e
   assert.equal(schemaMismatch.metadata.schemaMismatch, true);
   assert.ok(schemaMismatch.metadata.limitations.some(limitation => limitation.includes('telemetry schema')));
 });
+
+// ---------------------------------------------------------------------------
+// agent-tool-execution incidentId filtering (issue #80 review blocker 2)
+// ---------------------------------------------------------------------------
+
+test('agent-tool-execution filters by incidentId, threadId, or both', () => {
+  const from = new Date('2026-01-01T00:00:00Z');
+  const to = new Date('2026-01-01T01:00:00Z');
+
+  // Incident-only: the primary Mission Control path can have an incidentId without a threadId.
+  // Without this filter the query degrades to a workspace-wide top-N whose `take` can silently
+  // drop this incident's tool rows.
+  const incidentOnly = normalizeSreAgentEvidenceRequest('agent-tool-execution', { incidentId: 'INC-42' });
+  const incidentOnlyKql = buildSreAgentEvidenceKql(incidentOnly, from, to);
+  assert.match(incidentOnlyKql, /tostring\(customDimensions\.IncidentId\) == "INC-42"/);
+  assert.doesNotMatch(incidentOnlyKql, /customDimensions\.ThreadId\) ==/);
+
+  const threadOnly = normalizeSreAgentEvidenceRequest('agent-tool-execution', { threadId: 'thread-1' });
+  const threadOnlyKql = buildSreAgentEvidenceKql(threadOnly, from, to);
+  assert.match(threadOnlyKql, /tostring\(customDimensions\.ThreadId\) == "thread-1"/);
+  assert.doesNotMatch(threadOnlyKql, /customDimensions\.IncidentId\) ==/);
+
+  const both = normalizeSreAgentEvidenceRequest('agent-tool-execution', { threadId: 'thread-1', incidentId: 'INC-42' });
+  const bothKql = buildSreAgentEvidenceKql(both, from, to);
+  assert.match(bothKql, /tostring\(customDimensions\.ThreadId\) == "thread-1"/);
+  assert.match(bothKql, /tostring\(customDimensions\.IncidentId\) == "INC-42"/);
+
+  // The row projection must expose IncidentId so post-query correlation can compare it exactly.
+  assert.match(bothKql, /IncidentId = tostring\(customDimensions\.IncidentId\)/);
+});
+
+test('agent-tool-execution accepts incidentId as an allowed parameter', () => {
+  assert.doesNotThrow(() => normalizeSreAgentEvidenceRequest('agent-tool-execution', { incidentId: 'INC-42' }));
+  // Unrelated parameters remain rejected.
+  assert.throws(
+    () => normalizeSreAgentEvidenceRequest('agent-tool-execution', { impactedService: 'mongodb' }),
+    KubeInputError,
+  );
+});

@@ -757,6 +757,89 @@ describe('allowlist enforcement at the evidence boundary', () => {
     assert.equal(evidence.incidentResolved, false);
   });
 
+  it('flags an out-of-scope call represented ONLY by a successful ToolEnd', () => {
+    // Security regression: ToolEnd rows were excluded from the out-of-scope scan, so a disallowed
+    // operation that actually COMPLETED produced no finding -- quieter than a mere attempt.
+    const evidence = derive({
+      approvalRows: [approvalRow({ RawDimensions: { Decision: 'Approved' } })],
+      toolExecutionRows: [
+        toolEndRow({
+          ToolInput: JSON.stringify({ command: 'kubectl delete deployment/mongodb -n energy' }),
+          ToolOutput: 'deployment.apps "mongodb" deleted',
+          CallId: 'call_destructive',
+        }),
+      ],
+      resourceStateBefore: state(T(-400), 0),
+      resourceStateAfter: state(T(-30), 1),
+      probes: passingProbes(),
+    });
+    const findings = evidence.securityFindings.filter(finding => /Out-of-scope tool call/.test(finding));
+    assert.equal(findings.length, 1, 'a completed out-of-scope call must raise exactly one finding');
+    assert.match(findings[0]!, /ToolEnd/);
+    assert.match(findings[0]!, /COMPLETED/);
+    // It must never satisfy execution or verification.
+    assert.equal(evidence.execution, undefined);
+    assert.notEqual(evidence.state, 'verification-passed');
+    assert.equal(evidence.incidentResolved, false);
+  });
+
+  it('dedupes a ToolStart/ToolEnd pair for the same out-of-scope call by CallId', () => {
+    const bad = JSON.stringify({ command: 'kubectl delete ns energy' });
+    const evidence = derive({
+      approvalRows: [approvalRow({ RawDimensions: { Decision: 'Approved' } })],
+      toolExecutionRows: [
+        toolRow({ ToolInput: bad, CallId: 'call_same' }),
+        toolEndRow({ ToolInput: bad, ToolOutput: 'namespace "energy" deleted', CallId: 'call_same' }),
+      ],
+      probes: passingProbes(),
+    });
+    const findings = evidence.securityFindings.filter(finding => /Out-of-scope tool call/.test(finding));
+    assert.equal(findings.length, 1, 'a Start/End pair is one attempt, not two');
+    // The ToolEnd row wins because it carries the outcome.
+    assert.match(findings[0]!, /ToolEnd/);
+  });
+
+  it('falls back to SpanId then command text when CallId is absent', () => {
+    const bad = JSON.stringify({ command: 'kubectl exec mongodb -n energy -- sh' });
+    const evidence = derive({
+      approvalRows: [approvalRow({ RawDimensions: { Decision: 'Approved' } })],
+      toolExecutionRows: [
+        toolRow({ ToolInput: bad, CallId: undefined, SpanId: 'span-1' }),
+        toolEndRow({ ToolInput: bad, CallId: undefined, SpanId: 'span-1' }),
+      ],
+      probes: passingProbes(),
+    });
+    assert.equal(evidence.securityFindings.filter(finding => /Out-of-scope tool call/.test(finding)).length, 1);
+  });
+
+  it('reports distinct out-of-scope calls separately', () => {
+    const evidence = derive({
+      approvalRows: [approvalRow({ RawDimensions: { Decision: 'Approved' } })],
+      toolExecutionRows: [
+        toolEndRow({ ToolInput: JSON.stringify({ command: 'kubectl delete ns energy' }), CallId: 'call_a' }),
+        toolEndRow({ ToolInput: JSON.stringify({ command: 'kubectl exec mongodb -n energy -- sh' }), CallId: 'call_b' }),
+      ],
+      probes: passingProbes(),
+    });
+    assert.equal(evidence.securityFindings.filter(finding => /Out-of-scope tool call/.test(finding)).length, 2);
+  });
+
+  it('does not let a disallowed successful ToolEnd reach verification-passed alongside a valid one', () => {
+    // Even when a legitimate allowlisted execution exists, the disallowed completion must surface.
+    const evidence = derive({
+      approvalRows: [approvalRow({ RawDimensions: { Decision: 'Approved' } })],
+      toolExecutionRows: [
+        toolRow(),
+        toolEndRow(),
+        toolEndRow({ ToolInput: JSON.stringify({ command: 'kubectl delete ns energy' }), CallId: 'call_evil' }),
+      ],
+      resourceStateBefore: state(T(-400), 0),
+      resourceStateAfter: state(T(-30), 1),
+      probes: passingProbes(),
+    });
+    assert.ok(evidence.securityFindings.some(finding => /Out-of-scope tool call/.test(finding) && /COMPLETED/.test(finding)));
+  });
+
   it('does not let an out-of-scope execution satisfy the execution requirement', () => {
     const bad = JSON.stringify({ command: 'kubectl scale deployment/meter-service -n energy --replicas=5' });
     const evidence = derive({

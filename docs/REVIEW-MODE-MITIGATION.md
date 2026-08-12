@@ -131,12 +131,35 @@ these rules cannot be widened by a custom-agent or thread-level allow.
 ### Layer 2 — Azure RBAC for Kubernetes, namespace-scoped (opt-in)
 
 Set `enableAgentKubernetesRbac = true` (default `false`). This enables managed Entra integration
-with Azure RBAC on the cluster and assigns the agent identity a **custom role** whose only
-`dataActions` are `apps/deployments` read/write, at scope
+with Azure RBAC on the cluster and grants the agent identity a **custom role** whose only
+`dataActions` are `apps/deployments` read/write plus a few reads, assigned at scope
 `<aksResourceId>/namespaces/energy`. Authorization is then enforced by the API server, not by a
 string match.
 
-It is **off by default** because enabling Entra integration changes how `az aks get-credentials`
+> **Bicep cannot express this scope, so it does not create the assignment.**
+> Azure RBAC for Kubernetes Authorization scopes a namespace grant to the extension-resource path
+> `<aksResourceId>/namespaces/<namespace>`
+> ([manage-azure-rbac](https://learn.microsoft.com/azure/aks/manage-azure-rbac)). That path is not a
+> deployable ARM resource type, so Bicep has no symbolic reference to target and `scope:` cannot
+> name it. Writing `scope: aks` instead silently produces a **cluster-wide** grant.
+>
+> A cluster-wide `dataActions` grant labelled "namespace-scoped" is worse than no Layer 2 at all,
+> because the operator is told a boundary exists that does not. So:
+>
+> - `infra/bicep/modules/sre-agent-mitigation-role.bicep` creates **only the role definition**, and
+>   outputs `namespaceRoleAssignmentCreatedByTemplate = false` plus the exact required
+>   `namespaceAssignmentScope`.
+> - `scripts/configure-sre-agent-mitigation-guardrails.ps1 -Apply` creates the assignment
+>   idempotently with `az role assignment create --scope <aksId>/namespaces/energy`, then **reads it
+>   back and asserts the scope the service returned** matches exactly.
+> - Any assignment found at the bare cluster scope is reported as `CLUSTER-WIDE GRANT` and fails;
+>   any other namespace is reported as `OUT-OF-SCOPE GRANT` and fails. Neither is ever reported as
+>   namespace enforcement.
+> - `scripts/validate-sre-agent-mitigation-guardrails.ps1` and
+>   `tests/static/test_review_mode_mitigation_rbac.py` fail the build if a `roleAssignments`
+>   resource referencing the dataActions role reappears in the template.
+
+Layer 2 is **off by default** because enabling Entra integration changes how `az aks get-credentials`
 issues operator kubeconfigs, and this repository has no live environment in which to validate that
 change (§10). `scripts/deploy.ps1` already switches to `--admin` when the flag is on.
 
@@ -281,15 +304,18 @@ string. This closes an argument-smuggling class where a command carrying the req
 `-n energy` and `--replicas=N` tokens could also carry `--server`, `--token`, `--kubeconfig`,
 `--as system:masters`, `--all-namespaces`, or a second `deployment/...` target.
 
-### 8.1 Findings from the adversarial security review
+### 8.1 Findings from adversarial security and peer review
 
-Three issues were found by security review of this change and fixed before merge. Each has a
-named regression test:
+Six issues were found by review of this change and fixed before merge. Each has a named
+regression test:
 
 | Finding | Severity | Fix |
 | --- | --- | --- |
 | Lookahead-based command normalisation discarded extra arguments, so a smuggled command normalised into an allowlisted string | High | Replaced with a strict tokeniser (`mitigationLifecycle.test.ts`: "rejects argument-smuggling payloads…", "does not let a smuggled command reach verification-passed") |
+| Layer 2's Kubernetes `dataActions` assignment was written at `scope: aks` — a **cluster-wide** grant — while code, docs and script all claimed `<aksId>/namespaces/energy` | High | Template no longer creates the assignment; the configure script creates it at the exact namespace scope and verifies the returned scope (`tests/static/test_review_mode_mitigation_rbac.py`, validator guard) |
 | The run-mode gate selected its snapshot row with an OR over `IncidentId`/`ThreadId`, so the autonomy level could be read from a different agent thread of the same incident | Medium | `correlateRawRow()` applies the same strict equality used everywhere else (`mitigation.test.ts`: "reads the run mode only from a strictly correlated snapshot row") |
+| `agent-tool-execution` filtered only on `threadId`, so an incident-only correlation degraded to a workspace-wide top-N query that could drop the incident's tool rows | Medium | The template and its allowed parameters now accept `incidentId` too (`SreAgentEvidenceService.test.ts`, `mitigation.test.ts`: "filters tool execution by incidentId when no threadId is known") |
+| Out-of-scope `ToolEnd` rows were excluded from the security scan, so a disallowed operation that **succeeded** produced no finding — quieter than a mere attempt | Medium | All non-allowlisted rows are flagged regardless of event type, deduped by `CallId`/`SpanId` (`mitigationLifecycle.test.ts`: "flags an out-of-scope call represented ONLY by a successful ToolEnd") |
 | Redaction of space-separated CLI secret flags stopped at the first space inside quotes, leaking the remainder of a multi-word secret | Medium | The value pattern now consumes to the matching closing quote (`mitigationLifecycle.test.ts`: "redacts quoted secret values that contain spaces") |
 
 ---

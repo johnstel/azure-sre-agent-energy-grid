@@ -24,7 +24,13 @@
     Name of the Microsoft.App/agents resource. Discovered from the resource group when omitted.
 
 .PARAMETER Apply
-    Actually PUT the tool access policy. Without this, the script only reports what it would do.
+    Actually PUT the tool access policy, and create the namespace-scoped Layer 2 role assignment
+    when its custom role definition exists. Without this, the script only reports what it would do.
+
+.PARAMETER KubernetesNamespace
+    The single Kubernetes namespace the Layer 2 assignment may target. Any assignment found at a
+    different scope -- including the bare cluster scope -- is reported as a FAILURE, never as
+    namespace enforcement.
 
 .EXAMPLE
     ./scripts/configure-sre-agent-mitigation-guardrails.ps1 -ResourceGroupName rg-srelab-eastus2
@@ -39,6 +45,9 @@ param(
     [string]$ResourceGroupName,
 
     [string]$AgentName,
+
+    [ValidatePattern('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')]
+    [string]$KubernetesNamespace = 'energy',
 
     [switch]$Apply
 )
@@ -183,10 +192,73 @@ if ($identityPrincipal) {
     }
 
     $k8sRole = @($assignments | Where-Object { $_.roleDefinitionName -like 'SRE Agent Energy Grid Deployment Scaler*' })
-    if ($k8sRole.Count -gt 0) {
-        Write-Result 'PASS' 'Layer 2 active: the Kubernetes boundary is enforced by the API server at namespace scope.'
+
+    # Resolve the ONE scope at which the Layer 2 assignment is permitted to exist. Azure RBAC for
+    # Kubernetes Authorization scopes a namespace grant to <aksResourceId>/namespaces/<namespace>
+    # (https://learn.microsoft.com/azure/aks/manage-azure-rbac). Anything else -- notably the bare
+    # cluster id -- is a cluster-wide grant and must never be reported as namespace enforcement.
+    $aksId = az resource list --resource-group $ResourceGroupName --resource-type 'Microsoft.ContainerService/managedClusters' --query '[0].id' -o tsv 2>$null
+    $expectedNamespaceScope = if ($aksId) { "$aksId/namespaces/$KubernetesNamespace" } else { $null }
+
+    if ($k8sRole.Count -eq 0) {
+        Write-Result 'WARN' 'DEMO-ONLY PERMISSION BREADTH: Layer 2 (Azure RBAC for Kubernetes) is inactive, so the cluster-user credential is broader than this action needs. The tool access policy still constrains what the agent will run. See docs/REVIEW-MODE-MITIGATION.md section 4. Deploy with enableAgentKubernetesRbac = true and re-run this script with -Apply to create the namespace-scoped assignment.'
+    } elseif (-not $expectedNamespaceScope) {
+        Write-Result 'UNKNOWN' 'A Deployment Scaler assignment exists but the AKS resource id could not be resolved, so its scope could NOT be verified. Not reporting namespace enforcement.'
     } else {
-        Write-Result 'WARN' 'DEMO-ONLY PERMISSION BREADTH: Layer 2 (Azure RBAC for Kubernetes) is inactive, so the cluster-user credential is broader than this action needs. The tool access policy still constrains what the agent will run. See docs/REVIEW-MODE-MITIGATION.md section 4. Deploy with enableAgentKubernetesRbac = true to remove this breadth.'
+        # Compare exactly. A trailing-slash or casing difference is still a different scope, so
+        # normalise only trailing slashes and compare case-insensitively (ARM ids are
+        # case-insensitive but case-preserving).
+        $normalizedExpected = $expectedNamespaceScope.TrimEnd('/')
+        $correctlyScoped = @($k8sRole | Where-Object { $_.scope.TrimEnd('/') -ieq $normalizedExpected })
+        $wronglyScoped = @($k8sRole | Where-Object { $_.scope.TrimEnd('/') -ine $normalizedExpected })
+
+        foreach ($bad in $wronglyScoped) {
+            if ($bad.scope.TrimEnd('/') -ieq $aksId.TrimEnd('/')) {
+                Write-Result 'FAIL' "CLUSTER-WIDE GRANT: the Deployment Scaler role is assigned at the cluster scope '$($bad.scope)'. This is NOT namespace enforcement. Delete it with: az role assignment delete --ids $($bad.id)"
+            } else {
+                Write-Result 'FAIL' "OUT-OF-SCOPE GRANT: the Deployment Scaler role is assigned at '$($bad.scope)', which is not the expected '$normalizedExpected'. Delete it with: az role assignment delete --ids $($bad.id)"
+            }
+            $failures++
+        }
+
+        if ($correctlyScoped.Count -gt 0) {
+            Write-Result 'PASS' "Layer 2 active: Deployment Scaler assigned at exactly '$($correctlyScoped[0].scope)' -- the Kubernetes boundary is enforced by the API server for namespace '$KubernetesNamespace'."
+        } elseif ($wronglyScoped.Count -gt 0) {
+            Write-Result 'FAIL' "No Deployment Scaler assignment exists at the required namespace scope '$normalizedExpected'. Layer 2 is NOT enforcing a namespace boundary."
+            $failures++
+        }
+    }
+
+    # Create the namespace-scoped assignment when asked. Bicep cannot express this scope (see
+    # infra/bicep/modules/sre-agent-mitigation-role.bicep), so it is created here -- idempotently,
+    # and only ever at the exact namespace path.
+    if ($Apply -and $expectedNamespaceScope) {
+        $scalerRoleName = az role definition list --custom-role-only true --query "[?starts_with(roleName, 'SRE Agent Energy Grid Deployment Scaler')].roleName | [0]" -o tsv 2>$null
+        if (-not $scalerRoleName) {
+            Write-Result 'WARN' 'The Deployment Scaler custom role definition does not exist. Deploy with enableAgentKubernetesRbac = true before creating the namespace assignment.'
+        } elseif ($PSCmdlet.ShouldProcess($expectedNamespaceScope, "Assign '$scalerRoleName'")) {
+            $normalizedExpected = $expectedNamespaceScope.TrimEnd('/')
+            $already = @($k8sRole | Where-Object { $_.scope.TrimEnd('/') -ieq $normalizedExpected })
+            if ($already.Count -gt 0) {
+                Write-Result 'INFO' "Namespace-scoped assignment already exists at '$normalizedExpected'; nothing to do (idempotent)."
+            } else {
+                $created = az role assignment create --assignee-object-id $identityPrincipal --assignee-principal-type ServicePrincipal --role "$scalerRoleName" --scope $normalizedExpected -o json 2>$null | ConvertFrom-Json
+                if (-not $created) {
+                    Write-Result 'FAIL' "Failed to create the namespace-scoped assignment at '$normalizedExpected'."
+                    $failures++
+                } else {
+                    # Read back and assert the scope the SERVICE returned, not the one requested.
+                    $readBack = az role assignment show --scope $normalizedExpected --assignee $identityPrincipal --role "$scalerRoleName" -o json 2>$null | ConvertFrom-Json
+                    $actualScope = if ($readBack) { @($readBack)[0].scope } else { $created.scope }
+                    if ($actualScope -and $actualScope.TrimEnd('/') -ieq $normalizedExpected) {
+                        Write-Result 'PASS' "Created and verified namespace-scoped assignment. Returned scope: '$actualScope'"
+                    } else {
+                        Write-Result 'FAIL' "Assignment was created but its returned scope '$actualScope' does not match the required '$normalizedExpected'. Treating Layer 2 as NOT enforced."
+                        $failures++
+                    }
+                }
+            }
+        }
     }
 } else {
     Write-Result 'UNKNOWN' 'Could not resolve the agent managed identity principal; RBAC posture NOT verified.'

@@ -159,6 +159,61 @@ Assert-True ($role -match 'notDataActions') `
     'Custom role explicitly excludes secrets and pod exec via notDataActions.'
 
 # -----------------------------------------------------------------------------
+# 4b. Layer 2 must never be granted cluster-wide while being called namespace-scoped.
+#
+# Azure RBAC for Kubernetes scopes a namespace grant to <aksResourceId>/namespaces/<namespace>.
+# Bicep cannot target that extension-resource path, so an assignment written as `scope: aks`
+# silently becomes a CLUSTER-WIDE grant. That is strictly worse than no Layer 2, because the
+# operator is told a boundary exists that does not. These checks fail the build if such an
+# assignment reappears in the template.
+# -----------------------------------------------------------------------------
+
+$assignmentBlocks = [regex]::Matches(
+    $role,
+    "resource\s+(\w+)\s+'Microsoft\.Authorization/roleAssignments@[^']+'\s*=(?s).*?\n}"
+)
+
+$dataActionAssignmentAtClusterScope = $false
+foreach ($match in $assignmentBlocks) {
+    $block = $match.Value
+    # An assignment that references the Kubernetes dataActions role definition.
+    if ($block -match 'namespaceRole') {
+        $dataActionAssignmentAtClusterScope = $true
+    }
+}
+
+Assert-True (-not $dataActionAssignmentAtClusterScope) `
+    'Bicep does NOT create a role assignment for the Kubernetes dataActions role (it cannot express the namespace scope; the configure script creates it at <aksId>/namespaces/energy).'
+
+Assert-True ($role -match 'namespaceAssignmentScope') `
+    'Bicep emits the exact required namespace assignment scope as an output.'
+Assert-True ($role -match '\$\{aks\.id\}/namespaces/\$\{namespaceName\}') `
+    'The emitted namespace assignment scope is the documented <aksResourceId>/namespaces/<namespace> path.'
+Assert-True ($role -match 'namespaceRoleAssignmentCreatedByTemplate bool = false') `
+    'Bicep explicitly declares that it does not create the Layer 2 assignment.'
+
+# The configure script must create AND verify the exact scope, and must fail on a cluster-wide one.
+$configureScriptPath = Join-Path $repoRoot 'scripts/configure-sre-agent-mitigation-guardrails.ps1'
+if (-not (Test-Path $configureScriptPath)) {
+    Assert-True $false 'configure-sre-agent-mitigation-guardrails.ps1 is missing.'
+} else {
+    $configure = Get-Content -Path $configureScriptPath -Raw
+    Assert-True ($configure -match '\$aksId/namespaces/\$KubernetesNamespace') `
+        'The configure script builds the assignment scope as <aksId>/namespaces/<namespace>.'
+    Assert-True ($configure -match 'az role assignment create[^\n]*--scope \$normalizedExpected') `
+        'The configure script creates the Layer 2 assignment at the exact namespace scope.'
+    Assert-True ($configure -match 'az role assignment show') `
+        'The configure script reads the assignment back to verify the scope the service returned.'
+    Assert-True ($configure -match 'CLUSTER-WIDE GRANT') `
+        'The configure script fails loudly when the Layer 2 role is assigned at cluster scope.'
+    Assert-True ($configure -match 'OUT-OF-SCOPE GRANT') `
+        'The configure script fails loudly when the Layer 2 role is assigned to another namespace.'
+    # The regression being guarded: any assignment used to print "namespace scope" unconditionally.
+    Assert-True ($configure -notmatch "Write-Result 'PASS' 'Layer 2 active: the Kubernetes boundary is enforced by the API server at namespace scope\.'") `
+        'The configure script no longer claims namespace enforcement without verifying the scope.'
+}
+
+# -----------------------------------------------------------------------------
 # 5. Documentation honesty
 # -----------------------------------------------------------------------------
 

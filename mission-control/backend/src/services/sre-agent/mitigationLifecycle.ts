@@ -942,11 +942,30 @@ export function deriveMitigationLifecycle(input: DeriveMitigationLifecycleInput)
   }
 
   // --- Out-of-scope / blocked attempts are security findings, never progress -------------------
-  const outOfScope = tools.filter(row => !row.allowlisted && row.eventType !== 'ToolEnd');
-  for (const row of outOfScope) {
+  //
+  // Every non-allowlisted row is reported regardless of EventType. Excluding `ToolEnd` (as an
+  // earlier revision did) meant a disallowed operation that SUCCEEDED and was represented only by
+  // its ToolEnd row produced no security finding at all -- the completion of a forbidden action was
+  // quieter than its attempt. Start/End pairs for the same call are deduped by CallId (falling back
+  // to SpanId, then the command text) so one attempt yields one finding.
+  const outOfScopeByCall = new Map<string, ParsedToolExecutionRow>();
+  for (const row of tools) {
+    if (row.allowlisted) continue;
     const command = extractToolCommand(row.toolInput);
+    const identity = row.callId ?? row.spanId ?? `${row.toolName ?? 'unknown'}|${command ?? 'unknown'}`;
+    const existing = outOfScopeByCall.get(identity);
+    // Prefer the ToolEnd row: it carries the outcome, which is the more serious evidence.
+    if (!existing || (existing.eventType !== 'ToolEnd' && row.eventType === 'ToolEnd')) {
+      outOfScopeByCall.set(identity, row);
+    }
+  }
+  for (const row of outOfScopeByCall.values()) {
+    const command = extractToolCommand(row.toolInput);
+    const outcome = row.eventType === 'ToolEnd'
+      ? (row.blocked ? 'It was blocked at the enforcement boundary.' : 'It COMPLETED -- treat this as a policy bypass until proven otherwise.')
+      : 'It must not have executed.';
     securityFindings.push(
-      `Out-of-scope tool call observed at ${row.observedAt}: tool='${row.toolName ?? 'unknown'}' command='${(command ?? 'unknown').slice(0, 200)}'. It is outside the allowlist in docs/REVIEW-MODE-MITIGATION.md §3 and must not have executed.`,
+      `Out-of-scope tool call observed at ${row.observedAt} (${row.eventType}): tool='${row.toolName ?? 'unknown'}' command='${(command ?? 'unknown').slice(0, 200)}'. It is outside the allowlist in docs/REVIEW-MODE-MITIGATION.md §3. ${outcome}`,
     );
   }
   const blockedRows = tools.filter(row => row.blocked);

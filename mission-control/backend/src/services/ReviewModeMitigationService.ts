@@ -218,7 +218,7 @@ export class ReviewModeMitigationService {
     const [incidentRows, approvalRows, toolRows, azCliRows] = await Promise.all([
       query('incident-activity-snapshot', { incidentId: request.incidentId }),
       query('approval-decisions', { threadId: request.threadId, incidentId: request.incidentId }),
-      query('agent-tool-execution', { threadId: request.threadId }),
+      query('agent-tool-execution', { threadId: request.threadId, incidentId: request.incidentId }),
       query('agent-az-cli-execution', { threadId: request.threadId, incidentId: request.incidentId }),
     ]);
 

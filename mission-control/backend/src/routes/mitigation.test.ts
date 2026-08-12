@@ -194,10 +194,59 @@ describe('mitigation orchestration', () => {
     const deps = makeDependencies({ incident: [reviewIncidentRow] }, inventoryFixture(0, 0), impactFixture(false));
     await new ReviewModeMitigationService(deps).getMitigationEvidence({ threadId: THREAD_ID, incidentId: INCIDENT_ID });
 
+    // agent-tool-execution filters by BOTH identifiers so an incident-only correlation cannot
+    // degrade into a workspace-wide top-N query.
     const toolCall = deps.calls.find(call => call.startsWith('agent-tool-execution'))!;
-    assert.ok(!toolCall.includes('incidentId'), 'agent-tool-execution does not filter by incidentId');
+    assert.ok(toolCall.includes('incidentId'), 'agent-tool-execution must filter by incidentId when available');
+    assert.ok(toolCall.includes('threadId'), 'agent-tool-execution must filter by threadId when available');
+
     const snapshotCall = deps.calls.find(call => call.startsWith('incident-activity-snapshot'))!;
     assert.ok(!snapshotCall.includes('threadId'), 'incident-activity-snapshot does not filter by threadId');
+  });
+
+  it('filters tool execution by incidentId when no threadId is known', async () => {
+    // Regression: the primary UI path can supply an incidentId without a threadId.
+    const deps = makeDependencies({ incident: [reviewIncidentRow] }, inventoryFixture(0, 0), impactFixture(false));
+    await new ReviewModeMitigationService(deps).getMitigationEvidence({ incidentId: INCIDENT_ID });
+
+    const toolCall = deps.calls.find(call => call.startsWith('agent-tool-execution'))!;
+    assert.ok(toolCall.includes('incidentId'), 'incident-only correlation must still filter tool rows');
+    assert.ok(!toolCall.includes('threadId'), 'no threadId was observed, so none is sent');
+  });
+
+  it('correlates the incident-only path exactly despite concurrent-thread noise', async () => {
+    // The server-side filter narrows to this incident; post-query correlation must still reject
+    // rows from a different incident that the query may have returned.
+    const command = JSON.stringify({ command: 'kubectl scale deployment/mongodb -n energy --replicas=1' });
+    const noise = { timestamp: T(-240), EventType: 'ToolEnd', ToolName: 'RunKubectlWriteCommand', ToolInput: command, IncidentId: 'INC-OTHER', ThreadId: 'thread-other', CallId: 'noise' };
+
+    const deps = makeDependencies(
+      {
+        incident: [{ ...reviewIncidentRow, ThreadId: undefined }],
+        approval: [{ timestamp: T(-300), IncidentId: INCIDENT_ID, RawDimensions: { Decision: 'Approved' } }],
+        tool: [
+          noise,
+          { timestamp: T(-250), EventType: 'ToolStart', ToolName: 'RunKubectlWriteCommand', ToolInput: command, IncidentId: INCIDENT_ID, CallId: 'c1' },
+          { timestamp: T(-200), EventType: 'ToolEnd', ToolName: 'RunKubectlWriteCommand', ToolInput: command, ToolOutput: 'deployment.apps/mongodb scaled', IncidentId: INCIDENT_ID, CallId: 'c2' },
+        ],
+      },
+      inventoryFixture(1, 1),
+      impactFixture(true),
+      {
+        source: 'fixture',
+        resource: MITIGATION_TARGET.resource,
+        observedAt: T(-400),
+        specReplicas: 0,
+        readyReplicas: 0,
+        evidencePointer: 'fixture://before',
+      },
+    );
+
+    const result = await new ReviewModeMitigationService(deps).getMitigationEvidence({ incidentId: INCIDENT_ID });
+    assert.equal(result.evidence.state, 'verification-passed');
+    // The foreign row was rejected, not counted as this incident's execution.
+    assert.ok(result.evidence.rejectedEvidence.some(reason => /AgentToolExecution.*mismatch/i.test(reason)));
+    assert.equal(result.evidence.execution?.callId, 'c2');
   });
 
   it('blocks the flow when the observed run mode is autonomous', async () => {
