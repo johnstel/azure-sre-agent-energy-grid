@@ -853,10 +853,16 @@ async function loadMitigationEvidence() {
   // Correlate with the newest observed native thread/incident, if Mission Control has one.
   // Never invent an identifier: with none, the backend reports `ambiguous` rather than guessing.
   const correlated = incidentHandoffs.value.find(incident => incident.nativeEvidence?.threadId || incident.nativeEvidence?.incidentId);
+  if (!correlated?.nativeEvidence?.threadId && !correlated?.nativeEvidence?.incidentId) {
+    mitigationEvidence.value = undefined;
+    mitigationGuardrails.value = undefined;
+    mitigationError.value = '';
+    return;
+  }
   try {
     const response = await getMitigationEvidence({
-      threadId: correlated?.nativeEvidence?.threadId,
-      incidentId: correlated?.nativeEvidence?.incidentId,
+      threadId: correlated.nativeEvidence.threadId,
+      incidentId: correlated.nativeEvidence.incidentId,
     });
     mitigationEvidence.value = response.evidence;
     mitigationGuardrails.value = response.guardrails;

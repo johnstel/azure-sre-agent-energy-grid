@@ -119,11 +119,14 @@ export function normalizeMitigationRequest(raw: unknown): ReviewModeMitigationRe
   return request;
 }
 
+export const REVIEW_MODE_MITIGATION_CACHE_MS = 15_000;
+
 export interface ReviewModeMitigationDependencies {
   evidence: Pick<SreAgentEvidenceService, 'execute'>;
   kube: Pick<KubeClient, 'getInventory'>;
   customerImpact: Pick<CustomerImpactService, 'getCustomerImpact'>;
   now: () => Date;
+  cacheTtlMs?: number;
   /** Injected so tests can supply a captured pre-action observation. */
   resourceStateBefore?: () => ResourceStateObservation | undefined;
 }
@@ -134,6 +137,7 @@ function defaultDependencies(): ReviewModeMitigationDependencies {
     kube: new KubeClient(),
     customerImpact: new CustomerImpactService(),
     now: () => new Date(),
+    cacheTtlMs: REVIEW_MODE_MITIGATION_CACHE_MS,
   };
 }
 
@@ -177,7 +181,24 @@ function baselineKey(correlation: MitigationCorrelationKey): string {
     .join('|');
 }
 
+function hasObservedCorrelation(correlation: MitigationCorrelationKey): boolean {
+  return Object.values(correlation).some(value => typeof value === 'string' && value.trim().length > 0);
+}
+
+function evidenceCacheKey(correlation: MitigationCorrelationKey, minutes: number): string {
+  return JSON.stringify({
+    threadId: correlation.threadId ?? '',
+    correlationId: correlation.correlationId ?? '',
+    incidentId: correlation.incidentId ?? '',
+    traceId: correlation.traceId ?? '',
+    minutes,
+  });
+}
+
 export class ReviewModeMitigationService {
+  private readonly cache = new Map<string, { expiresAtMs: number; response: ReviewModeMitigationResponse }>();
+  private readonly inFlight = new Map<string, Promise<ReviewModeMitigationResponse>>();
+
   constructor(private readonly dependencies: ReviewModeMitigationDependencies = defaultDependencies()) {}
 
   async getMitigationEvidence(request: ReviewModeMitigationRequest): Promise<ReviewModeMitigationResponse> {
@@ -190,8 +211,47 @@ export class ReviewModeMitigationService {
       traceId: request.traceId,
     };
 
+    if (!hasObservedCorrelation(correlation)) {
+      return {
+        scenario: 'MongoDBDown',
+        evidence: deriveMitigationLifecycle({
+          now,
+          correlation,
+          resourceStateBefore: this.dependencies.resourceStateBefore?.(),
+          resourceStateHistory: [],
+        }),
+        guardrails: buildGuardrails(),
+        evidenceSources: ['No observed correlation identifiers; no Azure or Kubernetes queries were attempted.'],
+        collectedAt: now.toISOString(),
+      };
+    }
+
+    const cacheKey = evidenceCacheKey(correlation, minutes);
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiresAtMs > now.getTime()) {
+      return cached.response;
+    }
+    const inFlight = this.inFlight.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const requestPromise = this.collectMitigationEvidence(correlation, minutes, now);
+    this.inFlight.set(cacheKey, requestPromise);
+
+    return requestPromise.finally(() => {
+      this.inFlight.delete(cacheKey);
+    });
+  }
+
+  private async collectMitigationEvidence(
+    correlation: MitigationCorrelationKey,
+    minutes: number,
+    now: Date,
+  ): Promise<ReviewModeMitigationResponse> {
     const evidenceSources: string[] = [];
     let schemaMismatch = false;
+    let hadFailure = false;
 
     const query = async (
       templateName: string,
@@ -205,6 +265,7 @@ export class ReviewModeMitigationService {
         evidenceSources.push(`${templateName} (${response.rowCount} row(s), window ${minutes}m)`);
         return response.rows;
       } catch (error) {
+        hadFailure = true;
         if (error instanceof SreAgentEvidenceQueryError && error.schemaMismatch) {
           schemaMismatch = true;
         }
@@ -213,8 +274,15 @@ export class ReviewModeMitigationService {
       }
     };
 
-    // Each template only accepts the parameters its KQL actually filters on; passing an
-    // unsupported parameter is rejected by SreAgentEvidenceService rather than ignored.
+    const cacheKey = evidenceCacheKey(correlation, minutes);
+    const request = {
+      threadId: correlation.threadId,
+      correlationId: correlation.correlationId,
+      incidentId: correlation.incidentId,
+      traceId: correlation.traceId,
+      minutes,
+    };
+
     const [incidentRows, approvalRows, toolRows, azCliRows] = await Promise.all([
       query('incident-activity-snapshot', { incidentId: request.incidentId }),
       query('approval-decisions', { threadId: request.threadId, incidentId: request.incidentId }),
@@ -222,9 +290,6 @@ export class ReviewModeMitigationService {
       query('agent-az-cli-execution', { threadId: request.threadId, incidentId: request.incidentId }),
     ]);
 
-    // The effective run mode must come from a STRICTLY correlated incident row. An OR over
-    // IncidentId/ThreadId would short-circuit and could read the autonomy level from a different
-    // agent thread of the same incident (see correlateRawRow).
     const matchedIncident = incidentRows.find(row => correlateRawRow(row, correlation) === 'match');
 
     const observedAutonomyLevel =
@@ -239,6 +304,7 @@ export class ReviewModeMitigationService {
       inventory = await this.dependencies.kube.getInventory();
       evidenceSources.push('kubernetes inventory (live)');
     } catch {
+      hadFailure = true;
       evidenceSources.push('kubernetes inventory (unavailable)');
     }
 
@@ -247,6 +313,7 @@ export class ReviewModeMitigationService {
       impact = await this.dependencies.customerImpact.getCustomerImpact();
       evidenceSources.push('customer-impact golden transaction (PR #84)');
     } catch {
+      hadFailure = true;
       evidenceSources.push('customer-impact golden transaction (unavailable)');
     }
 
@@ -255,8 +322,6 @@ export class ReviewModeMitigationService {
     const key = baselineKey(correlation);
     const hasKey = key.replace(/\|/g, '').length > 0;
 
-    // Read the history BEFORE appending the current reading, so the current reading can never be
-    // selected as its own "before".
     const history = hasKey ? getMitigationObservationHistory(key) : [];
     if (after && hasKey) recordMitigationObservation(key, after);
 
@@ -275,13 +340,20 @@ export class ReviewModeMitigationService {
       schemaMismatch,
     });
 
-    return {
+    const response: ReviewModeMitigationResponse = {
       scenario: 'MongoDBDown',
       evidence,
       guardrails: buildGuardrails(),
       evidenceSources,
       collectedAt: now.toISOString(),
     };
+
+    if (!hadFailure) {
+      const ttlMs = this.dependencies.cacheTtlMs ?? REVIEW_MODE_MITIGATION_CACHE_MS;
+      this.cache.set(cacheKey, { expiresAtMs: now.getTime() + ttlMs, response });
+    }
+
+    return response;
   }
 }
 

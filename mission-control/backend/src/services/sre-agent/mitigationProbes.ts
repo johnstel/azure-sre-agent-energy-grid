@@ -84,6 +84,11 @@ export function buildKubernetesReadinessProbe(
   const ready = deployment.readyPods ?? 0;
   const available = deployment.availableReplicas ?? 0;
   const passed = ready >= 1 && available >= 1;
+  const observedAt = inventory.updatedAt;
+  const deploymentConditionUpdatedAt = deployment.updatedAt;
+  const deploymentDetail = deploymentConditionUpdatedAt && deploymentConditionUpdatedAt !== observedAt
+    ? `Deployment condition last changed at ${deploymentConditionUpdatedAt}; inventory was observed at ${observedAt}.`
+    : undefined;
 
   return withStaleness(
     {
@@ -91,11 +96,16 @@ export function buildKubernetesReadinessProbe(
       status: passed ? 'pass' : 'fail',
       source,
       observedValue: `readyReplicas=${ready}, availableReplicas=${available}, desiredReplicas=${deployment.desiredReplicas}`,
-      observedAt: deployment.updatedAt ?? inventory.updatedAt,
-      freshnessSeconds: freshnessSeconds(deployment.updatedAt ?? inventory.updatedAt, now),
+      observedAt,
+      freshnessSeconds: freshnessSeconds(observedAt, now),
       threshold: 'readyReplicas >= 1 and availableReplicas >= 1',
       evidencePointer,
-      detail: passed ? undefined : `Deployment reason: ${deployment.reason || 'not reported'}`,
+      detail: passed
+        ? deploymentDetail ?? undefined
+        : [
+            `Deployment reason: ${deployment.reason || 'not reported'}`,
+            deploymentDetail,
+          ].filter(Boolean).join(' '),
     },
     staleSeconds,
   );
@@ -145,17 +155,28 @@ export function buildServiceEndpointProbe(
   }
 
   const passed = summary.ready >= 1;
+  const observedAt = inventory.updatedAt;
+  const deploymentConditionUpdatedAt = deployment?.updatedAt;
+  const deploymentDetail = deploymentConditionUpdatedAt && deploymentConditionUpdatedAt !== observedAt
+    ? `Deployment condition last changed at ${deploymentConditionUpdatedAt}; inventory was observed at ${observedAt}.`
+    : undefined;
+
   return withStaleness(
     {
       probe: 'service-endpoint-health',
       status: passed ? 'pass' : 'fail',
       source,
       observedValue: `readyEndpoints=${summary.ready}, notReady=${summary.notReady}, total=${summary.total}`,
-      observedAt: deployment?.updatedAt ?? inventory.updatedAt,
-      freshnessSeconds: freshnessSeconds(deployment?.updatedAt ?? inventory.updatedAt, now),
+      observedAt,
+      freshnessSeconds: freshnessSeconds(observedAt, now),
       threshold: 'readyEndpoints >= 1',
       evidencePointer,
-      detail: passed ? undefined : 'No ready endpoint address; dependent services still cannot reach the database.',
+      detail: passed
+        ? deploymentDetail ?? undefined
+        : [
+            'No ready endpoint address; dependent services still cannot reach the database.',
+            deploymentDetail,
+          ].filter(Boolean).join(' '),
     },
     staleSeconds,
   );
@@ -249,10 +270,16 @@ export function observeMitigationResourceState(
   );
   if (!deployment) return undefined;
 
+  const observedAt = inventory.updatedAt;
+  const deploymentConditionUpdatedAt = deployment.updatedAt;
+
   return {
     source: `kubectl get deployment ${MITIGATION_TARGET.name} -n ${MITIGATION_TARGET.namespace} (${label})`,
     resource: MITIGATION_TARGET.resource,
-    observedAt: deployment.updatedAt ?? inventory.updatedAt,
+    observedAt,
+    ...(deploymentConditionUpdatedAt && deploymentConditionUpdatedAt !== observedAt
+      ? { deploymentConditionUpdatedAt }
+      : {}),
     specReplicas: deployment.desiredReplicas,
     readyReplicas: deployment.readyPods,
     observedGeneration: undefined,

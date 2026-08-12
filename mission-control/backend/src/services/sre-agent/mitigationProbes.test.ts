@@ -108,11 +108,32 @@ describe('kubernetes readiness probe', () => {
     const probe = buildKubernetesReadinessProbe(inventory({}, OLD), NOW);
     assert.equal(probe.status, 'stale');
   });
+
+  it('anchors freshness to the fresh inventory observation even when deployment conditions are stale', () => {
+    const probe = buildKubernetesReadinessProbe(inventory({ updatedAt: OLD }, FRESH), NOW);
+    assert.equal(probe.status, 'pass');
+    assert.equal(probe.observedAt, FRESH);
+    assert.equal(probe.freshnessSeconds, 30);
+    assert.match(probe.detail ?? '', /last changed at/i);
+  });
+
+  it('keeps stale inventory blocked even when the deployment condition is fresh', () => {
+    const probe = buildKubernetesReadinessProbe(inventory({ updatedAt: FRESH }, OLD), NOW);
+    assert.equal(probe.status, 'stale');
+    assert.equal(probe.observedAt, OLD);
+  });
 });
 
 describe('service endpoint probe', () => {
   it('passes with at least one ready endpoint', () => {
     assert.equal(buildServiceEndpointProbe(inventory(), NOW).status, 'pass');
+  });
+
+  it('anchors endpoint freshness to the fresh inventory observation even when Deployment conditions are stale', () => {
+    const probe = buildServiceEndpointProbe(inventory({ updatedAt: OLD }, FRESH), NOW);
+    assert.equal(probe.status, 'pass');
+    assert.equal(probe.observedAt, FRESH);
+    assert.equal(probe.freshnessSeconds, 30);
   });
 
   it('fails when no endpoint is ready even though the pod exists', () => {
@@ -197,6 +218,12 @@ describe('probe set and resource observation', () => {
     assert.equal(observation?.resource, MITIGATION_TARGET.resource);
     assert.equal(observation?.specReplicas, 0);
     assert.ok(observation?.evidencePointer.includes('before'));
+  });
+
+  it('records the inventory observation time as authoritative while preserving Deployment condition timing', () => {
+    const observation = observeMitigationResourceState(inventory({ updatedAt: OLD }, FRESH), 'after');
+    assert.equal(observation?.observedAt, FRESH);
+    assert.equal(observation?.deploymentConditionUpdatedAt, OLD);
   });
 
   it('returns undefined rather than inventing an observation', () => {

@@ -146,6 +146,7 @@ export interface ResourceStateObservation {
   source: string;
   resource: string;
   observedAt: string;
+  deploymentConditionUpdatedAt?: string;
   specReplicas?: number;
   readyReplicas?: number;
   observedGeneration?: number;
