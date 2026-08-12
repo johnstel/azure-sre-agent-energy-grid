@@ -306,6 +306,115 @@ export interface LogAnalyticsQueryResponse {
   };
 }
 
+// =============================================================================
+// Native Azure Monitor incident-platform evidence (issue #76)
+// =============================================================================
+// Documented Application Insights `customEvents` names emitted by Azure SRE Agent.
+// Source: https://learn.microsoft.com/azure/sre-agent/audit-agent-actions
+export type SreAgentEvidenceTemplateName =
+  | 'incident-activity-snapshot'
+  | 'agent-execution-lifecycle'
+  | 'agent-tool-execution'
+  | 'approval-decisions'
+  | 'incident-thread-timeline';
+
+export interface SreAgentEvidenceQueryRequest {
+  templateName: SreAgentEvidenceTemplateName;
+  minutes: number;
+  limit: number;
+  threadId?: string;
+  incidentId?: string;
+  impactedService?: string;
+  timeoutMs: number;
+}
+
+export interface SreAgentEvidenceQueryResponse {
+  templateName: SreAgentEvidenceTemplateName;
+  workspace: string;
+  timeRange: {
+    from: string;
+    to: string;
+    minutes: number;
+  };
+  rowCount: number;
+  rows: Record<string, unknown>[];
+  metadata: AnalystEvidenceMetadata & {
+    partial: boolean;
+    timeoutMs: number;
+    partialBehavior: string;
+    schemaMismatch: boolean;
+  };
+}
+
+// Shared correlation fields present on every Azure SRE Agent customEvents row.
+// Source: https://learn.microsoft.com/azure/sre-agent/audit-agent-actions#shared-fields-on-all-events
+export interface SreAgentSharedEventFields {
+  agentResourceId?: string;
+  agentName?: string;
+  traceId?: string;
+  spanId?: string;
+  parentSpanId?: string;
+  threadId?: string;
+  correlationId?: string;
+  logTimestamp?: string;
+}
+
+// Typed row shape for the documented `IncidentActivitySnapshot` event. Field names mirror
+// https://learn.microsoft.com/azure/sre-agent/audit-agent-actions#incident-lifecycle-incidentactivitysnapshot
+export interface IncidentActivitySnapshotRow extends SreAgentSharedEventFields {
+  timestamp: string;
+  incidentId?: string;
+  incidentTitle?: string;
+  incidentSeverity?: string;
+  incidentStatus?: string;
+  incidentPlatform?: string;
+  incidentMitigatedByAgent?: boolean;
+  incidentAssistedByAgent?: boolean;
+  agentAutonomyLevel?: string;
+  responsePlanId?: string;
+  responsePlanCustom?: boolean;
+  incidentImpactedService?: string;
+  incidentCreatedOn?: string;
+  incidentHandledOn?: string;
+  incidentMitigatedOn?: string;
+}
+
+export type NativeIncidentEvidenceState =
+  | 'local-fallback-only'
+  | 'native-observed'
+  | 'native-approval-required'
+  | 'native-mitigated'
+  | 'evidence-unavailable';
+
+export type NativeApprovalDecisionState = 'approved' | 'rejected' | 'pending' | 'unknown';
+
+// Reconciled, honest evidence for a single incident. `state` MUST default to
+// 'evidence-unavailable' when no observed telemetry exists -- never infer health from absence.
+export interface NativeIncidentEvidence {
+  state: NativeIncidentEvidenceState;
+  stale: boolean;
+  schemaMismatch: boolean;
+  observedAt?: string;
+  freshnessSeconds?: number;
+  incidentId?: string;
+  incidentTitle?: string;
+  responsePlanId?: string;
+  responsePlanCustom?: boolean;
+  autonomyLevel?: string;
+  mitigatedByAgent?: boolean;
+  assistedByAgent?: boolean;
+  impactedService?: string;
+  threadId?: string;
+  correlationId?: string;
+  createdOn?: string;
+  handledOn?: string;
+  mitigatedOn?: string;
+  approvalDecision?: NativeApprovalDecisionState;
+  cooldownHours: number;
+  withinCooldown: boolean;
+  limitations: string[];
+}
+
 export type ScenarioNarrationPromptStage = 'open-ended' | 'direct' | 'specific' | 'remediation';
 export type ScenarioNarrationDemoTier = 'core' | 'extended';
 

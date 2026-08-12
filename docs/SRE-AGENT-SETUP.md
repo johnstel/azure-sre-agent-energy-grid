@@ -178,6 +178,55 @@ You can also connect:
 - Azure Monitor Workspace (Prometheus)
 - Managed Grafana
 
+## Step 3b: Connect Azure Monitor as the incident platform (issue #76)
+
+This wires alert-driven incident automation: an Energy Grid Azure Monitor alert can start a native
+SRE Agent investigation thread without a presenter composing a prompt, while the existing Action
+Group → Mission Control webhook keeps working as a fallback.
+
+1. **Bicep (default, automated)**: `infra/bicep/main.bicepparam` sets `sreAgentIncidentPlatform =
+   'AzureMonitor'` by default. When `deploySreAgent = true`, `scripts/deploy.ps1` sets the
+   documented `Microsoft.App/agents` ARM property `properties.incidentManagementConfiguration.type
+   = 'AzureMonitor'` and grants the agent's managed identity **Monitoring Contributor** on the
+   resource group (required for the agent to see Azure Monitor alerts:
+   https://learn.microsoft.com/azure/sre-agent/azure-monitor-alerts). Set
+   `sreAgentIncidentPlatform = 'None'` to opt out.
+
+   > ⚠️ **Immediately after connecting**: Microsoft Learn documents that connecting an incident
+   > platform auto-creates a **Quickstart** response plan, and that **new response plans default
+   > to Autonomous mode**, not Review (https://learn.microsoft.com/azure/sre-agent/response-plan).
+   > As soon as `incidentManagementConfiguration.type` is set, go to the portal and confirm or
+   > delete the Quickstart plan **before** any alert can fire — do not wait until after your first
+   > live test. `scripts/configure-sre-agent-incident-response.ps1` prints this warning prominently
+   > every run as a reminder.
+2. **Response plan (idempotent script + portal confirmation)**: run
+   ```powershell
+   .\scripts\configure-sre-agent-incident-response.ps1 -ResourceGroupName rg-srelab-eastus2
+   ```
+   This checks the incident-platform connection and Monitoring Contributor role (across every
+   identity attached to the agent, at a configurable scope — see `-MonitoringContributorScope`),
+   then uses the [Azure MCP Server SRE Agent tools](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-sre-agent)
+   (`azmcp sreagent incidents plans create`, when the `azmcp` CLI is available) to idempotently
+   create a named `energy-grid-response-plan` filtered to Energy Grid services in **Review** mode.
+   The script fails closed (does not attempt to create a plan) if it cannot first confirm the list
+   of existing plans, to avoid creating a duplicate on top of an unconfirmed state. It always
+   prints the exact portal steps for anything it cannot confirm or automate: Microsoft Learn
+   documents **reinvestigation cooldown** (default 3h, merges repeated alert firings into one
+   thread) and **custom-agent routing** only in the Builder → Incident response plans portal UI
+   (https://learn.microsoft.com/azure/sre-agent/response-plan) — neither is exposed by the ARM
+   schema or by the current Azure MCP Server response-plan tool, so confirm both there after
+   running the script. Also delete the auto-created "Quickstart" response plan from the table view
+   once your own plan is confirmed, so incidents aren't routed or processed twice.
+3. **Never enable Autonomous mode for this demo.** The script blocks `-AgentMode autonomous`
+   unless `-AllowAutonomous` is also passed, and even then this repo's safe-language contract
+   (`docs/CAPABILITY-CONTRACTS.md` §9) requires a separate security review before demoing it.
+4. **Evidence**: once a response plan has run, Mission Control's incident cards can reconcile
+   against native `IncidentActivitySnapshot`/`AgentExecution`/`AgentToolExecution`/
+   `ApprovalDecision` telemetry (see `docs/CAPABILITY-CONTRACTS.md` §17 and
+   `mission-control/backend/src/services/SreAgentEvidenceService.ts`). Cards read
+   `local-fallback-only` or `evidence-unavailable` until that telemetry is actually observed —
+   Mission Control never infers a native investigation from missing data.
+
 ## Step 4: Start Diagnosing!
 
 Once connected, you can interact with SRE Agent using natural language:
@@ -256,7 +305,7 @@ kubectl run -n energy test --image=curlimages/curl --rm -it -- \
 
 ## Supportability and troubleshooting summary
 
-The current lab supportability path is operator-led: deploy or connect SRE Agent, grant the selected RBAC level, ask diagnosis prompts, review cited evidence, and apply any fix deliberately in Review mode. Scheduled tasks, incident-triggered automatic diagnosis, and external tool integrations are not wired or validated in this repository, so they are not part of the current supportability path.
+The current lab supportability path is operator-led: deploy or connect SRE Agent, grant the selected RBAC level, ask diagnosis prompts, review cited evidence, and apply any fix deliberately in Review mode. As of issue #76, incident-triggered automatic diagnosis has a supported setup path (Bicep + `scripts/configure-sre-agent-incident-response.ps1` + a confirming portal step) rather than being entirely unwired, but end-to-end live proof (an injected alert producing a native investigation thread, observed via `IncidentActivitySnapshot` telemetry) is pending until it is run in a live Energy Grid environment — see `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md`. Scheduled tasks and external tool integrations beyond Azure Monitor remain unwired and unvalidated in this repository.
 
 For symptom-first diagnosis and setup validation, use these links:
 

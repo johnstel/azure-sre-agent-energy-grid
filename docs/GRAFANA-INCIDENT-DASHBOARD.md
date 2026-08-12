@@ -42,7 +42,7 @@ The built-in Grafana annotation group is labeled **Annotations & Alerts**. It is
 
 - Application-level telemetry is only shown when the deployment emits AppRequests and AppDependencies with the repo-owned `sre.*` dimensions; otherwise the relevant panels remain empty rather than implying healthy zeros.
 - Azure SRE Agent conversation state, diagnosis output, or remediation proposals.
-- Alert-to-agent trigger status. No alert→agent automation is configured in this demo.
+- Alert-to-agent trigger status. Native incident-platform wiring is configured separately via Bicep and `scripts/configure-sre-agent-incident-response.ps1` (issue #76; see `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md`) and reconciled in Mission Control's incident cards, not on this dashboard.
 - SLO burn-rate or error-budget panels (SLO measurement infrastructure is a future wave).
 
 > **Safe-language note**: Do not describe the dashboard as an "incident management system" or claim it "detects incidents." It surfaces metrics that an operator interprets. Detection requires the operator to observe the data and initiate investigation — manually or via Azure SRE Agent.
@@ -132,4 +132,5 @@ The Managed Grafana workspace is deployed by `infra/bicep/modules/observability.
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
+| 2026-08-12 | 0.3 | Clarified alert-to-agent trigger status cross-reference for issue #76 native incident platform wiring | Copilot draft for review |
 | 2026-08-11 | 0.2 | Updated guide for Azure Monitor-backed telemetry, no-data semantics, and non-interactive context variables | Copilot draft for review |

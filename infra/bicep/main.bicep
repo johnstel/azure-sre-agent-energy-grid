@@ -115,6 +115,10 @@ param acrAdminUserEnabled bool = false
 @allowed(['High', 'Low'])
 param sreAgentAccessLevel string = 'Low'
 
+@description('Connect Azure Monitor as the SRE Agent incident platform via the documented Microsoft.App/agents incidentManagementConfiguration ARM property (issue #76). This is additive: the Action Group -> Mission Control webhook fallback (deployActionGroup/incidentWebhookServiceUri) keeps working whether or not this is enabled. Set to "None" to leave the agent disconnected from any incident platform.')
+@allowed(['AzureMonitor', 'None'])
+param sreAgentIncidentPlatform string = 'AzureMonitor'
+
 @description('Tags to apply to all resources')
 param tags object = {
   workload: 'energy-grid-demo'
@@ -264,6 +268,7 @@ module sreAgent 'modules/sre-agent.bicep' = if (deploySreAgent) {
     appInsightsAppId: appInsights.outputs.appId
     appInsightsConnectionString: appInsights.outputs.connectionString
     uniqueSuffix: uniqueSuffix
+    incidentPlatform: sreAgentIncidentPlatform
   }
 }
 
@@ -343,4 +348,6 @@ output sreAgentPortalUrl string = deploySreAgent ? sreAgent!.outputs.agentPortal
 output sreAgentName string = deploySreAgent ? sreAgent!.outputs.agentName : ''
 output sreAgentManagedIdentityId string = deploySreAgent ? sreAgent!.outputs.managedIdentityId : ''
 output sreAgentManagedIdentityPrincipalId string = deploySreAgent ? sreAgent!.outputs.managedIdentityPrincipalId : ''
+output sreAgentIncidentPlatformType string = deploySreAgent ? sreAgent!.outputs.incidentPlatformType : 'None'
+output sreAgentIncidentPlatformConfigured bool = deploySreAgent ? sreAgent!.outputs.incidentPlatformConfigured : false
 output activityLogDiagnosticSettingName string = activityLogDiagnostics.outputs.diagnosticSettingName
