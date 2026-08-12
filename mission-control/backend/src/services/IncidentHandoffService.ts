@@ -2,6 +2,7 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import type { NativeIncidentEvidence } from '../types/index.js';
 
 export type IncidentHandoffStatus = 'open' | 'acknowledged' | 'resolved';
 export type IncidentHandoffSeverity = 'critical' | 'warning' | 'unknown';
@@ -21,6 +22,12 @@ export interface IncidentHandoff {
   evidence: string[];
   operatorGuidance: string[];
   notes?: string[];
+  /**
+   * Native Azure SRE Agent evidence reconciled from Application Insights customEvents (issue #76).
+   * Absent until a reconciliation pass has run at least once; never fabricated. See
+   * NativeIncidentReconciliationService.ts for how this is computed.
+   */
+  nativeEvidence?: NativeIncidentEvidence;
 }
 
 export interface IncidentHandoffState {
@@ -303,6 +310,25 @@ export async function resolveIncident(id: string): Promise<IncidentHandoff | und
     const incident = state.incidents.find(candidate => candidate.id === id);
     if (!incident) return undefined;
     incident.status = 'resolved';
+    incident.updatedAt = new Date().toISOString();
+    state.updatedAt = incident.updatedAt;
+    await writeIncidentState(state);
+    return incident;
+  });
+}
+
+/**
+ * Attaches a freshly reconciled NativeIncidentEvidence snapshot (see
+ * NativeIncidentReconciliationService.ts) to a local incident handoff. This never mutates
+ * `status`/`severity`/local fields -- native evidence is additive, honest context alongside the
+ * existing Action Group fallback record, not a replacement for it.
+ */
+export async function attachNativeEvidence(id: string, nativeEvidence: NativeIncidentEvidence): Promise<IncidentHandoff | undefined> {
+  return withIncidentMutationLock(async () => {
+    const state = await readIncidentState();
+    const incident = state.incidents.find(candidate => candidate.id === id);
+    if (!incident) return undefined;
+    incident.nativeEvidence = nativeEvidence;
     incident.updatedAt = new Date().toISOString();
     state.updatedAt = incident.updatedAt;
     await writeIncidentState(state);

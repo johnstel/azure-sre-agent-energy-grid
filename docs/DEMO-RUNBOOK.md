@@ -551,7 +551,7 @@ Verify all doc-to-doc links resolve:
 
 - [ ] `docs/evidence/README.md` — All relative links resolve (no 404s)
 - [ ] `docs/evidence/kql/README.md` — All relative links resolve
-- [ ] `docs/CAPABILITY-CONTRACTS.md` — All section references are valid (§1–§16)
+- [ ] `docs/CAPABILITY-CONTRACTS.md` — All section references are valid (§1–§17)
 - [ ] `docs/DEMO-RUNBOOK.md` — All relative links resolve
 
 **Validation command:**

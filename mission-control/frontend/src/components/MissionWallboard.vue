@@ -258,6 +258,13 @@
             <span>{{ incident.scenarioName ? `Scenario · ${incident.scenarioName}` : 'Manual handoff' }}</span>
             <span>{{ incident.source }}</span>
           </div>
+          <div class="incident-handoff__meta">
+            <span class="badge" :class="nativeEvidenceBadgeClass(incident.nativeEvidence)">{{ nativeEvidenceLabel(incident.nativeEvidence) }}</span>
+            <span v-if="incident.nativeEvidence?.stale">stale evidence</span>
+          </div>
+          <p v-if="incident.nativeEvidence?.threadId" class="incident-handoff__native-detail">
+            Thread {{ incident.nativeEvidence.threadId }}<span v-if="incident.nativeEvidence.responsePlanId"> · Plan {{ incident.nativeEvidence.responsePlanId }}</span>
+          </p>
           <ul v-if="incident.evidence.length > 0" class="compact-list">
             <li v-for="piece in incident.evidence" :key="piece">{{ piece }}</li>
           </ul>
@@ -267,6 +274,9 @@
             </button>
             <button class="command-button command-button--primary" type="button" :disabled="incidentActionBusyId === incident.id || incident.status === 'resolved'" @click="updateIncidentHandoff(incident.id, 'resolve')">
               {{ incidentActionBusyId === incident.id ? 'Updating…' : 'Resolve' }}
+            </button>
+            <button class="command-button command-button--neutral" type="button" :disabled="incidentActionBusyId === incident.id" @click="reconcileNativeEvidenceForIncident(incident.id)">
+              {{ incidentActionBusyId === incident.id ? 'Updating…' : 'Check native evidence' }}
             </button>
           </div>
         </div>
@@ -589,6 +599,7 @@ const {
   getServices,
   acknowledgeIncident,
   resolveIncident,
+  reconcileNativeEvidence,
 } = useApi();
 
 const inventory = ref<InventoryItem[]>([]);
@@ -834,6 +845,19 @@ async function updateIncidentHandoff(id: string, action: 'acknowledge' | 'resolv
     incidentHandoffs.value = incidentHandoffs.value.map(incident => incident.id === updatedIncident.id ? updatedIncident : incident);
   } catch (error) {
     incidentHandoffError.value = `Unable to update incident handoff: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    incidentActionBusyId.value = null;
+  }
+}
+
+async function reconcileNativeEvidenceForIncident(id: string) {
+  incidentActionBusyId.value = id;
+  try {
+    const response = await reconcileNativeEvidence(id);
+    const updatedIncident = response.incident;
+    incidentHandoffs.value = incidentHandoffs.value.map(incident => incident.id === updatedIncident.id ? updatedIncident : incident);
+  } catch (error) {
+    incidentHandoffError.value = `Unable to reconcile native evidence: ${error instanceof Error ? error.message : String(error)}`;
   } finally {
     incidentActionBusyId.value = null;
   }
@@ -1603,6 +1627,30 @@ function incidentBadgeClass(status: IncidentHandoff['status']): string {
   return 'badge-offline';
 }
 
+function nativeEvidenceLabel(nativeEvidence?: IncidentHandoff['nativeEvidence']): string {
+  switch (nativeEvidence?.state) {
+    case 'native-mitigated': return 'Native: mitigated';
+    case 'native-approval-required': return 'Native: approval required';
+    case 'native-observed': return 'Native: investigation observed';
+    case 'local-fallback-only': return 'Local alert handoff only';
+    case 'evidence-unavailable':
+    default:
+      return 'Native evidence unavailable';
+  }
+}
+
+function nativeEvidenceBadgeClass(nativeEvidence?: IncidentHandoff['nativeEvidence']): string {
+  switch (nativeEvidence?.state) {
+    case 'native-mitigated': return 'badge-online';
+    case 'native-approval-required': return 'badge-warning';
+    case 'native-observed': return 'badge-warning';
+    case 'local-fallback-only': return 'badge-neutral';
+    case 'evidence-unavailable':
+    default:
+      return 'badge-neutral';
+  }
+}
+
 function preflightStatusSymbol(status: PreflightCheck['status']): string {
   if (status === 'pass') return '✓';
   if (status === 'warn') return '⚠';
@@ -2125,6 +2173,14 @@ defineExpose({
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
+  align-items: center;
+}
+
+.incident-handoff__native-detail {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 .incident-handoff__actions {

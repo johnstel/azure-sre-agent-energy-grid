@@ -536,10 +536,121 @@ These rules prevent wasted effort from building on unstable foundations.
 
 ---
 
-## 16 · Document History
+## 16 · Native Incident Platform Evidence Contract (issue #76)
+
+This section defines the shared contract for reconciling native Azure SRE Agent incident-platform
+evidence with the local Action Group → Mission Control webhook fallback (§4, §9). It governs
+`mission-control/backend/src/services/SreAgentEvidenceService.ts` and
+`NativeIncidentReconciliationService.ts`.
+
+### Documented event names
+
+Source: [Audit Agent Actions](https://learn.microsoft.com/azure/sre-agent/audit-agent-actions). All
+four live in the `customEvents` table of the SRE Agent's linked Application Insights resource
+(the same workspace-based App Insights resource this repo already deploys for application
+telemetry — see `infra/bicep/modules/app-insights.bicep` and `sre-agent.bicep`'s
+`logConfiguration`).
+
+| Event name | Field enumeration status |
+|---|---|
+| `IncidentActivitySnapshot` | Documented: `IncidentId`, `IncidentTitle`, `IncidentSeverity`, `IncidentStatus`, `IncidentPlatform`, `IncidentMitigatedByAgent`, `IncidentAssistedByAgent`, `AgentAutonomyLevel`, `ResponsePlanId`, `ResponsePlanCustom`, `IncidentImpactedService`, `IncidentCreatedOn`, `IncidentHandledOn`, `IncidentMitigatedOn` |
+| `AgentExecution` | `SCHEMA_TBD` — Microsoft Learn documents only "session start/end lifecycle" without an itemized field table |
+| `AgentToolExecution` | Documented: `EventType`, `ToolName`, `ToolInput`, `ToolOutput`, `SubAgentName`, `CallId` |
+| `ApprovalDecision` | `SCHEMA_TBD` — Microsoft Learn shows only a raw `customDimensions` projection, no itemized field table |
+
+Shared correlation fields on every event (all four): `gen_ai.agent.id`, `gen_ai.agent.name`,
+`TraceId`, `SpanId`, `ParentSpanId`, `ThreadId`, `LogTimestamp`, `CorrelationId`.
+
+Per the §8 `SCHEMA_TBD` rule, any query or dashboard referencing `AgentExecution` or
+`ApprovalDecision` fields beyond the shared correlation fields must be tagged `// SCHEMA_TBD` and
+must not be treated as a stable production contract.
+
+### Incident platform literal (`incidentManagementConfiguration.type`)
+
+Source: [API reference for Azure SRE Agent](https://learn.microsoft.com/azure/sre-agent/api-reference#agent-properties),
+which enumerates this field as: `PagerDuty`, `AzMonitor`, `ServiceNow`, or `None`. **Azure Monitor's
+literal is `AzMonitor`**, not `AzureMonitor` — `sre-agent.bicep`'s `incidentManagementConfigurationType`
+parameter and `scripts/configure-sre-agent-incident-response.ps1`'s `-ExpectedIncidentPlatformType`
+both default to `AzMonitor` and are `@allowed`/`ValidateSet`-constrained to the four documented
+literals. This repo's own Bicep/script *selector* param (`incidentPlatform`/`sreAgentIncidentPlatform`,
+allowed `AzureMonitor`/`None`) is a separate, internal name and intentionally does not need to match
+the ARM literal — only the value actually written to `incidentManagementConfiguration.type` does.
+Because ARM does not enforce an allowed-values constraint on this property (it is typed as a bare
+`string` in the generic ARM template schema), a wrong literal deploys successfully while the SRE
+Agent backend silently ignores the unrecognized platform type — do not rely on deployment success
+alone to confirm the platform connected; read back `incidentManagementConfiguration.type` and
+compare it to the documented enum, exactly as the setup script does.
+
+### Reinvestigation cooldown
+
+Documented default (Azure Monitor response plans only): **3 hours**, configurable 1–24h in the
+portal (Builder → Incident response plans → autonomy step). Repeated firings of the same alert
+rule within the cooldown window merge into the existing investigation thread; resolved threads
+within the window are reopened rather than duplicated. This is **not** exposed by the
+`Microsoft.App/agents` ARM schema or by the current Azure MCP Server response-plan tool — it must
+be confirmed/set in the portal. `NativeIncidentReconciliationService.ts` computes a client-side
+`withinCooldown` estimate (default 3h) for display only; it does not control or guarantee the
+agent's actual merge decision.
+
+### Evidence states
+
+Mission Control incident cards expose exactly one of these states (never blended, never inferred
+from absence):
+
+| State | Meaning |
+|---|---|
+| `local-fallback-only` | No native evidence observed; the Action Group webhook fallback (§4, §9) created the card. |
+| `native-observed` | A matching `IncidentActivitySnapshot` row was observed; not yet mitigated, and not blocked on approval. |
+| `native-approval-required` | `AgentAutonomyLevel = review` and no `ApprovalDecision` has been observed yet. |
+| `native-mitigated` | `IncidentMitigatedByAgent = true` on the freshest observed row. |
+| `evidence-unavailable` | No native evidence and no local fallback either, or the evidence query failed schema validation. |
+
+### Correlation approach
+
+Local incidents are correlated to native evidence by, in order of preference: a previously observed
+`ThreadId`/`IncidentId` (sticky across repeated reconciliation calls), an explicit operator-supplied
+override, or a best-effort `scenarioName → IncidentImpactedService` keyword heuristic (see
+`SCENARIO_IMPACTED_SERVICE_HINTS` in `mission-control/backend/src/routes/incidents.ts`). The
+heuristic is **not** a documented Azure SRE Agent contract — `IncidentImpactedService` is
+populated by the agent's own investigation, so a keyword match is a hint, not proof.
+
+An explicit `IncidentId` or a `ThreadId` that actually matches a returned row (`selectRowsForCorrelation`
+in `NativeIncidentReconciliationService.ts`) counts as a **strong** correlation. When neither is
+available and the impactedService heuristic returns more than one distinct `IncidentId` after
+de-duplication, the match is **ambiguous** — `reconcileNativeIncidentEvidence` refuses to silently
+pick the newest one and reports `local-fallback-only`/`evidence-unavailable` instead. A known
+`ThreadId` that matches nothing never falls back to the unfiltered row set, to avoid attributing a
+different incident's thread/plan/mitigation status to the wrong local card.
+
+### Rules
+
+- KQL must only be built through the allowlisted templates in `SreAgentEvidenceService.ts`
+  (`incident-activity-snapshot`, `agent-execution-lifecycle`, `agent-tool-execution`,
+  `approval-decisions`, `incident-thread-timeline`). Do not add freeform KQL entry points.
+- A query that fails because the deployed telemetry schema no longer matches the documented event
+  or field names must surface `schemaMismatch: true` and report `evidence-unavailable` — never
+  silently return zero rows as if the agent were idle.
+- Duplicate `IncidentActivitySnapshot` rows for the same `IncidentId` are lifecycle updates, not
+  separate incidents; reconciliation keeps only the freshest row by `timestamp`. A row with an
+  unparsable `timestamp` is dropped, not defaulted to "now".
+- More than one distinct candidate `IncidentId` without a strong correlation is ambiguous, not an
+  invitation to guess the newest one (see Correlation approach above).
+- Do not remove the Action Group → Mission Control webhook fallback (§4, §9) until native handling
+  has passed repeatable live validation (OOMKilled ×2 for cooldown, MongoDBDown ×1).
+- Do not enable Autonomous mode for this contract. `scripts/configure-sre-agent-incident-response.ps1`
+  blocks `-AgentMode autonomous` without an explicit `-AllowAutonomous` acknowledgment. Note that
+  Microsoft Learn documents new response plans (including the auto-created Quickstart plan) as
+  defaulting to Autonomous — confirming/deleting the Quickstart plan in the portal immediately
+  after connecting Azure Monitor is a required manual step, not optional cleanup.
+
+---
+
+## 17 · Document History
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
+| 2026-08-12 | 0.4 | Corrected `incidentManagementConfiguration.type` literal to documented `AzMonitor` (was incorrectly `AzureMonitor`); added literal enum subsection (issue #76 review fix) | Copilot draft for review |
+| 2026-08-12 | 0.3 | Added §16 Native Incident Platform Evidence Contract (issue #76) | Copilot draft for review |
 | 2026-04-26 | 0.2 | Wave 0 fix pass — S0-1..S0-5 security blockers, accessLevel terminology fix | Lambert (QA/Docs) |
 | 2026-04-26 | 0.2 | Alert deployment status, RBAC source-of-truth, retention prerequisites (Wave 0 infra precision) | Ripley (Infra Dev) |
 | 2026-04-26 | 0.1 | Wave 0 — Initial contract definitions | Lambert (QA/Docs) |
