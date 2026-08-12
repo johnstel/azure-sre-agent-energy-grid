@@ -545,6 +545,383 @@
       ],
       "title": "Scenario timeline and annotations",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 40
+      },
+      "id": 9,
+      "panels": [],
+      "title": "Demo customer impact — slo-meter-ingest (AppRequests raw runs)",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "CUSTOMER_IMPACT": {
+                  "color": "red",
+                  "index": 0,
+                  "text": "CUSTOMER IMPACT"
+                },
+                "DEGRADED": {
+                  "color": "yellow",
+                  "index": 1,
+                  "text": "DEGRADED"
+                },
+                "HEALTHY": {
+                  "color": "green",
+                  "index": 2,
+                  "text": "HEALTHY (demo)"
+                },
+                "NO_DATA": {
+                  "color": "orange",
+                  "index": 3,
+                  "text": "NO DATA — UNKNOWN"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "noValue": "NO DATA — UNKNOWN",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 0,
+        "y": 41
+      },
+      "id": 10,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^State$/",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "azureMonitor": {
+            "queryType": "Logs",
+            "query": "AppRequests\n| where TimeGenerated > ago(10m)\n| where Name == 'slo.meter-ingest.transaction'\n| extend SyntheticName = tostring(Properties['synthetic.name']), SyntheticMode = tostring(Properties['synthetic.mode']), CorrelationId = tostring(Properties['synthetic.correlation_id']), FailureStage = tostring(Properties['synthetic.failure_stage']), FailureReason = tostring(Properties['synthetic.failure_reason'])\n| where SyntheticName == 'slo-meter-ingest' and SyntheticMode == 'demo'\n| where isnotempty(CorrelationId)\n| summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage, FailureReason) by CorrelationId\n| summarize RunCount = count(), SuccessfulRunCount = countif(Success == true), LastSuccessfulTransaction = maxif(TimeGenerated, Success == true), LatestCriticalFailure = maxif(TimeGenerated, Success == false and FailureStage in ('persistence', 'ingress'))\n| extend SuccessRatePct = iff(RunCount > 0, 100.0 * todouble(SuccessfulRunCount) / todouble(RunCount), real(null))\n| extend FreshnessMinutes = iff(isnull(LastSuccessfulTransaction), real(null), todouble(datetime_diff('second', now(), LastSuccessfulTransaction)) / 60.0)\n| extend State = case(RunCount == 0, 'NO_DATA', not(isnull(LatestCriticalFailure)) and (isnull(LastSuccessfulTransaction) or LastSuccessfulTransaction <= LatestCriticalFailure), 'CUSTOMER_IMPACT', SuccessfulRunCount == 0, 'CUSTOMER_IMPACT', FreshnessMinutes > 5.0 or SuccessRatePct < 95.0, 'DEGRADED', 'HEALTHY')\n| project State",
+            "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
+            "resourceGroup": "__RESOURCE_GROUP__",
+            "subscriptionId": "__SUBSCRIPTION_ID__"
+          }
+        }
+      ],
+      "title": "Synthetic customer-impact state",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "noValue": "NO DATA — UNKNOWN",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 5,
+        "y": 41
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^SuccessRatePct$/",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "azureMonitor": {
+            "queryType": "Logs",
+            "query": "AppRequests\n| where TimeGenerated > ago(10m)\n| where Name == 'slo.meter-ingest.transaction'\n| extend SyntheticName = tostring(Properties['synthetic.name']), SyntheticMode = tostring(Properties['synthetic.mode']), CorrelationId = tostring(Properties['synthetic.correlation_id']), FailureStage = tostring(Properties['synthetic.failure_stage'])\n| where SyntheticName == 'slo-meter-ingest' and SyntheticMode == 'demo'\n| where isnotempty(CorrelationId)\n| summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage) by CorrelationId\n| summarize RunCount = count(), SuccessfulRunCount = countif(Success == true)\n| extend SuccessRatePct = iff(RunCount > 0, 100.0 * todouble(SuccessfulRunCount) / todouble(RunCount), real(null))\n| project SuccessRatePct",
+            "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
+            "resourceGroup": "__RESOURCE_GROUP__",
+            "subscriptionId": "__SUBSCRIPTION_ID__"
+          }
+        }
+      ],
+      "title": "Success rate (10m, target ≥95%)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [],
+          "noValue": "NO DATA — UNKNOWN",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 15000
+              },
+              {
+                "color": "red",
+                "value": 30000
+              }
+            ]
+          },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 10,
+        "y": 41
+      },
+      "id": 12,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^P95DurationMs$/",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "azureMonitor": {
+            "queryType": "Logs",
+            "query": "AppRequests\n| where TimeGenerated > ago(10m)\n| where Name == 'slo.meter-ingest.transaction'\n| extend SyntheticName = tostring(Properties['synthetic.name']), SyntheticMode = tostring(Properties['synthetic.mode']), CorrelationId = tostring(Properties['synthetic.correlation_id']), FailureStage = tostring(Properties['synthetic.failure_stage'])\n| where SyntheticName == 'slo-meter-ingest' and SyntheticMode == 'demo'\n| where isnotempty(CorrelationId)\n| summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage) by CorrelationId\n| summarize RunCount = count(), P95DurationMs = percentile(DurationMs, 95)\n| extend P95DurationMs = iff(RunCount > 0, P95DurationMs, real(null))\n| project P95DurationMs",
+            "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
+            "resourceGroup": "__RESOURCE_GROUP__",
+            "subscriptionId": "__SUBSCRIPTION_ID__"
+          }
+        }
+      ],
+      "title": "p95 end-to-end latency (raw runs)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "noValue": "NO SUCCESS — UNKNOWN",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "m"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 15,
+        "y": 41
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^FreshnessMinutes$/",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "azureMonitor": {
+            "queryType": "Logs",
+            "query": "AppRequests\n            | where TimeGenerated > ago(10m)\n| where Name == 'slo.meter-ingest.transaction'\n| extend SyntheticName = tostring(Properties['synthetic.name']), SyntheticMode = tostring(Properties['synthetic.mode']), CorrelationId = tostring(Properties['synthetic.correlation_id']), FailureStage = tostring(Properties['synthetic.failure_stage'])\n| where SyntheticName == 'slo-meter-ingest' and SyntheticMode == 'demo'\n| where isnotempty(CorrelationId)\n| summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage) by CorrelationId\n| summarize LastSuccessfulTransaction = maxif(TimeGenerated, Success == true)\n| extend FreshnessMinutes = iff(isnull(LastSuccessfulTransaction), real(null), todouble(datetime_diff('second', now(), LastSuccessfulTransaction)) / 60.0)\n| project FreshnessMinutes",
+            "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
+            "resourceGroup": "__RESOURCE_GROUP__",
+            "subscriptionId": "__SUBSCRIPTION_ID__"
+          }
+        }
+      ],
+      "title": "Last successful transaction freshness",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "__AZURE_MONITOR_DATASOURCE_UID__"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "color-text",
+            "inspect": false
+          },
+          "mappings": [
+            {
+              "options": {
+                "NO_DATA": {
+                  "color": "orange",
+                  "index": 0,
+                  "text": "NO DATA — UNKNOWN"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "noValue": "NO DATA — UNKNOWN",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BurnRate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "short"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 4,
+        "x": 20,
+        "y": 41
+      },
+      "id": 14,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "azureMonitor": {
+            "queryType": "Logs",
+            "query": "AppRequests\n| where TimeGenerated > ago(10m)\n| where Name == 'slo.meter-ingest.transaction'\n| extend SyntheticName = tostring(Properties['synthetic.name']), SyntheticMode = tostring(Properties['synthetic.mode']), CorrelationId = tostring(Properties['synthetic.correlation_id']), FailureStage = tostring(Properties['synthetic.failure_stage']), FailureReason = tostring(Properties['synthetic.failure_reason'])\n| where SyntheticName == 'slo-meter-ingest' and SyntheticMode == 'demo'\n| where isnotempty(CorrelationId)\n| summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage, FailureReason) by CorrelationId\n| extend LatestFailureAt = iff(Success == false, TimeGenerated, datetime(null))\n| extend LatestFailureStage = iff(isnull(LatestFailureAt), '', FailureStage), LatestFailureReason = iff(isnull(LatestFailureAt), '', FailureReason)\n| summarize RunCount = count(), FailedRunCount = countif(Success == false), arg_max(LatestFailureAt, LatestFailureStage, LatestFailureReason)\n| extend FailureRatio = iff(RunCount > 0, todouble(FailedRunCount) / todouble(RunCount), real(null))\n| extend BurnRate = iff(RunCount > 0, FailureRatio / 0.05, real(null))\n| extend State = iff(RunCount == 0, 'NO_DATA', 'DATA')\n| project State, LatestFailureAt, LatestFailureStage, LatestFailureReason, RunCount, FailedRunCount, FailureRatio, BurnRate",
+            "workspaceResourceId": "__WORKSPACE_RESOURCE_ID__",
+            "resourceGroup": "__RESOURCE_GROUP__",
+            "subscriptionId": "__SUBSCRIPTION_ID__"
+          }
+        }
+      ],
+      "title": "Failure stage and burn rate",
+      "type": "table"
     }
   ],
   "refresh": "30s",

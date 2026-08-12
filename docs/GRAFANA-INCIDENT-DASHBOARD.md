@@ -31,6 +31,7 @@ The Azure Managed Grafana incident dashboard visualises infrastructure- and appl
 | Requests and errors | Azure Monitor / Log Analytics (AppRequests) | Request volume and 5xx error trends filtered by the selected namespace, service, and scenario |
 | Dependency failures | Azure Monitor / Log Analytics (AppDependencies) | Dependency failure counts by dependency type and service |
 | Scenario timeline and annotations | Azure Monitor / Log Analytics (AppRequests) | Error trend over time and scenario-aware context for the selected scope, with manual timeline annotations surfaced as **Annotations & Alerts** |
+| Demo customer impact | Azure Monitor / Log Analytics (AppRequests) | Demo-only `slo-meter-ingest` state, unique-run success rate, raw-run p95, last-success freshness, and failure stage/burn rate |
 
 All data is scoped to the `energy` namespace unless noted otherwise.
 
@@ -42,8 +43,8 @@ The built-in Grafana annotation group is labeled **Annotations & Alerts**. It is
 
 - Application-level telemetry is only shown when the deployment emits AppRequests and AppDependencies with the repo-owned `sre.*` dimensions; otherwise the relevant panels remain empty rather than implying healthy zeros.
 - Azure SRE Agent conversation state, diagnosis output, or remediation proposals.
-- Alert-to-agent trigger status. Native incident-platform wiring is configured separately via Bicep and `scripts/configure-sre-agent-incident-response.ps1` (issue #76; see `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md`) and reconciled in Mission Control's incident cards, not on this dashboard.
-- SLO burn-rate or error-budget panels (SLO measurement infrastructure is a future wave).
+- The dashboard does not itself trigger or invoke Azure SRE Agent. Native incident-platform wiring is configured separately via Bicep and `scripts/configure-sre-agent-incident-response.ps1` (issue #76; see `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md`) and reconciled in Mission Control's incident cards.
+- A production SLO, SLA, customer-count, revenue, energy-not-served, or MTTR-improvement claim. The `slo-meter-ingest` row is an accelerated demo simulation with a separate live-proof gate.
 
 > **Safe-language note**: Do not describe the dashboard as an "incident management system" or claim it "detects incidents." It surfaces metrics that an operator interprets. Detection requires the operator to observe the data and initiate investigation — manually or via Azure SRE Agent.
 
@@ -110,7 +111,7 @@ Use this checklist before referencing the incident dashboard in any customer-fac
 - [ ] Dashboard is described as an **observability surface**, not a detection or diagnosis tool.
 - [ ] No claim that the dashboard invokes, triggers, or communicates with Azure SRE Agent.
 - [ ] No MTTR percentage claims derived from dashboard data.
-- [ ] No SLO or error-budget claims unless measurement infrastructure is deployed and verified.
+- [ ] `slo-meter-ingest` is described as a demo-only simulation; use real AppRequests evidence before describing an observed state.
 - [ ] GA + API-pin disclosure appears if the material also references SRE Agent.
 - [ ] Screenshots are real captures, redacted, and not placeholders.
 - [ ] Language is consistent with [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) and [ANALYST-SAFE-LANGUAGE.md](ANALYST-SAFE-LANGUAGE.md).
@@ -122,7 +123,7 @@ Use this checklist before referencing the incident dashboard in any customer-fac
 The Managed Grafana workspace is deployed by `infra/bicep/modules/observability.bicep`:
 
 - **Resource**: `Microsoft.Dashboard/grafana@2023-09-01`, Standard SKU, SystemAssigned identity.
-- **Data sources**: Azure Monitor Workspace (Prometheus) for kube-state/container metrics and a provisioned Azure Monitor datasource for `AppRequests` / `AppDependencies` queries, bound to the deployment's subscription, resource group, and Log Analytics workspace at import time.
+- **Data sources**: Azure Monitor Workspace (Prometheus) for kube-state/container metrics and a provisioned Azure Monitor datasource for `AppRequests` / `AppDependencies` queries, including the synthetic `slo-meter-ingest` AppRequests contract, bound to the deployment's subscription, resource group, and Log Analytics workspace at import time.
 - **RBAC**: Grafana's managed identity receives Monitoring Reader on the subscription.
 - **Toggle**: Set `deployObservability = true` in `infra/bicep/main.bicepparam` (default).
 
@@ -132,5 +133,6 @@ The Managed Grafana workspace is deployed by `infra/bicep/modules/observability.
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
-| 2026-08-12 | 0.3 | Clarified alert-to-agent trigger status cross-reference for issue #76 native incident platform wiring | Copilot draft for review |
+| 2026-08-12 | 0.4 | Clarified dashboard boundary for separate native incident-platform wiring | Copilot draft for review |
+| 2026-08-12 | 0.3 | Added demo-only customer-impact SLO row, no-data semantics, and live-proof boundary | Copilot |
 | 2026-08-11 | 0.2 | Updated guide for Azure Monitor-backed telemetry, no-data semantics, and non-interactive context variables | Copilot draft for review |

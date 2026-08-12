@@ -16,7 +16,8 @@ kql/
 │   ├── activity-log-rbac.kql
 │   ├── scenario-oom-killed.kql
 │   ├── scenario-mongodb-down.kql
-│   └── scenario-service-mismatch.kql
+│   ├── scenario-service-mismatch.kql
+│   └── slo-meter-ingest.kql
 └── schema-tbd/                 # Preview schemas subject to change (SRE Agent App Insights)
     └── sre-agent-telemetry.kql
 ```
@@ -85,6 +86,7 @@ let timeBin = 5m;              // Parameter: Time bucket granularity
 | `scenario-oom-killed.kql` | Verify OOMKilled scenario detection | `sre_scenario`, `sre_namespace`, `sre_service`, `TimeRange`, `timeBin` | KubeEvents, KubePodInventory | TimeBucket, ResourceId, CorrelationId |
 | `scenario-mongodb-down.kql` | Verify MongoDB outage and cascading failure detection | `sre_scenario`, `sre_namespace`, `sre_component`, `TimeRange`, `timeBin` | KubePodInventory, KubeServices, KubeEvents | TimeBucket, ResourceId, CorrelationId |
 | `scenario-service-mismatch.kql` | Capture symptom evidence for service selector mismatch (silent failure) | `sre_scenario`, `sre_namespace`, `sre_service`, `TimeRange`, `timeBin` | KubePodInventory, KubeServices | TimeBucket, ResourceId, CorrelationId |
+| `slo-meter-ingest.kql` | Derive demo-only unique-run success, raw p95, freshness, failure stage, and explicit no-data state | `TimeRange`, `freshnessLimit`, `sloName`, `sloMode` | AppRequests from repo-owned synthetic SERVER spans | TimeBucket, ResourceId, CorrelationId |
 
 ### SCHEMA_TBD Queries (docs/evidence/kql/schema-tbd/)
 
@@ -220,6 +222,7 @@ Several queries require Wave 1 infrastructure that is now **defined in Bicep** b
 | `alert-history.kql` | Alerts deployed (`deployAlerts = true`) | Enabled in `main.bicep` and `main.bicepparam` | Pending deployment/UAT |
 | `activity-log-rbac.kql` | Activity Log diagnostic export | Defined via `activity-log-diagnostics.bicep` | Pending deployment/UAT |
 | `sre-agent-telemetry.kql` | SRE Agent deployed with App Insights | Defined in Bicep | Pending SRE Agent telemetry schema verification |
+| `slo-meter-ingest.kql` | Synthetic probe runs and emits the documented AppRequests shape | Defined in repo-owned services and `application.yaml` | Pending healthy/failure/recovery live-proof gate |
 
 **Expected behavior during Wave 1 UAT:**
 - Queries will **parse successfully** but may **return no results** until prerequisites are deployed

@@ -326,7 +326,7 @@ Every end-to-end incident lifecycle must record these timestamps. Until measurem
 | `T2` | SRE Agent conversation started | Operator opens SRE Agent portal and submits first prompt |
 | `T3` | Recommendation made | SRE Agent returns diagnosis and recommended action |
 | `T4` | Operator action taken | Human approves/executes remediation |
-| `T5` | Service healthy | All affected pods Running/Ready, endpoints serving |
+| `T5` | Functional recovery verified | A newer successful `slo-meter-ingest` transaction is persisted and confirmed; pods/endpoints alone are insufficient. |
 
 - **MTTR** = `T5 − T1` (time from detection to recovery).
 - **Agent diagnosis time** = `T3 − T2`.
@@ -334,14 +334,18 @@ Every end-to-end incident lifecycle must record these timestamps. Until measurem
 
 ### SLO framework
 
-SLO definitions will be added in Wave 5. Reserve the following structure:
+`slo-meter-ingest` is a demo-only customer-journey SLO backed by a repository-owned
+synthetic transaction. Its success condition is MongoDB persistence confirmed through
+`dispatch-service`, not HTTP acceptance or Kubernetes readiness.
 
-| SLO Name | Indicator | Target | Burn-Rate Window | Alert Severity |
-|----------|-----------|--------|------------------|----------------|
-| `slo-pod-availability` | Pod Running ratio in `energy` namespace | 99.5% | 5m / 1h / 6h | Sev 1 / Sev 2 / Sev 3 |
-| `slo-meter-ingest` | Meter readings processed per minute | > 0 for 5m | 5m | Sev 0 |
+| SLO Name | Indicator | Target | Evaluation / burn-rate window | No-data behavior |
+|----------|-----------|--------|-------------------------------|------------------|
+| `slo-meter-ingest` | Unique synthetic correlation IDs with successful persistence confirmation | >= 95% success; p95 <= 30 seconds; last success <= 5 minutes | Rolling 10 minutes; burn rate = failure ratio / 5% error budget | `NO_DATA` / unknown, never healthy |
+| `slo-pod-availability` | Pod Running ratio in `energy` namespace | Reserved; not a customer-impact objective | Not implemented | N/A |
 
-These are placeholders. Do not implement burn-rate alerts until real data sources exist.
+The `slo-meter-ingest` windows are accelerated demonstration semantics, not a production
+SLO or SLA. The implementation, scenario mapping, and live-proof gate are defined in
+[`SLO-METER-INGEST.md`](SLO-METER-INGEST.md).
 
 ---
 

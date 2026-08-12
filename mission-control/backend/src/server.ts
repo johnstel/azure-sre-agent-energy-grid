@@ -17,6 +17,7 @@ import { registerPortalValidationRoutes } from './routes/portal-validations.js';
 import { registerAnalystRoutes } from './routes/analyst.js';
 import { registerIncidentRoutes } from './routes/incidents.js';
 import { registerRehearsalRoutes } from './routes/rehearsals.js';
+import { registerCustomerImpactRoutes } from './routes/customer-impact.js';
 import { getSreAgentService, registerSreAgentRoutes } from './routes/sre-agent.js';
 import { addScenarioJsonBodyCompatibility } from './utils/jsonBodyCompatibility.js';
 
@@ -89,6 +90,7 @@ async function start() {
   registerAnalystRoutes(app);
   registerIncidentRoutes(app);
   registerRehearsalRoutes(app);
+  registerCustomerImpactRoutes(app);
   registerSreAgentRoutes(app);
 
   // The SRE Agent adapter owns a child MCP server process; stop it with the backend so

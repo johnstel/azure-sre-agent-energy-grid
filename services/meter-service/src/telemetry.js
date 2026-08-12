@@ -1,5 +1,7 @@
-const { useAzureMonitor } = require("@azure/monitor-opentelemetry");
+const { useAzureMonitor, shutdownAzureMonitor } = require("@azure/monitor-opentelemetry");
 const { context, propagation, trace, SpanStatusCode } = require("@opentelemetry/api");
+
+let azureMonitorInitialized = false;
 
 function initializeTelemetry() {
   const connectionString = process.env.APPLICATIONINSIGHTS_CONNECTION_STRING || process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "";
@@ -14,12 +16,13 @@ function initializeTelemetry() {
     "sre.version": process.env.SRE_VERSION || "2026-04-25"
   };
 
-  if (connectionString) {
+  if (connectionString && !azureMonitorInitialized) {
     try {
       useAzureMonitor({
         connectionString,
         resource: { attributes: resourceAttributes }
       });
+      azureMonitorInitialized = true;
     } catch (error) {
       console.warn(`[meter-service] telemetry initialization failed: ${error.message}`);
     }
@@ -29,6 +32,14 @@ function initializeTelemetry() {
     tracer: trace.getTracer("meter-service"),
     resourceAttributes
   };
+}
+
+async function shutdownTelemetry() {
+  if (!azureMonitorInitialized) {
+    return;
+  }
+  await shutdownAzureMonitor();
+  azureMonitorInitialized = false;
 }
 
 function buildTelemetryAttributes(extra = {}) {
@@ -72,6 +83,7 @@ function addExceptionAttributes(span, error) {
 
 module.exports = {
   initializeTelemetry,
+  shutdownTelemetry,
   buildTelemetryAttributes,
   extractCorrelationId,
   createCorrelationCarrier,

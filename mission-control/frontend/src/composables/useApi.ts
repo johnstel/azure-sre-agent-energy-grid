@@ -4,6 +4,7 @@ import type {
   AssistantAskResponse,
   AssistantClientContext,
   AssistantConversationMessage,
+  CustomerImpactResponse,
   CreateRehearsalRunRequest,
   Deployment,
   DestroyParams,
@@ -94,6 +95,7 @@ function buildHeaders(options?: RequestInit): HeadersInit | undefined {
 export function useApi() {
   return {
     getHealth: () => api<{ status: string }>('/api/health'),
+    getCustomerImpact: () => api<CustomerImpactResponse>('/api/customer-impact'),
     getPreflight: () => api<{ checks: PreflightCheck[] }>('/api/preflight'),
     getPods: () => api<{ pods: Pod[] }>('/api/pods'),
     getServices: () => api<{ services: Service[] }>('/api/services'),

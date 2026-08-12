@@ -27,7 +27,7 @@ The Azure SRE Agent Energy Grid demo lab deploys a fully automated Azure environ
 | **P0** | `mode: 'Review'` vs `mode: 'Auto'` trade-off is not documented for customers | Cannot answer the #1 customer question: "Can it auto-remediate?" |
 | **P0** | Alert rules default to off (`deployAlerts = false`); no alert-to-agent trigger is wired | Cannot demonstrate autonomous detection or alert querying |
 | **P0** | No SRE Agent audit trail evidence (screenshots, KQL queries, or dashboards) | Cannot answer "Show me what the agent did" |
-| **P1** | No MTTR instrumentation, no SLO/error-budget framework | Value story is qualitative only |
+| **P1** | Demo-only `slo-meter-ingest` source, SLI queries, burn-rate rules, and Mission Control state are implemented; live evidence remains pending | Value story cannot be presented as a measured production SLO until the live-proof gate is complete |
 | **P1** | Demo apps do not emit Application Insights telemetry | Application-level observability prompts return thin results |
 
 ---
@@ -261,7 +261,7 @@ With `accessLevel: 'High'`, the managed identity holds: Log Analytics Reader + R
 
 **Toil reduction**: For the Azure SRE Agent Service demo, toil reduction must be framed around the intended agent-assisted diagnosis workflow once portal evidence exists. Mission Control can reduce local scenario-injection toil, but it is out of scope as proof of Azure SRE Agent capability.
 
-**SLO / error budget**: ❌ Not implemented. No SLO definitions, no error budget tracking, no burn-rate alerting exist in the repo.
+**SLO / error budget**: ⚠️ A demo-only `slo-meter-ingest` contract now defines success rate, raw-run p95, freshness, no-data behavior, and burn-rate rules. It is not production guidance and has no captured live evidence yet. See [`SLO-METER-INGEST.md`](SLO-METER-INGEST.md).
 
 | Status | Item |
 |--------|------|
@@ -271,7 +271,7 @@ With `accessLevel: 'High'`, the managed identity holds: Log Analytics Reader + R
 | ⚠️ | Wallboard severity is sticky for services with historical restarts: RabbitMQ readiness warnings can persist after current readiness recovers because `deriveSeverity()` marks `warning` whenever `restarts > 0`, with no decay window (`MissionWallboard.vue:1256-1260`) |
 | ❌ | No automated alert → SRE Agent trigger (all detection is human-initiated) |
 | ❌ | No MTTR instrumentation |
-| ❌ | No SLO/error-budget framework |
+| ⚠️ | Demo-only `slo-meter-ingest` framework exists; live evidence and scheduled-task proof remain pending |
 
 ### 4.2 Root-Cause Hypothesis Generation
 
@@ -346,7 +346,7 @@ The demo is **qualitative only** for all three metrics. This is the most signifi
 |--------|----------------|----------------|
 | **MTTR** | Demonstrates diagnosis speed (single prompt vs. multi-step manual) | No timestamps captured; no before/after comparison data |
 | **Toil reduction** | Wallboard auto-refresh, one-click scenarios, prompt library | No measurement of time saved or manual steps eliminated |
-| **SLO / error budget** | Not present | No SLO definitions, no burn-rate alerting, no availability tracking |
+| **SLO / error budget** | Demo-only synthetic meter-ingest success, p95, freshness, and no-data contract | No production target or live evidence claim until the proof gate is complete |
 
 > **Recommendation**: Frame each scenario in terms of *which SRE metric it improves* without fabricating numbers. Use language like "reduces the manual investigation from ~5 `kubectl` commands to a single prompt" rather than "reduces MTTR by X%."
 
@@ -567,7 +567,7 @@ graph TB
 | ID | Delta | Category | Action Required |
 |----|-------|----------|-----------------|
 | P1-1 | No MTTR instrumentation | Measurement | Instrument incident-open → diagnosis → remediation → close timestamps |
-| P1-2 | Demo apps don't emit App Insights telemetry | Observability | Add Application Insights SDK to at least meter-service and dispatch-service |
+| P1-2 | Repo-owned meter-service and dispatch-service now emit OpenTelemetry; live AppRequests validation remains pending | Observability | Execute the `slo-meter-ingest` live-proof gate before making a telemetry coverage claim |
 | P1-3 | No CI/CD pipeline for change correlation | Correlation | Add GitHub Actions workflow so SRE Agent can show commit-to-incident linking via MCP |
 | P1-4 | No runbook library | Governance | Create structured runbooks for top scenarios (OOMKilled, CrashLoop, MongoDBDown) |
 | P1-5 | No compound/multi-symptom failure demo | Diagnosis | Create at least one scenario with >1 contributing factor |
