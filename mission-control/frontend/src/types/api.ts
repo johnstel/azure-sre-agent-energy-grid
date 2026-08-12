@@ -60,6 +60,8 @@ export interface Service {
   externalIP?: string;
   externalHostname?: string;
   publicUrl?: string;
+  labels?: Record<string, string>;
+  annotations?: Record<string, string>;
 }
 
 export interface KubeEvent {
@@ -173,6 +175,40 @@ export interface InventoryResponse {
   orphanPods: InventoryPodSummary[];
   services: Service[];
   events: KubeEvent[];
+}
+
+export type CustomerImpactStatus = 'healthy' | 'degraded' | 'critical' | 'unknown' | 'no-data';
+
+export interface CustomerImpactTelemetry {
+  dataStatus: 'available' | 'no-data' | 'unavailable';
+  source: string;
+  runCount?: number;
+  successCount?: number;
+  failureCount?: number;
+  successRatePct?: number;
+  p95LatencyMs?: number;
+  lastSuccess?: string;
+  lastSuccessAgeSeconds?: number;
+  latestCriticalFailure?: string;
+  failureStages?: string[];
+  error?: string;
+}
+
+export interface CustomerImpactScenarioEvidence {
+  kind: 'MongoDBDown' | 'ServiceMismatch';
+  evidence: string;
+}
+
+export interface CustomerImpactResponse {
+  journey: string;
+  status: CustomerImpactStatus;
+  telemetry: CustomerImpactTelemetry;
+  kubernetesDataStatus: 'available' | 'unavailable';
+  evidenceSources: string[];
+  affectedStage: string;
+  recoveryCondition: string;
+  scenarioImpact?: CustomerImpactScenarioEvidence;
+  collectedAt: string;
 }
 
 export interface PodLogResponse {

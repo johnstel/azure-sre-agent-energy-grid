@@ -1272,16 +1272,17 @@ function Set-RepoServiceImages {
     }
 
     $images = @(
-        [pscustomobject]@{ Deployment = 'meter-service'; Container = 'meter-service' },
-        [pscustomobject]@{ Deployment = 'asset-service'; Container = 'asset-service' },
-        [pscustomobject]@{ Deployment = 'dispatch-service'; Container = 'dispatch-service' }
+        [pscustomobject]@{ Workload = 'deployment/meter-service'; Container = 'meter-service'; ImageName = 'meter-service' },
+        [pscustomobject]@{ Workload = 'deployment/asset-service'; Container = 'asset-service'; ImageName = 'asset-service' },
+        [pscustomobject]@{ Workload = 'deployment/dispatch-service'; Container = 'dispatch-service'; ImageName = 'dispatch-service' },
+        [pscustomobject]@{ Workload = 'cronjob/synthetic-meter-ingest-probe'; Container = 'synthetic-meter-ingest-probe'; ImageName = 'meter-service' }
     )
 
     foreach ($image in $images) {
-        $registryImage = "$AcrLoginServer/$($image.Deployment):$ImageTag"
-        kubectl set image "deployment/$($image.Deployment)" "$($image.Container)=$registryImage" -n energy 2>$null | Out-Null
+        $registryImage = "$AcrLoginServer/$($image.ImageName):$ImageTag"
+        kubectl set image $image.Workload "$($image.Container)=$registryImage" -n energy 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ⚠️  Could not update image for deployment $($image.Deployment)" -ForegroundColor Yellow
+            Write-Host "  ⚠️  Could not update image for $($image.Workload)" -ForegroundColor Yellow
         }
     }
 }
@@ -1366,10 +1367,16 @@ Write-Host "`n📦 Deploying demo application to AKS..." -ForegroundColor Yellow
 $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
 
 if (Test-Path $k8sPath) {
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $repoImageTag = (& git -C $repoRoot rev-parse --short HEAD 2>$null).Trim()
+    if ([string]::IsNullOrWhiteSpace($repoImageTag)) {
+        $repoImageTag = Get-Date -Format 'yyyyMMddHHmmss'
+    }
+
     kubectl apply -f $k8sPath
-    Publish-RepoOwnedServiceImages -ResourceGroupName $resourceGroupName -AcrLoginServer $outputs.acrLoginServer.value -ImageTag 'latest'
+    Publish-RepoOwnedServiceImages -ResourceGroupName $resourceGroupName -AcrLoginServer $outputs.acrLoginServer.value -ImageTag $repoImageTag
     Configure-TelemetrySecret -ResourceGroupName $resourceGroupName
-    Set-RepoServiceImages -AcrLoginServer $outputs.acrLoginServer.value -ImageTag 'latest'
+    Set-RepoServiceImages -AcrLoginServer $outputs.acrLoginServer.value -ImageTag $repoImageTag
     Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
 
     Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow

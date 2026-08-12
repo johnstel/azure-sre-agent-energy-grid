@@ -1,8 +1,8 @@
 const http = require("http");
-const { randomUUID } = require("crypto");
 const amqp = require("amqplib");
 const { context, trace } = require("@opentelemetry/api");
 const { initializeTelemetry, buildTelemetryAttributes, extractCorrelationId, createCorrelationCarrier, setSpanStatus, addExceptionAttributes } = require("./telemetry");
+const { createSyntheticEvent } = require("./synthetic-transaction");
 
 const { tracer, resourceAttributes } = initializeTelemetry();
 
@@ -63,14 +63,11 @@ function createApp(dependencies = {}) {
 
       if (req.method === "POST" && route === "/events") {
         const body = await readBody(req);
-        const event = {
-          id: body.id || randomUUID(),
-          meterId: body.meterId || "SM-0001",
-          reading: body.reading || 0,
-          zone: body.zone || "Zone-A North",
-          observedAt: new Date().toISOString(),
-          correlationId
-        };
+        const event = createSyntheticEvent(
+          { ...body, correlationId: body.correlationId || correlationId },
+          correlationId,
+          { now: new Date() }
+        );
         const carrier = createCorrelationCarrier(req, correlationId);
         const publishSpan = tracer.startSpan("rabbitmq.publish", {
           attributes: {

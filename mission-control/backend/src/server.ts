@@ -17,6 +17,7 @@ import { registerPortalValidationRoutes } from './routes/portal-validations.js';
 import { registerAnalystRoutes } from './routes/analyst.js';
 import { registerIncidentRoutes } from './routes/incidents.js';
 import { registerRehearsalRoutes } from './routes/rehearsals.js';
+import { registerCustomerImpactRoutes } from './routes/customer-impact.js';
 import { addScenarioJsonBodyCompatibility } from './utils/jsonBodyCompatibility.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -88,6 +89,7 @@ async function start() {
   registerAnalystRoutes(app);
   registerIncidentRoutes(app);
   registerRehearsalRoutes(app);
+  registerCustomerImpactRoutes(app);
 
   // SPA fallback — must be after API routes
   if (existsSync(frontendDist)) {

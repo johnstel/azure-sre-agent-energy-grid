@@ -2,13 +2,26 @@
 
 > **Duration**: 20 minutes · **Audience**: SRE managers, security reviewers, executive buyers
 > **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
-> **Pre-read**: [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) · [DEMO-RUNBOOK.md](DEMO-RUNBOOK.md)
+> **Pre-read**: [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) · [DEMO-RUNBOOK.md](DEMO-RUNBOOK.md) · [SLO-METER-INGEST.md](SLO-METER-INGEST.md)
 
 ---
 
 ## The Story in One Sentence
 
 > "Azure SRE Agent can reduce a multi-tool manual investigation into a conversational diagnosis path — with remediation kept operator-controlled in this demo."
+
+---
+
+## Customer-Impact Opening (Under 60 Seconds)
+
+Start with Mission Control or Grafana, not `kubectl`:
+
+1. Show the **Meter ingestion SLO** status and say: "This is a demo-only synthetic transaction that follows one meter reading through ingress, RabbitMQ, dispatch, and persistence."
+2. Point to success rate, p95, and last-success freshness only when the view has real data. If it says `NO_DATA` or `UNKNOWN`, say exactly that; do not substitute a green zero.
+3. State the recovery rule: "Pods being ready is not the finish line. We need a new, successful end-to-end transaction after the repair."
+4. Transition: "Now we can use Azure SRE Agent to investigate the evidence, with the operator still controlling remediation."
+
+If a scheduled Grid Readiness task has not produced captured evidence, do **not** say that it found the condition proactively. Use the task as a configuration and validation path only.
 
 ---
 
@@ -20,7 +33,7 @@
 
 **Goal:** Show why the demo matters without opening with `kubectl`.
 
-1. **Open with the business question:** "Can AI help my SRE team diagnose faster without giving up control?"
+1. **Open with the customer journey:** show the 60-second customer-impact opening, then ask: "Can AI help my SRE team diagnose faster without giving up control?"
 2. **Frame the value:** AI-assisted diagnosis, human-controlled remediation, and clear trust boundaries.
 3. **Show the trust model first:** Diagnosis Only → Recommend & Execute → Autonomous (not demonstrated).
 4. **Use the MongoDBDown wow moment:** show the dashboard or captured evidence if available; then ask the SRE Agent prompt or replay real captured evidence. Do not invent portal output.
@@ -103,15 +116,16 @@ During deployment, the repo-managed Azure Managed Grafana incident dashboard is 
 **Narrative**: "The meter readings database goes offline. But the symptoms appear in three different services."
 
 1. **Break**: `kubectl apply -f k8s/scenarios/mongodb-down.yaml`
-2. **Show the cascade**: MongoDB is at 0 replicas → the `mongodb` Service has no endpoints → dispatch-service cannot persist meter readings
-3. **Run the manual path first**:
+2. **Show the customer-impact state**: the golden transaction should become `critical` with a `persistence_timeout` stage; the app can accept ingress while dispatch cannot confirm persistence.
+3. **Show the cascade**: MongoDB is at 0 replicas → the `mongodb` Service has no endpoints → dispatch-service cannot persist meter readings
+4. **Run the manual path first**:
    - Follow `DEMO-RUNBOOK.md` Step 4c: start with `kubectl get pods -n energy`, trace deployment readiness, check `mongodb` endpoints, confirm `dispatch-service` depends on `mongodb://mongodb:27017`, and use logs/events as corroborating evidence.
    - Say: "This is the manual breadcrumb trail. Watch for the same dependency chain when we ask SRE Agent."
-4. **Ask SRE Agent**: "Meter readings are being accepted but never dispatched. What's wrong?"
-5. **Contrast live, don't fabricate**:
+5. **Ask SRE Agent**: "Meter readings are being accepted but never dispatched. What's wrong?"
+6. **Contrast live, don't fabricate**:
    - If the portal responds, compare what the agent recommends against the manual conclusion: MongoDB is scaled to zero, the `mongodb` Service has no endpoints, and dispatch cannot persist meter readings.
    - If the portal is unavailable, say: "SRE Agent is GA; we'll complete the manual diagnosis and show the prompt/evidence path without claiming a live agent result."
-6. **Fix**: `kubectl apply -f k8s/base/application.yaml` — the agent recommends; the operator executes in this demo unless real approval UI evidence exists.
+7. **Fix**: `kubectl apply -f k8s/base/application.yaml` — the agent recommends; the operator executes in this demo unless real approval UI evidence exists.
 
 **Why this is the climax**: Cascading failures are hard SRE problems. This scenario tests whether live SRE Agent output can help trace the same dependency chain shown in the manual path.
 
@@ -120,17 +134,22 @@ During deployment, the repo-managed Azure Managed Grafana incident dashboard is 
 **Narrative**: "After a 'v2 upgrade', meter readings fail silently. But all pods are green."
 
 1. **Break**: `kubectl apply -f k8s/scenarios/service-mismatch.yaml`
-2. **Show the trap**: `kubectl get pods -n energy` — everything looks healthy!
-3. **But**: `kubectl get endpoints meter-service -n energy` — zero endpoints
-4. **Ask SRE Agent**: "The grid dashboard loads but meter readings fail. Everything looks healthy."
-5. **Highlight conditionally**: If live portal output or approved prior evidence shows it, point to the real diagnosis. Otherwise say: "The observable root cause is a selector mismatch — the Service points to `meter-service-v2` but pods are labeled `meter-service`."
-6. **Fix**: `kubectl apply -f k8s/base/application.yaml`
+2. **Show the customer-impact state**: the synthetic journey should be `critical` with the `ingress` stage even when the infrastructure board looks green.
+3. **Show the trap**: `kubectl get pods -n energy` — everything looks healthy!
+4. **But**: `kubectl get endpoints meter-service -n energy` — zero endpoints
+5. **Ask SRE Agent**: "The grid dashboard loads but meter readings fail. Everything looks healthy."
+6. **Highlight conditionally**: If live portal output or approved prior evidence shows it, point to the real diagnosis. Otherwise say: "The observable root cause is a selector mismatch — the Service points to `meter-service-v2` but pods are labeled `meter-service`."
+7. **Fix**: `kubectl apply -f k8s/base/application.yaml`
 
 **Why this scenario last**: It tests a subtle failure pattern that humans can miss. Pods are green and logs may be quiet, so the evidence path checks endpoints and selectors before any SRE Agent claim is made.
 
 ---
 
 ## Act 3: Trust & Prove (5 minutes)
+
+### Functional Recovery Gate
+
+After applying the repair, wait for the next synthetic transaction or run an approved one-shot probe. Show its persisted completion and the newer AppRequests result before narrating recovery. The phrase "all pods are ready" is infrastructure context, not proof that the meter-ingest journey recovered.
 
 ### The Trust Anchor: Review Mode Approval Gate
 
@@ -212,6 +231,7 @@ See [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for the complete 
 - ❌ "Autonomous incident detection" → ✅ "Diagnoses issues you point it to; can be wired to alerts"
 - ❌ "Full audit trail" → ✅ "Operational telemetry is configured to App Insights; exact fields are SCHEMA_TBD"
 - ❌ "Production-grade RBAC" → ✅ "Demo uses broad permissions; see our production RBAC guidance"
+- ❌ "The scheduled task caught this before users noticed" → ✅ "The task configuration is ready; only a captured scheduled execution can demonstrate proactive analysis."
 
 ---
 
@@ -219,6 +239,7 @@ See [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for the complete 
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
+| 2026-08-12 | 0.6 | Added 60-second customer-impact opening, functional recovery gate, and scheduled-task evidence boundary | Copilot |
 | 2026-04-29 | 0.5 | Added persona routing for executive buyer, SRE manager, and security reviewer paths | Lambert (QA/Docs) |
 | 2025-07-22 | 0.4 | SCHEMA_TBD audit fix — replace all "conversations logged in App Insights" with evidence-safe telemetry language | Lambert (QA/Docs) |
 | 2025-07-22 | 0.3 | Security fix — soften 3 audit overclaims per SAFE-LANGUAGE-GUARDRAILS alignment | Lambert (QA/Docs) |

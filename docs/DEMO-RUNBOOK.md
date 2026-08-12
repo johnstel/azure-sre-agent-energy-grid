@@ -17,6 +17,8 @@ This is the single sequential checklist for running the Energy Grid SRE Agent de
 - [ ] Review [docs/COSTS.md](COSTS.md) — budget ~$34-40/day with SRE Agent
 - [ ] Identify which scenarios you will demo (recommended: OOMKilled → MongoDBDown → ServiceMismatch)
 - [ ] Review [docs/SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for claims to avoid
+- [ ] Review the demo-only [meter-ingest SLO contract](SLO-METER-INGEST.md) and its live-proof gate
+- [ ] If a proactive task is in scope, configure and validate it through [Grid Readiness scheduled-task guidance](SRE-AGENT-GRID-READINESS-TASK.md); do not claim findings until real runs are captured
 - [ ] Review the visual evidence convention in [docs/evidence/screenshots/README.md](evidence/screenshots/README.md)
 - [ ] If reusing screenshots from a prior run, confirm they are real captures, redacted, and not placeholders
 - [ ] **External demo only**: complete the [External Demo Security Checklist](#external-demo-security-checklist) below
@@ -103,6 +105,8 @@ kubectl exec -n energy deploy/grid-dashboard -- curl -s localhost:8080/health
 ```
 
 - [ ] Grid dashboard responds
+- [ ] `kubectl get cronjob synthetic-meter-ingest-probe -n energy` reports the two-minute probe schedule
+- [ ] Record whether the customer-impact panel shows real telemetry, `NO_DATA`, or `UNKNOWN`; neither non-green state is a healthy baseline
 
 **Evidence capture — per scenario baseline screenshots** (use as pre-demo study material and for the visual evidence pack, #38):
 
@@ -125,13 +129,13 @@ If replacing a reference PNG with a fresh live capture, redact it and update the
 After deployment, the Managed Grafana workspace is available in the resource group. No repo-managed dashboard import is performed as part of this branch.
 
 1. Open the Managed Grafana instance from the Azure Portal resource group or run `site` in the dev container terminal to retrieve the URL.
-2. Confirm that the workspace shows the baseline panels and that the scenario variable is available.
-3. Keep the workspace open during the demo to show the transition from healthy to degraded to critical while the operator investigates.
+2. Confirm that the workspace shows the customer-impact SLO row, baseline panels, and the scenario variable.
+3. Keep the workspace open during the demo to show the transition from healthy to degraded to critical or no-data while the operator investigates.
 
 ### Demo path guidance
 
-- 5-minute path: show the namespace health, pod restarts, and alert-state views.
-- 10-minute path: add CPU/memory, request/error-rate, and timeline annotations.
+- 5-minute path: start with the customer-impact state, then show namespace health, pod restarts, and alert-state views.
+- 10-minute path: add the SLO success/p95/freshness row, CPU/memory, request/error-rate, and timeline annotations.
 - 20-minute path: include dependency failures, scenario narrative, and the operator handoff panels.
 
 Use the safe-language guardrails in [docs/SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) when presenting the dashboard. Do not imply autonomous remediation; present it as evidence that the operator can review and act on.
@@ -294,8 +298,18 @@ kubectl apply -f k8s/base/application.yaml
 kubectl get pods -n energy
 ```
 
-- [ ] All pods back to Running/Ready
-- [ ] Screenshot recovery state → `docs/evidence/screenshots/<scenario>_after-fix.png`
+- [ ] All pods back to Running/Ready (infrastructure recovery evidence only)
+- [ ] Wait for the next `synthetic-meter-ingest-probe` execution and identify its completed Job:
+
+  ```bash
+  kubectl get jobs -n energy -l app.kubernetes.io/component=synthetic-probe --sort-by=.status.startTime
+  kubectl logs -n energy job/<latest-completed-probe-job>
+  ```
+
+- [ ] Confirm the JSON result has `"success":true` and a correlation ID, then use `docs/evidence/kql/stable/slo-meter-ingest.kql` to confirm the newer persisted transaction in AppRequests.
+- [ ] Screenshot the functional recovery state → `docs/evidence/screenshots/<scenario>_after-fix.png`
+
+Do not mark `T5` or say the customer journey recovered when only pods are ready. A new successful synthetic transaction is the recovery gate.
 
 ### 5g. Record timestamps
 
@@ -327,6 +341,7 @@ fix-all
 
 - [ ] All pods Running/Ready
 - [ ] No error events in last 5 minutes
+- [ ] A newer successful `slo-meter-ingest` transaction is visible before presenting a healthy customer-impact state
 
 ---
 

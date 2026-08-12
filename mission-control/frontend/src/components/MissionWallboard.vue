@@ -231,6 +231,7 @@
       </section>
 
       <aside class="ops-panel" aria-label="Active incidents and pod board">
+        <CustomerImpactPanel :impact="customerImpact" :error="customerImpactError" />
         <section class="wallboard-card incident-handoff-card">
         <div class="wallboard-panel__heading">
           <div>
@@ -524,11 +525,13 @@ import PortalValidation from './PortalValidation.vue';
 import RehearsalWorkflow from './RehearsalWorkflow.vue';
 import ScenarioNarrationPanel from './ScenarioNarrationPanel.vue';
 import Terminal from './Terminal.vue';
+import CustomerImpactPanel from './CustomerImpactPanel.vue';
 import type {
   Deployment,
   AssistantAskResponse,
   AssistantClientContext,
   AssistantConversationMessage,
+  CustomerImpactResponse,
   IncidentHandoff,
   InventoryItem,
   InventorySeverity,
@@ -572,6 +575,7 @@ const {
   enableScenario,
   fixAll,
   getDeployments,
+  getCustomerImpact,
   getEvents,
   getIncidentHandoffs,
   getInventory,
@@ -593,6 +597,8 @@ const events = ref<KubeEvent[]>([]);
 const scenarios = ref<Scenario[]>([]);
 const preflightChecks = ref<PreflightCheck[]>([]);
 const incidentHandoffs = ref<IncidentHandoff[]>([]);
+const customerImpact = ref<CustomerImpactResponse>();
+const customerImpactError = ref('');
 
 const inventoryLoading = ref(false);
 const inventoryError = ref('');
@@ -752,7 +758,7 @@ const analystTranscriptStatus = computed(() => {
 
 async function refreshAll() {
   inventoryLoading.value = true;
-  await Promise.all([loadInventory(), loadRuntime(), loadScenarios(), loadIncidentHandoffs()]);
+  await Promise.all([loadInventory(), loadRuntime(), loadScenarios(), loadIncidentHandoffs(), loadCustomerImpact()]);
   inventoryLoading.value = false;
 }
 
@@ -803,6 +809,16 @@ async function loadIncidentHandoffs() {
   } catch (error) {
     incidentHandoffError.value = `Incident handoffs unavailable: ${error instanceof Error ? error.message : String(error)}`;
     incidentHandoffs.value = [];
+  }
+}
+
+async function loadCustomerImpact() {
+  customerImpactError.value = '';
+  try {
+    customerImpact.value = await getCustomerImpact();
+  } catch (error) {
+    customerImpact.value = undefined;
+    customerImpactError.value = `Customer-impact API unavailable: ${error instanceof Error ? error.message : String(error)}`;
   }
 }
 

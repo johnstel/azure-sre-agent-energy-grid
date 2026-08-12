@@ -614,6 +614,110 @@ spec:
 
 ---
 # =============================================================================
+# Synthetic SLO Probe - Meter ingest transaction validation
+# =============================================================================
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: synthetic-meter-ingest-probe
+  namespace: energy
+  labels:
+    app: meter-service
+    app.kubernetes.io/component: synthetic-probe
+    app.kubernetes.io/part-of: energy-grid-demo
+    sre-demo: breakable
+  annotations:
+    sre-agent-demo/description: "Runs a synthetic meter-ingest transaction every two minutes for SLO validation."
+    sre-agent-demo/probe: "slo-meter-ingest"
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  startingDeadlineSeconds: 30
+  jobTemplate:
+    spec:
+      ttlSecondsAfterFinished: 600
+      activeDeadlineSeconds: 45
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app: meter-service
+            app.kubernetes.io/component: synthetic-probe
+            app.kubernetes.io/part-of: energy-grid-demo
+            sre-demo: breakable
+          annotations:
+            sre-agent-demo/description: "Runs a synthetic meter-ingest transaction every two minutes for SLO validation."
+            sre-agent-demo/probe: "slo-meter-ingest"
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            nodepool-type: user
+          containers:
+            - name: synthetic-meter-ingest-probe
+              image: ghcr.io/johnstel/azure-sre-agent-energy-grid/meter-service:latest
+              imagePullPolicy: Always
+              command: ["node", "/app/scripts/synthetic-transaction.js"]
+              resources:
+                requests:
+                  memory: "64Mi"
+                  cpu: "50m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "100m"
+              env:
+                - name: METER_SERVICE_URL
+                  value: "http://meter-service.energy.svc.cluster.local:3000"
+                - name: DISPATCH_SERVICE_URL
+                  value: "http://dispatch-service.energy.svc.cluster.local:3001"
+                - name: SYNTHETIC_TOTAL_TIMEOUT_MS
+                  value: "30000"
+                - name: SYNTHETIC_REQUEST_TIMEOUT_MS
+                  value: "2000"
+                - name: SYNTHETIC_MAX_RETRIES
+                  value: "3"
+                - name: SYNTHETIC_BACKOFF_BASE_MS
+                  value: "100"
+                - name: SYNTHETIC_POLL_INTERVAL_MS
+                  value: "250"
+                - name: SRE_SERVICE
+                  value: meter-service
+                - name: SRE_NAMESPACE
+                  valueFrom:
+                    configMapKeyRef:
+                      name: energy-service-config
+                      key: SRE_NAMESPACE
+                - name: SRE_SCENARIO
+                  valueFrom:
+                    configMapKeyRef:
+                      name: energy-service-config
+                      key: SRE_SCENARIO
+                - name: SRE_COMPONENT
+                  valueFrom:
+                    configMapKeyRef:
+                      name: energy-service-config
+                      key: SRE_COMPONENT
+                - name: SRE_VERSION
+                  valueFrom:
+                    configMapKeyRef:
+                      name: energy-service-config
+                      key: SRE_VERSION
+                - name: OTEL_SERVICE_NAME
+                  valueFrom:
+                    configMapKeyRef:
+                      name: energy-service-config
+                      key: OTEL_SERVICE_NAME
+                      optional: true
+                - name: APPLICATIONINSIGHTS_CONNECTION_STRING
+                  valueFrom:
+                    secretKeyRef:
+                      name: telemetry-credentials
+                      key: applicationinsights-connection-string
+                      optional: true
+
+---
+# =============================================================================
 # Grid Dashboard - Consumer portal (nginx serving custom HTML)
 # =============================================================================
 apiVersion: v1

@@ -82,6 +82,54 @@ export class LogAnalyticsQueryService {
       },
     };
   }
+
+  /**
+   * Executes the fixed customer-impact query. Unlike analyst templates this is
+   * an internal contract, not a caller-configurable KQL endpoint.
+   */
+  async executeSloMeterIngest(minutes: number): Promise<{
+    workspace: string;
+    rows: Record<string, unknown>[];
+    source: string;
+  }> {
+    const workspace = configuredWorkspaceId();
+    if (!workspace) {
+      throw new LogAnalyticsQueryError('Log Analytics workspace is not configured. Set LOG_ANALYTICS_WORKSPACE_ID or AZURE_LOG_ANALYTICS_WORKSPACE_ID.', 503);
+    }
+
+    const result = await this.executor([
+      'monitor', 'log-analytics', 'query',
+      '--workspace', workspace,
+      '--analytics-query', buildSloMeterIngestKql(minutes),
+      '--timespan', `PT${minutes}M`,
+      '--output', 'json',
+    ], DEFAULT_TIMEOUT_MS);
+
+    return {
+      workspace,
+      rows: mapAzureQueryRows(result.stdout),
+      source: 'Azure Monitor Log Analytics AppRequests',
+    };
+  }
+}
+
+/**
+ * The synthetic transaction is represented by one logical correlation ID.
+ * Aggregating before calculating totals prevents retries or duplicate exports
+ * from inflating the logical failure count.
+ */
+export function buildSloMeterIngestKql(minutes: number): string {
+  const safeMinutes = Math.min(MAX_MINUTES, Math.max(1, Math.floor(minutes)));
+  return [
+    'AppRequests',
+    `| where TimeGenerated > ago(${safeMinutes}m)`,
+    '| where Name == "slo.meter-ingest.transaction"',
+    '| extend SyntheticName=tostring(Properties["synthetic.name"]), SyntheticMode=tostring(Properties["synthetic.mode"]), CorrelationId=tostring(Properties["synthetic.correlation_id"]), FailureStage=tostring(Properties["synthetic.failure_stage"])',
+    '| where SyntheticName == "slo-meter-ingest" and SyntheticMode == "demo" and isnotempty(CorrelationId)',
+    '| extend RequestSuccess=toint(Success), RequestDurationMs=todouble(DurationMs)',
+    '| summarize LogicalSuccess=max(RequestSuccess), LogicalDurationMs=max(RequestDurationMs), LogicalLastObserved=max(TimeGenerated), LogicalLastSuccess=maxif(TimeGenerated, RequestSuccess == 1), FailureStage=take_anyif(FailureStage, RequestSuccess == 0 and isnotempty(FailureStage)) by CorrelationId',
+    '| summarize runCount=count(), successCount=countif(LogicalSuccess == 1), failureCount=countif(LogicalSuccess == 0), successRatePct=round(100.0 * countif(LogicalSuccess == 1) / count(), 2), p95LatencyMs=percentile(LogicalDurationMs, 95), lastSuccess=max(LogicalLastSuccess), latestCriticalFailure=maxif(LogicalLastObserved, LogicalSuccess == 0 and FailureStage in ("persistence_timeout", "ingress")), failureStages=make_set_if(FailureStage, LogicalSuccess == 0 and isnotempty(FailureStage), 5)',
+  ].join('\n');
 }
 
 export function normalizeLogAnalyticsRequest(
