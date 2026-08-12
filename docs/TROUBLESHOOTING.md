@@ -680,6 +680,35 @@ If this doesn't resolve the issue, see [Supportability Guide -> Restoring Health
 
 ---
 
+## Mission Control → Azure SRE Agent (MCP) Issues
+
+The Mission Control **Investigate with Azure SRE Agent** panel talks to a real Azure SRE Agent through the Azure MCP Server. Start with the built-in preflight, which names the failing control and its fix:
+
+```bash
+curl -s localhost:3333/api/sre-agent/preflight | jq '.ready, .checks'
+```
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| Panel shows "Azure SRE Agent is not configured" | `SRE_AGENT_NAME` / `SRE_AGENT_SUBSCRIPTION_ID` unset | Set both, then restart Mission Control. See [SRE Agent MCP Integration §4](SRE-AGENT-MCP-INTEGRATION.md#4-configuration). |
+| `kind: "auth"` — authentication failed | Not signed in; Azure MCP Server suppresses interactive sign-in in server mode | `az login` (add `--tenant <agent-tenant-id>` for a cross-tenant agent), then retry |
+| `kind: "permission"` — 403 | Missing RBAC | Assign **Reader** (control plane) and **SRE Agent Administrator** (data plane) at the `Microsoft.App/agents` scope |
+| `kind: "not-found"` | Wrong agent name/subscription/resource group, or agent not provisioned | Verify config values and that `provisioningState` is `Succeeded` |
+| `kind: "network"` | `*.azuresre.ai` blocked by proxy/firewall | Allow outbound DNS + HTTPS to `*.azuresre.ai` and `management.azure.com` |
+| `kind: "runtime-missing"` | `npx` not on PATH | Install Node.js LTS, or set `SRE_AGENT_MCP_COMMAND` |
+| Preflight: "Azure MCP Server did not expose …" | Stale npx cache or a package version without the `sreagent` namespace | `rm -rf ~/.npm/_npx`, or pin `SRE_AGENT_MCP_PACKAGE` to a known-good version |
+| **Preflight: "Blocked tools were exposed"** | The `--tool` allowlist was not applied | **Do not demo this build.** Mission Control must launch Azure MCP Server with its six `--tool` flags. |
+| First investigation is very slow | Cold `npx` download of the MCP server | Pre-warm with `npx -y @azure/mcp@latest server start --help`, or pin the version |
+| `kind: "timeout"` | Investigation exceeded the configured budget | Narrow the prompt, or raise `SRE_AGENT_INVESTIGATION_TIMEOUT_MS` (max 15 min) |
+| Response shows "no citations" | The agent returned none | Expected. Mission Control never invents citations. |
+| Status stuck at "Awaiting approval" | Standard mode paused at an approval gate | Approve in the SRE Agent portal. Mission Control never auto-approves, by design. |
+| Stop pressed but the agent keeps working | No server-side cancel is documented | Mission Control aborts its request and does not retry; review the thread in the portal |
+| Thread lost after a backend restart | Expected — only the thread reference is durable | `GET /api/sre-agent/threads`, then `GET /api/sre-agent/investigations/:threadId` to re-attach |
+
+> **Never** work around a failure by using Local Analyst output in place of an SRE Agent answer. The failure path deliberately returns `localAnalystSubstituted: false` and a portal handoff.
+
+---
+
 ## Related Documentation
 
 | Document | Use When |
@@ -687,9 +716,10 @@ If this doesn't resolve the issue, see [Supportability Guide -> Restoring Health
 | [Supportability Guide](SUPPORTABILITY.md) | Understanding what's supportable, escalation paths, known limitations |
 | [Breakable Scenarios](BREAKABLE-SCENARIOS.md) | You need to understand or inject a specific failure scenario |
 | [SRE Agent Setup](SRE-AGENT-SETUP.md) | First-time setup, RBAC configuration, portal connection |
+| [SRE Agent MCP Integration](SRE-AGENT-MCP-INTEGRATION.md) | Mission Control's embedded SRE Agent investigations, config, and safety model |
 | [AKS maxPods Runbook](AKS-MAXPODS-MAINTENANCE-RUNBOOK.md) | Node pool replacement for scheduling pressure |
 | [Capability Contracts](CAPABILITY-CONTRACTS.md) | Architecture decisions, telemetry schemas, RBAC matrix |
 
 ---
 
-*Last updated: 2026-05-06 | Maintainer: SRE Lab Team*
+*Last updated: 2026-08-12 | Maintainer: SRE Lab Team*
