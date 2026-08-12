@@ -120,6 +120,32 @@ export function normalizeMitigationRequest(raw: unknown): ReviewModeMitigationRe
 }
 
 export const REVIEW_MODE_MITIGATION_CACHE_MS = 15_000;
+export const REVIEW_MODE_MITIGATION_CACHE_MAX_KEYS = 64;
+
+function pruneMitigationEvidenceCache(
+  cache: Map<string, { expiresAtMs: number; response: ReviewModeMitigationResponse }>,
+  nowMs: number,
+  maxKeys = REVIEW_MODE_MITIGATION_CACHE_MAX_KEYS,
+): void {
+  for (const [key, entry] of cache.entries()) {
+    if (entry.expiresAtMs <= nowMs) cache.delete(key);
+  }
+
+  while (cache.size > maxKeys) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey === undefined) break;
+    cache.delete(oldestKey);
+  }
+}
+
+function touchMitigationEvidenceCache(
+  cache: Map<string, { expiresAtMs: number; response: ReviewModeMitigationResponse }>,
+  key: string,
+  entry: { expiresAtMs: number; response: ReviewModeMitigationResponse },
+): void {
+  cache.delete(key);
+  cache.set(key, entry);
+}
 
 export interface ReviewModeMitigationDependencies {
   evidence: Pick<SreAgentEvidenceService, 'execute'>;
@@ -227,9 +253,17 @@ export class ReviewModeMitigationService {
     }
 
     const cacheKey = evidenceCacheKey(correlation, minutes);
+    const nowMs = now.getTime();
+    pruneMitigationEvidenceCache(this.cache, nowMs);
+
     const cached = this.cache.get(cacheKey);
-    if (cached && cached.expiresAtMs > now.getTime()) {
-      return cached.response;
+    if (cached) {
+      if (cached.expiresAtMs <= nowMs) {
+        this.cache.delete(cacheKey);
+      } else {
+        touchMitigationEvidenceCache(this.cache, cacheKey, cached);
+        return cached.response;
+      }
     }
     const inFlight = this.inFlight.get(cacheKey);
     if (inFlight) {
@@ -350,7 +384,9 @@ export class ReviewModeMitigationService {
 
     if (!hadFailure) {
       const ttlMs = this.dependencies.cacheTtlMs ?? REVIEW_MODE_MITIGATION_CACHE_MS;
-      this.cache.set(cacheKey, { expiresAtMs: now.getTime() + ttlMs, response });
+      const cacheEntry = { expiresAtMs: now.getTime() + ttlMs, response };
+      touchMitigationEvidenceCache(this.cache, cacheKey, cacheEntry);
+      pruneMitigationEvidenceCache(this.cache, now.getTime());
     }
 
     return response;

@@ -11,6 +11,7 @@ import { describe, it, beforeEach } from 'node:test';
 import Fastify from 'fastify';
 
 import {
+  REVIEW_MODE_MITIGATION_CACHE_MAX_KEYS,
   ReviewModeMitigationRequestError,
   ReviewModeMitigationService,
   buildGuardrails,
@@ -130,6 +131,19 @@ function makeDependencies(
       },
     },
   };
+}
+
+function cacheKeyFor(
+  correlation: { threadId?: string; correlationId?: string; incidentId?: string; traceId?: string },
+  minutes = 60,
+): string {
+  return JSON.stringify({
+    threadId: correlation.threadId ?? '',
+    correlationId: correlation.correlationId ?? '',
+    incidentId: correlation.incidentId ?? '',
+    traceId: correlation.traceId ?? '',
+    minutes,
+  });
 }
 
 const reviewIncidentRow = {
@@ -307,6 +321,44 @@ describe('mitigation orchestration', () => {
 
     assert.equal(first, second);
     assert.equal(deps.calls.length, 4);
+  });
+
+  it('caps the evidence cache and evicts the oldest keys while keeping the newest active key', async () => {
+    const deps = makeDependencies({ incident: [reviewIncidentRow] }, inventoryFixture(1, 1), impactFixture(true));
+    const service = new ReviewModeMitigationService({ ...deps, cacheTtlMs: 30_000 });
+
+    for (let i = 0; i < REVIEW_MODE_MITIGATION_CACHE_MAX_KEYS + 6; i += 1) {
+      await service.getMitigationEvidence({
+        threadId: `thread-${i.toString().padStart(4, '0')}`,
+        incidentId: `INC-${i.toString().padStart(4, '0')}`,
+      });
+    }
+
+    const cache = (service as any).cache as Map<string, { expiresAtMs: number }>;
+    assert.equal(cache.size, REVIEW_MODE_MITIGATION_CACHE_MAX_KEYS);
+    assert.ok(!cache.has(cacheKeyFor({ threadId: 'thread-0000', incidentId: 'INC-0000' })));
+    assert.ok(cache.has(cacheKeyFor({ threadId: `thread-${(REVIEW_MODE_MITIGATION_CACHE_MAX_KEYS + 5).toString().padStart(4, '0')}`, incidentId: `INC-${(REVIEW_MODE_MITIGATION_CACHE_MAX_KEYS + 5).toString().padStart(4, '0')}` })));
+  });
+
+  it('evicts expired evidence entries while keeping the most recent key fresh', async () => {
+    let nowMs = 0;
+    const deps = makeDependencies({ incident: [reviewIncidentRow] }, inventoryFixture(1, 1), impactFixture(true));
+    const service = new ReviewModeMitigationService({
+      ...deps,
+      now: () => new Date(nowMs),
+      cacheTtlMs: 1_000,
+    });
+
+    await service.getMitigationEvidence({ threadId: 'thread-0', incidentId: 'INC-0' });
+    nowMs = 500;
+    await service.getMitigationEvidence({ threadId: 'thread-1', incidentId: 'INC-1' });
+    nowMs = 1_500;
+    await service.getMitigationEvidence({ threadId: 'thread-2', incidentId: 'INC-2' });
+
+    const cache = (service as any).cache as Map<string, { expiresAtMs: number }>;
+    assert.ok(!cache.has(cacheKeyFor({ threadId: 'thread-0', incidentId: 'INC-0' })));
+    assert.ok(!cache.has(cacheKeyFor({ threadId: 'thread-1', incidentId: 'INC-1' })));
+    assert.ok(cache.has(cacheKeyFor({ threadId: 'thread-2', incidentId: 'INC-2' })));
   });
 
   it('deduplicates concurrent identical requests instead of running overlapping batches', async () => {
