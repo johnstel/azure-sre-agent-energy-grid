@@ -557,7 +557,7 @@ graph TB
 | P0-2 | Permission-boundary diagram absent from core demo materials before this document | Architecture | Promote the trust-tier diagram in §3.4 into the README, demo deck, or customer handout |
 | P0-3 | `mode: 'Review'` vs `mode: 'Auto'` not documented | Action Model | Document the trade-off, explain why Review was chosen, note Auto exists |
 | P0-4 | Alert rules default to off (`deployAlerts = false`) | Detection | Recommend `deployAlerts = true` for customer demos; document the opt-in |
-| P0-5 | No alert-to-agent trigger wired | Detection | Document Subagent builder / Incident triggers as next step; wire if possible |
+| P0-5 | Alert-to-agent trigger wired via Bicep `incidentManagementConfiguration` + `scripts/configure-sre-agent-incident-response.ps1` (issue #76); live end-to-end proof pending | Detection | See `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md` for capability findings and outstanding live-validation checklist |
 | P0-6 | No SRE Agent audit trail evidence | Auditability | Capture Portal screenshots showing conversation audit, action proposals, execution log |
 | P0-7 | No pre-built KQL audit queries | Auditability | Create queries for: pod lifecycle events, SRE Agent actions from App Insights, RBAC changes from Activity Log |
 | P0-8 | No "demo vs. production" permissions guidance | Security | Document `accessLevel: 'Low'` as diagnosis-only option; provide minimum role set for production |

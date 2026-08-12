@@ -1,14 +1,19 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { ALLOWED_AKS_ANALYST_QUERIES, AnalystKubeQueryService } from '../services/AnalystKubeQueryService.js';
 import { configuredWorkspaceId, LogAnalyticsQueryError, LogAnalyticsQueryService, normalizeLogAnalyticsRequest } from '../services/LogAnalyticsQueryService.js';
+import { configuredSreAgentWorkspaceId, normalizeSreAgentEvidenceRequest, SreAgentEvidenceQueryError, SreAgentEvidenceService } from '../services/SreAgentEvidenceService.js';
 import { KubeClientError, KubeInputError } from '../services/KubeClient.js';
 
 const aksQueries = new AnalystKubeQueryService();
 const logAnalytics = new LogAnalyticsQueryService();
+const sreAgentEvidence = new SreAgentEvidenceService();
 const ENERGY_NAMESPACE = 'energy' as const;
 const DEFAULT_LOG_ANALYTICS_MINUTES = 30;
 const DEFAULT_LOG_ANALYTICS_TIMEOUT_MS = 15_000;
+const DEFAULT_SRE_AGENT_EVIDENCE_MINUTES = 60;
+const DEFAULT_SRE_AGENT_EVIDENCE_TIMEOUT_MS = 15_000;
 const LOG_SOURCE = 'Azure Monitor Log Analytics query via governed canned template';
+const SRE_AGENT_EVIDENCE_SOURCE = 'Azure SRE Agent Application Insights customEvents via governed canned template';
 const AKS_SOURCE = `kubectl get (read-only) against namespace '${ENERGY_NAMESPACE}'`;
 
 export function registerAnalystRoutes(app: FastifyInstance): void {
@@ -25,6 +30,14 @@ export function registerAnalystRoutes(app: FastifyInstance): void {
       return reply.send(await logAnalytics.execute(req.params.templateName, req.query));
     } catch (err) {
       return sendLogAnalystError(reply, req.params.templateName, req.query, err);
+    }
+  });
+
+  app.get<{ Params: { templateName: string }; Querystring: Record<string, unknown> }>('/api/analyst/sre-agent/:templateName', async (req, reply) => {
+    try {
+      return reply.send(await sreAgentEvidence.execute(req.params.templateName, req.query));
+    } catch (err) {
+      return sendSreAgentEvidenceError(reply, req.params.templateName, req.query, err);
     }
   });
 }
@@ -58,6 +71,24 @@ function sendLogAnalystError(
 
   const message = err instanceof Error ? err.message : String(err);
   return reply.status(500).send(buildLogAnalyticsErrorResponse(templateName, query, message, 'unavailable'));
+}
+
+function sendSreAgentEvidenceError(
+  reply: FastifyReply,
+  templateName: string,
+  query: Record<string, unknown>,
+  err: unknown,
+) {
+  if (err instanceof KubeInputError) {
+    return reply.status(400).send(buildSreAgentEvidenceErrorResponse(templateName, query, err.message, 'denied'));
+  }
+
+  if (err instanceof SreAgentEvidenceQueryError) {
+    return reply.status(err.statusCode).send(buildSreAgentEvidenceErrorResponse(templateName, query, err.message, 'unavailable', err.schemaMismatch));
+  }
+
+  const message = err instanceof Error ? err.message : String(err);
+  return reply.status(500).send(buildSreAgentEvidenceErrorResponse(templateName, query, message, 'unavailable'));
 }
 
 export function buildAksErrorResponse(queryName: string, error: string, status: 'denied' | 'unavailable') {
@@ -126,6 +157,59 @@ export function buildLogAnalyticsErrorResponse(
 function tryNormalizeLogAnalyticsRequest(templateName: string, query: Record<string, unknown>) {
   try {
     return normalizeLogAnalyticsRequest(templateName, query);
+  } catch {
+    return undefined;
+  }
+}
+
+export function buildSreAgentEvidenceErrorResponse(
+  templateName: string,
+  query: Record<string, unknown>,
+  error: string,
+  status: 'denied' | 'unavailable',
+  schemaMismatch = false,
+) {
+  const normalized = tryNormalizeSreAgentEvidenceRequest(templateName, query);
+  const now = new Date();
+  const minutes = normalized?.minutes ?? DEFAULT_SRE_AGENT_EVIDENCE_MINUTES;
+  const timeoutMs = normalized?.timeoutMs ?? DEFAULT_SRE_AGENT_EVIDENCE_TIMEOUT_MS;
+  const from = new Date(now.getTime() - minutes * 60_000);
+  const limitations = status === 'denied'
+    ? ['Mission Control uses canned Azure SRE Agent evidence templates only; unknown templates and invalid parameters are rejected.']
+    : ['No inference is made from missing, timed-out, or unavailable native evidence -- absence is reported as unknown, never as healthy or mitigated.'];
+  if (schemaMismatch) {
+    limitations.push('The deployed Azure SRE Agent telemetry schema may no longer match the documented event/field names used by this template.');
+  }
+
+  return {
+    error,
+    templateName,
+    workspace: configuredSreAgentWorkspaceId() ?? 'not configured',
+    status,
+    timeRange: {
+      from: from.toISOString(),
+      to: now.toISOString(),
+      minutes,
+    },
+    rowCount: 0,
+    rows: [],
+    metadata: {
+      source: SRE_AGENT_EVIDENCE_SOURCE,
+      collectedAt: new Date().toISOString(),
+      limitations,
+      confidence: 'none',
+      status,
+      partial: false,
+      timeoutMs,
+      partialBehavior: 'Partial or timed-out query results are not accepted as complete evidence; Mission Control must treat this response as unavailable or denied.',
+      schemaMismatch,
+    },
+  };
+}
+
+function tryNormalizeSreAgentEvidenceRequest(templateName: string, query: Record<string, unknown>) {
+  try {
+    return normalizeSreAgentEvidenceRequest(templateName, query);
   } catch {
     return undefined;
   }

@@ -50,6 +50,24 @@ param acrAdminUserEnabled = false
 // For external/customer-facing demos, omit this parameter or set to 'Low'.
 param sreAgentAccessLevel = 'High'
 
+// Connect Azure Monitor as the SRE Agent incident platform (issue #76).
+// This wires the documented Microsoft.App/agents incidentManagementConfiguration ARM property and
+// grants the agent's managed identity Monitoring Contributor on this resource group, so Azure Monitor
+// alerts on Energy Grid resources become visible to the agent. The response plan itself (severity/title
+// filter, Review-mode autonomy, reinvestigation cooldown) is NOT exposed by this ARM resource -- run
+// scripts/configure-sre-agent-incident-response.ps1 after deployment, which automates what it can via
+// the Azure MCP Server and prints exact portal steps for anything that remains portal-only.
+// The existing Action Group -> Mission Control webhook fallback keeps working regardless of this value.
+//
+// ⚠️ UPGRADING AN EXISTING DEPLOYMENT: redeploying with this parameter set (the default) connects
+// Azure Monitor on an agent that previously had no incident platform configured. Microsoft Learn
+// documents that connecting a platform auto-creates a "Quickstart" response plan, and that new
+// response plans default to Autonomous mode, not Review. Run
+// scripts/configure-sre-agent-incident-response.ps1 (or check the portal) IMMEDIATELY after
+// redeploying to confirm or delete the Quickstart plan, before any alert can fire. Set this to
+// 'None' first if you want to stage the Bicep change without connecting the platform yet.
+param sreAgentIncidentPlatform = 'AzureMonitor'
+
 // Tags
 param tags = {
   workload: 'energy-grid-demo'

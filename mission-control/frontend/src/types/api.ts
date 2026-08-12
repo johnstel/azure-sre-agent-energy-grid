@@ -265,6 +265,43 @@ export type IncidentHandoffStatus = 'open' | 'acknowledged' | 'resolved';
 export type IncidentHandoffSeverity = 'critical' | 'warning' | 'unknown';
 export type IncidentHandoffSource = 'action-group' | 'dashboard' | 'manual';
 
+export type NativeIncidentEvidenceState =
+  | 'local-fallback-only'
+  | 'native-observed'
+  | 'native-approval-required'
+  | 'native-mitigated'
+  | 'evidence-unavailable';
+
+export type NativeApprovalDecisionState = 'approved' | 'rejected' | 'pending' | 'unknown';
+
+// Reconciled, honest native Azure SRE Agent evidence (issue #76). `state` is only ever
+// 'native-*' after telemetry was actually observed in Application Insights customEvents --
+// Mission Control never infers a native state from absent or timed-out evidence.
+export interface NativeIncidentEvidence {
+  state: NativeIncidentEvidenceState;
+  stale: boolean;
+  schemaMismatch: boolean;
+  observedAt?: string;
+  freshnessSeconds?: number;
+  incidentId?: string;
+  incidentTitle?: string;
+  responsePlanId?: string;
+  responsePlanCustom?: boolean;
+  autonomyLevel?: string;
+  mitigatedByAgent?: boolean;
+  assistedByAgent?: boolean;
+  impactedService?: string;
+  threadId?: string;
+  correlationId?: string;
+  createdOn?: string;
+  handledOn?: string;
+  mitigatedOn?: string;
+  approvalDecision?: NativeApprovalDecisionState;
+  cooldownHours: number;
+  withinCooldown: boolean;
+  limitations: string[];
+}
+
 export interface IncidentHandoff {
   id: string;
   key: string;
@@ -279,6 +316,7 @@ export interface IncidentHandoff {
   evidence: string[];
   operatorGuidance: string[];
   notes?: string[];
+  nativeEvidence?: NativeIncidentEvidence;
 }
 
 export interface IncidentHandoffMutationResponse {
@@ -288,6 +326,10 @@ export interface IncidentHandoffMutationResponse {
 
 export interface IncidentHandoffListResponse {
   incidents: IncidentHandoff[];
+}
+
+export interface IncidentHandoffReconcileResponse {
+  incident: IncidentHandoff;
 }
 
 export interface DeployParams {
