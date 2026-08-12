@@ -15,13 +15,19 @@ let rawRuns =
         SyntheticName = tostring(Properties["synthetic.name"]),
         SyntheticMode = tostring(Properties["synthetic.mode"]),
         CorrelationId = tostring(Properties["synthetic.correlation_id"]),
-        FailureStage = tostring(Properties["synthetic.failure_stage"])
+        FailureStage = tostring(Properties["synthetic.failure_stage"]),
+        FailureReason = tostring(Properties["synthetic.failure_reason"])
     | where SyntheticName == sloName and SyntheticMode == sloMode and isnotempty(CorrelationId)
-    | project TimeGenerated, CorrelationId, Success, DurationMs, FailureStage, _ResourceId;
+    | project TimeGenerated, CorrelationId, Success, DurationMs, FailureStage, FailureReason, _ResourceId;
 let logicalRuns =
     rawRuns
-    | summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage, _ResourceId) by CorrelationId;
+    | summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage, FailureReason, _ResourceId) by CorrelationId;
 logicalRuns
+| extend
+    CriticalFailureAt = iff(Success == false and FailureStage in ("persistence", "ingress"), TimeGenerated, datetime(null))
+| extend
+    CriticalFailureStage = iff(isnull(CriticalFailureAt), "", FailureStage),
+    CriticalFailureReason = iff(isnull(CriticalFailureAt), "", FailureReason)
 | summarize
     RunCount = count(),
     SuccessCount = countif(Success == true),
@@ -29,10 +35,11 @@ logicalRuns
     SuccessRatePct = iff(count() == 0, real(null), 100.0 * countif(Success == true) / count()),
     P95LatencyMs = percentile(DurationMs, 95),
     LastSuccess = maxif(TimeGenerated, Success == true),
-    LatestCriticalFailure = maxif(TimeGenerated, Success == false and FailureStage in ("persistence_timeout", "ingress")),
     FailureStages = make_set_if(FailureStage, Success == false and isnotempty(FailureStage), 5),
+    FailureReasons = make_set_if(FailureReason, Success == false and isnotempty(FailureReason), 5),
     ResourceId = take_any(_ResourceId),
-    CorrelationId = take_any(CorrelationId)
+    CorrelationId = take_any(CorrelationId),
+    arg_max(CriticalFailureAt, CriticalFailureStage, CriticalFailureReason)
 | extend
     TimeBucket = bin(now(), 1m),
     Freshness = iff(isnull(LastSuccess), timespan(null), now() - LastSuccess),
@@ -57,8 +64,11 @@ logicalRuns
     SuccessRatePct,
     P95LatencyMs,
     LastSuccess,
-    LatestCriticalFailure,
+    LatestCriticalFailure = CriticalFailureAt,
+    LatestCriticalFailureStage = CriticalFailureStage,
+    LatestCriticalFailureReason = CriticalFailureReason,
     Freshness,
     FailureStages,
+    FailureReasons,
     DataState,
     DemoStatus

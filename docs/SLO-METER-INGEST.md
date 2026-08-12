@@ -46,7 +46,8 @@ Each runner invocation creates one OpenTelemetry `SERVER` span named `slo.meter-
 | `Properties["synthetic.name"]` | `slo-meter-ingest` |
 | `Properties["synthetic.mode"]` | `demo` |
 | `Properties["synthetic.correlation_id"]` | Per-run correlation ID |
-| `Properties["synthetic.failure_stage"]` | `ingress`, `completion_check`, `persistence_timeout`, or `success` |
+| `Properties["synthetic.failure_stage"]` | `ingress`, `persistence`, or `success` |
+| `Properties["synthetic.failure_reason"]` | Detail such as `persistence_confirmation_timeout`, `persistence_http_500`, `persistence_timeout`, or `persistence_request_error` |
 
 The implementation retains existing `sre.*` resource attributes. It deliberately does **not** use custom metric histograms as the p95 source: Azure Monitor flattens OpenTelemetry histogram aggregates, so an AppMetrics percentile would not be the percentile of individual transactions. Use raw `AppRequests.DurationMs` records instead.
 
@@ -73,7 +74,7 @@ The Bicep rules expose five signals:
 |---|---|
 | `slo-meter-ingest-burn` | Unique-run success rate is below the 95% demo target. |
 | `slo-meter-ingest-customer-impact` | Actual runs all failed or the last successful run is older than five minutes. |
-| `slo-meter-ingest-mongodb-down` | `persistence_timeout` failures map to MongoDBDown; it does not auto-mitigate without functional recovery evidence. |
+| `slo-meter-ingest-mongodb-down` | Any post-ingress `persistence` confirmation failure maps to MongoDBDown; `synthetic.failure_reason` distinguishes timeout, HTTP, and network detail. It does not auto-mitigate without functional recovery evidence. |
 | `slo-meter-ingest-service-mismatch` | `ingress` failures map to ServiceMismatch; it does not auto-mitigate without functional recovery evidence. |
 | `slo-meter-ingest-no-data` | No transaction telemetry in 10 minutes; warning/unknown, never healthy. |
 
@@ -85,7 +86,7 @@ These are Azure Monitor alert rules only. They do not automatically invoke Azure
 |---|---|---|
 | `healthy` | Actual telemetry exists, all targets are met, and no scenario-impact evidence is present. | "The demo probe has recently completed the meter-ingest path." |
 | `degraded` | Actual runs include some success, but the success-rate, latency, or recovery criteria are not met. | "The journey is degraded according to the demo probe." |
-| `critical` | Actual runs all fail, the last success is stale, a latest `persistence_timeout` or `ingress` failure has no later success, or MongoDBDown/ServiceMismatch has conclusive Kubernetes evidence. | "The synthetic meter-ingest journey cannot currently be confirmed." |
+| `critical` | Actual runs all fail, the last success is stale, a latest `persistence` or `ingress` failure has no later success, or MongoDBDown/ServiceMismatch has conclusive Kubernetes evidence. | "The synthetic meter-ingest journey cannot currently be confirmed." |
 | `no-data` | The query completed but found no synthetic run in its window. | "No probe telemetry is present; this is not a healthy result." |
 | `unknown` | The query, identity, workspace, or Kubernetes evidence source was unavailable. | "The evidence source is unavailable; do not infer health." |
 
@@ -103,6 +104,12 @@ Mission Control renders these states separately. After a failure, pod readiness 
 ## Production Recommendation Boundary
 
 Do not transplant these accelerated windows, traffic shape, or target into production. A production SLO must be owned by the product and operations teams and should define real customer populations, expected demand, authenticated probe policy, data classification, durable retention, error-budget policy, alert routing, and a statistically meaningful review period. This lab makes no availability, revenue, customer-count, energy-not-served, or MTTR-improvement claim.
+
+## Code Scanning Disposition
+
+The MongoDB completion lookup accepts a correlation ID only after strict allowlist validation and constructs a fixed `bson.D` filter with literal `correlationId` and `synthetic` keys. It never decodes request data into a BSON query, permits a caller-selected operator, or interpolates a database query string.
+
+GitHub CodeQL rule `go/sql-injection` currently treats a scalar value in this Go MongoDB filter as a query-taint sink, even though the filter structure is fixed. The repository records this as a narrow false positive in code-scanning alert #5 rather than disabling the rule globally. The inline source comment identifies the fixed-filter constraint; future changes must preserve that constraint and reopen the finding if the query becomes structure-controlled by input.
 
 ## Live Proof Gate
 

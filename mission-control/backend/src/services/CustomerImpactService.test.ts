@@ -49,7 +49,7 @@ test('ingress-stage actual all-failure telemetry is critical', () => {
   }), 'critical');
 });
 
-test('a critical failure stage remains critical until a newer successful transaction exists', () => {
+test('a persistence failure remains critical until a newer successful transaction exists', () => {
   const now = new Date('2026-08-12T16:02:00.000Z');
   const afterFailure = telemetry({
     runCount: 20,
@@ -58,7 +58,10 @@ test('a critical failure stage remains critical until a newer successful transac
     successRatePct: 95,
     lastSuccess: '2026-08-12T16:00:00.000Z',
     latestCriticalFailure: '2026-08-12T16:01:00.000Z',
-    failureStages: ['ingress'],
+    latestCriticalFailureStage: 'persistence',
+    latestCriticalFailureReason: 'persistence_http_500',
+    failureStages: ['persistence'],
+    failureReasons: ['persistence_http_500'],
   });
   assert.equal(deriveCustomerImpactStatus({
     telemetry: afterFailure,
@@ -76,6 +79,68 @@ test('a critical failure stage remains critical until a newer successful transac
   }), 'healthy');
 });
 
+test('persistence failure reason is returned as customer-impact evidence', async () => {
+  const service = new CustomerImpactService({
+    logAnalytics: {
+      executeSloMeterIngest: async () => ({
+        rows: [{
+          runCount: 1,
+          successCount: 0,
+          failureCount: 1,
+          successRatePct: 0,
+          p95LatencyMs: 1_000,
+          latestCriticalFailure: '2026-08-12T15:59:00.000Z',
+          latestCriticalFailureStage: 'persistence',
+          latestCriticalFailureReason: 'persistence_http_500',
+          failureStages: ['persistence'],
+          failureReasons: ['persistence_http_500'],
+        }],
+        source: SOURCE,
+        workspace: 'workspace',
+      }),
+    },
+    kube: { getInventory: async () => inventoryWith({}) },
+    scenarios: () => [],
+    now: () => NOW,
+    cacheTtlMs: 0,
+  });
+
+  const impact = await service.getCustomerImpact();
+  assert.equal(impact.status, 'critical');
+  assert.equal(impact.affectedStage, 'Meter ingestion persistence confirmation (persistence_http_500)');
+});
+
+test('customer impact preserves the paired latest critical stage and reason', async () => {
+  const service = new CustomerImpactService({
+    logAnalytics: {
+      executeSloMeterIngest: async () => ({
+        rows: [{
+          runCount: 4,
+          successCount: 3,
+          failureCount: 1,
+          successRatePct: 75,
+          p95LatencyMs: 1_000,
+          lastSuccess: '2026-08-12T15:58:00.000Z',
+          latestCriticalFailure: '2026-08-12T15:59:00.000Z',
+          latestCriticalFailureStage: 'persistence',
+          latestCriticalFailureReason: 'persistence_http_500',
+          failureStages: ['ingress', 'persistence'],
+          failureReasons: ['ingress_http_503', 'persistence_http_500'],
+        }],
+        source: SOURCE,
+        workspace: 'workspace',
+      }),
+    },
+    kube: { getInventory: async () => inventoryWith({}) },
+    scenarios: () => [],
+    now: () => NOW,
+    cacheTtlMs: 0,
+  });
+
+  const impact = await service.getCustomerImpact();
+  assert.equal(impact.affectedStage, 'Meter ingestion persistence confirmation (persistence_http_500)');
+});
+
 test('high p95 with actual successes is degraded', () => {
   assert.equal(deriveCustomerImpactStatus({
     telemetry: telemetry({ p95LatencyMs: 30_001 }),
@@ -88,11 +153,13 @@ test('repeat correlation IDs do not inflate logical failure count', () => {
   const transactions = deduplicateSyntheticTransactions([
     { correlationId: 'same-run', success: false, durationMs: 100, timeGenerated: '2026-08-12T15:58:00.000Z', failureStage: 'ingress' },
     { correlationId: 'same-run', success: true, durationMs: 200, timeGenerated: '2026-08-12T15:59:00.000Z' },
-    { correlationId: 'failed-run', success: false, durationMs: 300, timeGenerated: '2026-08-12T15:59:30.000Z', failureStage: 'mongodb' },
+    { correlationId: 'failed-run', success: false, durationMs: 300, timeGenerated: '2026-08-12T15:59:30.000Z', failureStage: 'persistence' },
   ]);
   assert.equal(transactions.length, 2);
   assert.equal(transactions.filter((transaction) => !transaction.success).length, 1);
   assert.match(buildSloMeterIngestKql(15), /LogicalSuccess=max\(RequestSuccess\).*by CorrelationId/s);
+  assert.match(buildSloMeterIngestKql(15), /arg_max\(TimeGenerated, FailureStage, FailureReason\) by CorrelationId/);
+  assert.match(buildSloMeterIngestKql(15), /FailureStage in \("persistence", "ingress"\)/);
 });
 
 test('stale or missing last success is critical when actual runs exist', () => {

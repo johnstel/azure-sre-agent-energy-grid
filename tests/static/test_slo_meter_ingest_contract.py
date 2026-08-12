@@ -37,6 +37,9 @@ class SloMeterIngestStaticContractTests(unittest.TestCase):
         self.assertIn('arg_max(TimeGenerated, Success, DurationMs', query)
         self.assertIn('percentile(DurationMs, 95)', query)
         self.assertIn('LatestCriticalFailure', query)
+        self.assertIn('FailureReason', query)
+        self.assertIn('FailureStage in ("persistence", "ingress")', query)
+        self.assertIn('arg_max(CriticalFailureAt, CriticalFailureStage, CriticalFailureReason)', query)
         self.assertIn('RunCount == 0, "NO_DATA"', query)
         self.assertIn('now() - LastSuccess > freshnessLimit', query)
         self.assertNotIn('coalesce(SuccessRatePct, 100', query)
@@ -51,8 +54,9 @@ class SloMeterIngestStaticContractTests(unittest.TestCase):
             'sloMeterIngestNoDataAlert',
         ):
             self.assertIn(logical_name, alerts)
-        self.assertIn('FailureStage == \'persistence_timeout\'', alerts)
+        self.assertIn('FailureStage == \'persistence\'', alerts)
         self.assertIn('FailureStage == \'ingress\'', alerts)
+        self.assertIn('FailureReasons', alerts)
         self.assertIn('LatestCriticalFailure', alerts)
         self.assertIn('NoDataSignal = iff(SloTransactionRunCount == 0, 1, 0)', alerts)
         self.assertIn('FreshnessMinutes > 5.0', alerts)
@@ -67,6 +71,9 @@ class SloMeterIngestStaticContractTests(unittest.TestCase):
             'Last successful transaction freshness',
             'Failure stage and burn rate',
         }.issubset(titles))
+        failure_panel = next(panel for panel in dashboard['panels'] if panel.get('title') == 'Failure stage and burn rate')
+        failure_query = failure_panel['targets'][0]['azureMonitor']['query']
+        self.assertIn('arg_max(LatestFailureAt, LatestFailureStage, LatestFailureReason)', failure_query)
 
     def test_docs_keep_demo_and_scheduled_task_claims_evidence_safe(self):
         slo_doc = (ROOT / 'docs/SLO-METER-INGEST.md').read_text(encoding='utf-8')

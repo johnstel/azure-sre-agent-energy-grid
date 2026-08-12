@@ -85,7 +85,8 @@ async function runSyntheticTransaction(dependencies = {}) {
       "synthetic.name": "slo-meter-ingest",
       "synthetic.mode": "demo",
       "synthetic.correlation_id": correlationId,
-      "synthetic.failure_stage": "success"
+      "synthetic.failure_stage": "success",
+      "synthetic.failure_reason": "completed"
     }
   });
 
@@ -93,6 +94,7 @@ async function runSyntheticTransaction(dependencies = {}) {
     success: false,
     correlationId,
     failureStage: "success",
+    failureReason: "completed",
     attempts: 0,
     elapsedMs: 0,
     status: "failed"
@@ -119,6 +121,7 @@ async function runSyntheticTransaction(dependencies = {}) {
           break;
         }
         ingressError = new Error(`meter-service ingress returned ${response.status}`);
+        ingressError.failureReason = `ingress_http_${response.status}`;
       } catch (error) {
         ingressError = error;
       }
@@ -132,17 +135,17 @@ async function runSyntheticTransaction(dependencies = {}) {
     }
 
     if (!accepted) {
-      result.success = false;
-      result.failureStage = "ingress";
-      result.status = "failed";
-      result.error = ingressError && ingressError.message ? ingressError.message : "ingress failed";
-      span.setAttributes({ "synthetic.failure_stage": result.failureStage });
-      span.setStatus({ code: SpanStatusCode.ERROR, message: result.error });
-      span.recordException(ingressError || new Error(result.error));
-      return result;
+      return recordFailure(
+        result,
+        span,
+        "ingress",
+        failureReasonForRequestError(ingressError, "ingress"),
+        ingressError || new Error("meter-service ingress failed")
+      );
     }
 
     let completionError = null;
+    let completionFailureReason = null;
     while (nowProvider() - startTime < totalTimeoutMs) {
       const requestController = requestTimeoutMs > 0 ? AbortSignal.timeout(requestTimeoutMs) : undefined;
       try {
@@ -156,10 +159,14 @@ async function runSyntheticTransaction(dependencies = {}) {
           const payload = await response.json();
           result.success = true;
           result.failureStage = "success";
+          result.failureReason = "completed";
           result.status = payload.status || "completed";
           result.dispatchStatus = payload.status || "completed";
           result.completedAt = payload.persistedAt || null;
-          span.setAttributes({ "synthetic.failure_stage": result.failureStage });
+          span.setAttributes({
+            "synthetic.failure_stage": result.failureStage,
+            "synthetic.failure_reason": result.failureReason
+          });
           span.setStatus({ code: SpanStatusCode.OK, message: "completed" });
           return result;
         }
@@ -168,31 +175,32 @@ async function runSyntheticTransaction(dependencies = {}) {
           continue;
         }
         completionError = new Error(`dispatch lookup returned ${response.status}`);
+        completionFailureReason = `persistence_http_${response.status}`;
         break;
       } catch (error) {
         completionError = error;
+        completionFailureReason = failureReasonForRequestError(error, "persistence");
         break;
       }
     }
 
     if (completionError) {
-      result.success = false;
-      result.failureStage = "completion_check";
-      result.status = "failed";
-      result.error = completionError && completionError.message ? completionError.message : "dispatch lookup failed";
-      span.setAttributes({ "synthetic.failure_stage": result.failureStage });
-      span.setStatus({ code: SpanStatusCode.ERROR, message: result.error });
-      span.recordException(completionError);
-      return result;
+      return recordFailure(
+        result,
+        span,
+        "persistence",
+        completionFailureReason || "persistence_request_error",
+        completionError
+      );
     }
 
-    result.success = false;
-    result.failureStage = "persistence_timeout";
-    result.status = "failed";
-    result.error = "dispatch transaction not persisted before deadline";
-    span.setAttributes({ "synthetic.failure_stage": result.failureStage });
-    span.setStatus({ code: SpanStatusCode.ERROR, message: result.error });
-    return result;
+    return recordFailure(
+      result,
+      span,
+      "persistence",
+      "persistence_confirmation_timeout",
+      new Error("dispatch transaction not persisted before deadline")
+    );
   } finally {
     result.elapsedMs = nowProvider() - startTime;
     span.setAttributes({
@@ -201,6 +209,33 @@ async function runSyntheticTransaction(dependencies = {}) {
     });
     span.end();
   }
+}
+
+function recordFailure(result, span, failureStage, failureReason, error) {
+  result.success = false;
+  result.failureStage = failureStage;
+  result.failureReason = failureReason;
+  result.status = "failed";
+  result.error = error && error.message ? error.message : String(error);
+  span.setAttributes({
+    "synthetic.failure_stage": failureStage,
+    "synthetic.failure_reason": failureReason
+  });
+  span.setStatus({ code: SpanStatusCode.ERROR, message: result.error });
+  span.recordException(error);
+  return result;
+}
+
+function failureReasonForRequestError(error, prefix) {
+  if (error && typeof error === "object" && typeof error.failureReason === "string") {
+    return error.failureReason;
+  }
+  const name = error && typeof error === "object" && "name" in error ? String(error.name) : "";
+  const message = error && typeof error === "object" && "message" in error ? String(error.message) : String(error || "");
+  if (name === "TimeoutError" || name === "AbortError" || /timed?\s*out|timeout|abort/i.test(message)) {
+    return `${prefix}_timeout`;
+  }
+  return `${prefix}_request_error`;
 }
 
 async function main(dependencies = {}) {
@@ -228,6 +263,7 @@ if (require.main === module) {
 module.exports = {
   boundedSyntheticExpiry,
   createSyntheticEvent,
+  failureReasonForRequestError,
   normalizeSyntheticReading,
   runSyntheticTransaction,
   main

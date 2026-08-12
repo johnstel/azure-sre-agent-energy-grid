@@ -60,6 +60,8 @@ type TransactionRecord struct {
 	SyntheticMode string    `bson:"syntheticMode,omitempty" json:"syntheticMode,omitempty"`
 }
 
+type validatedCorrelationID string
+
 type Persistence interface {
 	Save(context.Context, MeterEvent) error
 	Lookup(context.Context, string) (*TransactionRecord, error)
@@ -174,15 +176,28 @@ func isIdempotentDuplicate(event MeterEvent, existing *TransactionRecord) bool {
 }
 
 func (p *MongoPersistence) Lookup(ctx context.Context, correlationID string) (*TransactionRecord, error) {
-	if !isValidCorrelationID(correlationID) {
-		return nil, ErrInvalidCorrelationID
+	validatedID, err := validateCorrelationID(correlationID)
+	if err != nil {
+		return nil, err
 	}
 	if p.client == nil {
 		return nil, fmt.Errorf("mongo client not initialized")
 	}
+	return p.lookupSyntheticTransaction(ctx, validatedID)
+}
+
+// lookupSyntheticTransaction keeps the MongoDB query shape fixed: request input
+// is accepted only as a regex-validated scalar, never as an operator or key.
+// CodeQL alert #5 is a documented MongoDB scalar-filter false positive; do not
+// replace this fixed bson.D with a request-decoded query document.
+func (p *MongoPersistence) lookupSyntheticTransaction(ctx context.Context, correlationID validatedCorrelationID) (*TransactionRecord, error) {
 	collection := p.client.Database(p.dbName).Collection(p.collection)
 	var record TransactionRecord
-	err := collection.FindOne(ctx, bson.M{"correlationId": correlationID, "synthetic": true}).Decode(&record)
+	filter := bson.D{
+		{Key: "correlationId", Value: string(correlationID)},
+		{Key: "synthetic", Value: true},
+	}
+	err := collection.FindOne(ctx, filter).Decode(&record)
 	if err == mongo.ErrNoDocuments {
 		return nil, ErrNotFound
 	}
@@ -190,6 +205,13 @@ func (p *MongoPersistence) Lookup(ctx context.Context, correlationID string) (*T
 		return nil, err
 	}
 	return &record, nil
+}
+
+func validateCorrelationID(correlationID string) (validatedCorrelationID, error) {
+	if !isValidCorrelationID(correlationID) {
+		return "", ErrInvalidCorrelationID
+	}
+	return validatedCorrelationID(correlationID), nil
 }
 
 func isValidCorrelationID(correlationID string) bool {
@@ -200,6 +222,7 @@ type Server struct {
 	persistence Persistence
 	queueName   string
 	tracer      trace.Tracer
+	logger      *log.Logger
 	amqpConn    *amqp.Connection
 	amqpCh      *amqp.Channel
 }
@@ -249,7 +272,7 @@ func InitTracer() *sdktrace.TracerProvider {
 }
 
 func NewServer(persistence Persistence, queueName string) *Server {
-	return &Server{persistence: persistence, queueName: queueName, tracer: otel.Tracer("dispatch-service")}
+	return &Server{persistence: persistence, queueName: queueName, tracer: otel.Tracer("dispatch-service"), logger: log.Default()}
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -391,6 +414,14 @@ func (s *Server) consumeMessages() {
 	}
 }
 
+func (s *Server) warnf(format string, args ...any) {
+	if s.logger != nil {
+		s.logger.Printf(format, args...)
+		return
+	}
+	log.Printf(format, args...)
+}
+
 func (s *Server) handleMessage(ctx context.Context, msg amqp.Delivery) error {
 	var event MeterEvent
 	if err := json.Unmarshal(msg.Body, &event); err != nil {
@@ -425,19 +456,37 @@ func (s *Server) handleMessage(ctx context.Context, msg amqp.Delivery) error {
 		attribute.String("sre.component", "mongodb"),
 	)
 	err := s.persistence.Save(saveCtx, event)
+	switch {
+	case err == nil:
+		saveSpan.SetStatus(codes.Ok, "persisted")
+	case errors.Is(err, ErrExpired):
+		saveSpan.SetStatus(codes.Ok, "expired synthetic event ignored")
+	default:
+		saveSpan.SetStatus(codes.Error, err.Error())
+		saveSpan.RecordError(err)
+	}
 	saveSpan.End()
 	if err != nil {
 		if errors.Is(err, ErrCorrelationConflict) {
 			span.SetStatus(codes.Error, err.Error())
 			span.RecordError(err)
-			log.Printf("discarding conflicting duplicate correlation id: %v", err)
+			s.warnf("WARNING: discarding conflicting duplicate correlation id: %v", err)
 			if s.amqpCh != nil {
 				_ = s.amqpCh.Ack(msg.DeliveryTag, false)
 			}
 			return nil
 		}
-		if errors.Is(err, ErrExpired) || errors.Is(err, ErrInvalidCorrelationID) {
-			span.SetStatus(codes.Ok, "ignored")
+		if errors.Is(err, ErrExpired) {
+			span.SetStatus(codes.Ok, "expired synthetic event ignored")
+			if s.amqpCh != nil {
+				_ = s.amqpCh.Ack(msg.DeliveryTag, false)
+			}
+			return nil
+		}
+		if errors.Is(err, ErrInvalidCorrelationID) {
+			span.SetStatus(codes.Error, err.Error())
+			span.RecordError(err)
+			s.warnf("WARNING: discarding message with invalid correlation id (message_id=%q): %v", event.ID, err)
 			if s.amqpCh != nil {
 				_ = s.amqpCh.Ack(msg.DeliveryTag, false)
 			}

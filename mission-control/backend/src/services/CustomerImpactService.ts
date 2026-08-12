@@ -33,7 +33,10 @@ export interface CustomerImpactTelemetry {
   lastSuccess?: string;
   lastSuccessAgeSeconds?: number;
   latestCriticalFailure?: string;
+  latestCriticalFailureStage?: string;
+  latestCriticalFailureReason?: string;
   failureStages?: string[];
+  failureReasons?: string[];
   error?: string;
 }
 
@@ -183,7 +186,10 @@ export function telemetryFromRows(rows: Record<string, unknown>[], source: strin
     p95LatencyMs: numberValue(row.p95LatencyMs),
     lastSuccess,
     latestCriticalFailure: isoDateValue(row.latestCriticalFailure),
+    latestCriticalFailureStage: nonEmptyString(row.latestCriticalFailureStage),
+    latestCriticalFailureReason: nonEmptyString(row.latestCriticalFailureReason),
     failureStages: stringArray(row.failureStages),
+    failureReasons: stringArray(row.failureReasons),
   };
   if (lastSuccess) {
     telemetry.lastSuccessAgeSeconds = Math.max(0, Math.floor((now.getTime() - new Date(lastSuccess).getTime()) / 1000));
@@ -266,8 +272,18 @@ function requiresFunctionalRecovery(telemetry: CustomerImpactTelemetry): boolean
 function affectedStage(telemetry: CustomerImpactTelemetry, scenarioImpact?: ScenarioImpactEvidence): string {
   if (scenarioImpact?.kind === 'MongoDBDown') return 'Meter ingestion dependency: MongoDB';
   if (scenarioImpact?.kind === 'ServiceMismatch') return 'Meter-service routing';
+  if (telemetry.latestCriticalFailureStage === 'persistence') {
+    return formatFailureDetail('Meter ingestion persistence confirmation', telemetry.latestCriticalFailureReason);
+  }
+  if (telemetry.latestCriticalFailureStage === 'ingress') {
+    return formatFailureDetail('Meter-service ingress', telemetry.latestCriticalFailureReason);
+  }
   if (telemetry.failureStages?.[0]) return telemetry.failureStages[0];
   return 'Synthetic meter ingestion transaction';
+}
+
+function formatFailureDetail(stage: string, reason?: string): string {
+  return reason ? `${stage} (${reason})` : stage;
 }
 
 function recoveryCondition(
@@ -297,6 +313,10 @@ function numberValue(value: unknown): number | undefined {
 function isoDateValue(value: unknown): string | undefined {
   if (typeof value !== 'string' || !Number.isFinite(new Date(value).getTime())) return undefined;
   return value;
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 function stringArray(value: unknown): string[] | undefined {

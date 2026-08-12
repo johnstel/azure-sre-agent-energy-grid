@@ -377,11 +377,11 @@ resource sloMeterIngestCustomerImpactAlert 'Microsoft.Insights/scheduledQueryRul
             AppRequests
             | where TimeGenerated > ago(10m)
             | where Name == 'slo.meter-ingest.transaction'
-            | extend SyntheticName = tostring(Properties['synthetic.name']), SyntheticMode = tostring(Properties['synthetic.mode']), CorrelationId = tostring(Properties['synthetic.correlation_id']), FailureStage = tostring(Properties['synthetic.failure_stage'])
+            | extend SyntheticName = tostring(Properties['synthetic.name']), SyntheticMode = tostring(Properties['synthetic.mode']), CorrelationId = tostring(Properties['synthetic.correlation_id']), FailureStage = tostring(Properties['synthetic.failure_stage']), FailureReason = tostring(Properties['synthetic.failure_reason'])
             | where SyntheticName == 'slo-meter-ingest' and SyntheticMode == 'demo'
             | where isnotempty(CorrelationId)
             | summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage) by CorrelationId
-            | summarize RunCount = count(), SuccessfulRunCount = countif(Success == true), LastSuccessfulTransaction = maxif(TimeGenerated, Success == true), LatestCriticalFailure = maxif(TimeGenerated, Success == false and FailureStage in ('persistence_timeout', 'ingress'))
+            | summarize RunCount = count(), SuccessfulRunCount = countif(Success == true), LastSuccessfulTransaction = maxif(TimeGenerated, Success == true), LatestCriticalFailure = maxif(TimeGenerated, Success == false and FailureStage in ('persistence', 'ingress'))
             | extend FreshnessMinutes = iff(isnull(LastSuccessfulTransaction), 9999.0, todouble(datetime_diff('second', now(), LastSuccessfulTransaction)) / 60.0)
             | extend CustomerImpactSignal = iff(RunCount > 0 and (SuccessfulRunCount == 0 or FreshnessMinutes > 5.0 or (not(isnull(LatestCriticalFailure)) and (isnull(LastSuccessfulTransaction) or LastSuccessfulTransaction <= LatestCriticalFailure))), 1, 0)
             | where CustomerImpactSignal == 1
@@ -418,7 +418,7 @@ resource sloMeterIngestMongoPersistenceAlert 'Microsoft.Insights/scheduledQueryR
   kind: 'LogAlert'
   properties: {
     displayName: 'Energy Grid demo - meter ingest MongoDBDown impact'
-    description: 'Demo-only synthetic meter-ingest persistence failures mapped to the MongoDBDown scenario from AppRequests failure_stage=persistence_timeout. Verify a post-failure successful transaction before closing this evidence signal. This is not a production SLA claim.'
+    description: 'Demo-only synthetic meter-ingest persistence confirmation failures mapped to the MongoDBDown scenario from AppRequests failure_stage=persistence. Consult synthetic.failure_reason for timeout, HTTP, or network detail. Verify a post-failure successful transaction before closing this evidence signal. This is not a production SLA claim.'
     enabled: true
     severity: 1
     scopes: [
@@ -435,13 +435,13 @@ resource sloMeterIngestMongoPersistenceAlert 'Microsoft.Insights/scheduledQueryR
             AppRequests
             | where TimeGenerated > ago(10m)
             | where Name == 'slo.meter-ingest.transaction'
-            | extend SyntheticName = tostring(Properties['synthetic.name']), SyntheticMode = tostring(Properties['synthetic.mode']), CorrelationId = tostring(Properties['synthetic.correlation_id']), FailureStage = tostring(Properties['synthetic.failure_stage'])
+            | extend SyntheticName = tostring(Properties['synthetic.name']), SyntheticMode = tostring(Properties['synthetic.mode']), CorrelationId = tostring(Properties['synthetic.correlation_id']), FailureStage = tostring(Properties['synthetic.failure_stage']), FailureReason = tostring(Properties['synthetic.failure_reason'])
             | where SyntheticName == 'slo-meter-ingest' and SyntheticMode == 'demo'
             | where isnotempty(CorrelationId)
-            | summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage) by CorrelationId
-            | where Success == false and FailureStage == 'persistence_timeout'
-            | summarize MongoDBDownFailureRunCount = count()
-            | project MongoDBDownFailureRunCount
+            | summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage, FailureReason) by CorrelationId
+            | where Success == false and FailureStage == 'persistence'
+            | summarize MongoDBDownFailureRunCount = count(), FailureReasons = make_set_if(FailureReason, isnotempty(FailureReason), 5)
+            | project MongoDBDownFailureRunCount, FailureReasons
           '''
           timeAggregation: 'Total'
           metricMeasureColumn: 'MongoDBDownFailureRunCount'

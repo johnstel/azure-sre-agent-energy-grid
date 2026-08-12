@@ -124,11 +124,14 @@ export function buildSloMeterIngestKql(minutes: number): string {
     'AppRequests',
     `| where TimeGenerated > ago(${safeMinutes}m)`,
     '| where Name == "slo.meter-ingest.transaction"',
-    '| extend SyntheticName=tostring(Properties["synthetic.name"]), SyntheticMode=tostring(Properties["synthetic.mode"]), CorrelationId=tostring(Properties["synthetic.correlation_id"]), FailureStage=tostring(Properties["synthetic.failure_stage"])',
+    '| extend SyntheticName=tostring(Properties["synthetic.name"]), SyntheticMode=tostring(Properties["synthetic.mode"]), CorrelationId=tostring(Properties["synthetic.correlation_id"]), FailureStage=tostring(Properties["synthetic.failure_stage"]), FailureReason=tostring(Properties["synthetic.failure_reason"])',
     '| where SyntheticName == "slo-meter-ingest" and SyntheticMode == "demo" and isnotempty(CorrelationId)',
     '| extend RequestSuccess=toint(Success), RequestDurationMs=todouble(DurationMs)',
-    '| summarize LogicalSuccess=max(RequestSuccess), LogicalDurationMs=max(RequestDurationMs), LogicalLastObserved=max(TimeGenerated), LogicalLastSuccess=maxif(TimeGenerated, RequestSuccess == 1), FailureStage=take_anyif(FailureStage, RequestSuccess == 0 and isnotempty(FailureStage)) by CorrelationId',
-    '| summarize runCount=count(), successCount=countif(LogicalSuccess == 1), failureCount=countif(LogicalSuccess == 0), successRatePct=round(100.0 * countif(LogicalSuccess == 1) / count(), 2), p95LatencyMs=percentile(LogicalDurationMs, 95), lastSuccess=max(LogicalLastSuccess), latestCriticalFailure=maxif(LogicalLastObserved, LogicalSuccess == 0 and FailureStage in ("persistence_timeout", "ingress")), failureStages=make_set_if(FailureStage, LogicalSuccess == 0 and isnotempty(FailureStage), 5)',
+    '| summarize LogicalSuccess=max(RequestSuccess), LogicalDurationMs=max(RequestDurationMs), LogicalLastObserved=max(TimeGenerated), LogicalLastSuccess=maxif(TimeGenerated, RequestSuccess == 1), arg_max(TimeGenerated, FailureStage, FailureReason) by CorrelationId',
+    '| extend CriticalFailureAt=iff(LogicalSuccess == 0 and FailureStage in ("persistence", "ingress"), LogicalLastObserved, datetime(null))',
+    '| extend CriticalFailureStage=iff(isnull(CriticalFailureAt), "", FailureStage), CriticalFailureReason=iff(isnull(CriticalFailureAt), "", FailureReason)',
+    '| summarize runCount=count(), successCount=countif(LogicalSuccess == 1), failureCount=countif(LogicalSuccess == 0), successRatePct=round(100.0 * countif(LogicalSuccess == 1) / count(), 2), p95LatencyMs=percentile(LogicalDurationMs, 95), lastSuccess=max(LogicalLastSuccess), failureStages=make_set_if(FailureStage, LogicalSuccess == 0 and isnotempty(FailureStage), 5), failureReasons=make_set_if(FailureReason, LogicalSuccess == 0 and isnotempty(FailureReason), 5), arg_max(CriticalFailureAt, CriticalFailureStage, CriticalFailureReason)',
+    '| project runCount, successCount, failureCount, successRatePct, p95LatencyMs, lastSuccess, latestCriticalFailure=CriticalFailureAt, latestCriticalFailureStage=CriticalFailureStage, latestCriticalFailureReason=CriticalFailureReason, failureStages, failureReasons',
   ].join('\n');
 }
 

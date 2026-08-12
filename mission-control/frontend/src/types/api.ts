@@ -190,7 +190,10 @@ export interface CustomerImpactTelemetry {
   lastSuccess?: string;
   lastSuccessAgeSeconds?: number;
   latestCriticalFailure?: string;
+  latestCriticalFailureStage?: string;
+  latestCriticalFailureReason?: string;
   failureStages?: string[];
+  failureReasons?: string[];
   error?: string;
 }
 

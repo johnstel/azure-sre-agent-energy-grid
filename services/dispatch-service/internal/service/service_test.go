@@ -1,8 +1,10 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -11,6 +13,9 @@ import (
 	"time"
 
 	"github.com/streadway/amqp"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 type stubPersistence struct {
@@ -66,10 +71,33 @@ func TestResolveRabbitURLBuildsEscapedCredentialURL(t *testing.T) {
 
 func TestHandleMessageTreatsExpiredSyntheticAsSafe(t *testing.T) {
 	persistence := &stubPersistence{saveErr: ErrExpired}
-	srv := NewServer(persistence, "meter-events")
+	srv, recorder, logs, provider := instrumentedServer(persistence)
+	defer func() { _ = provider.Shutdown(context.Background()) }()
 	msg := amqp.Delivery{Body: []byte(`{"id":"2","meterId":"SM-SYNTHETIC-0001","reading":0.01,"correlationId":"corr-2","synthetic":true,"expiresAt":"2020-01-01T00:00:00Z"}`)}
 	if err := srv.handleMessage(context.Background(), msg); err != nil {
 		t.Fatalf("expected expired synthetic event to be ignored, got %v", err)
+	}
+	if spanStatusCode(t, recorder, "dispatch.consume") != codes.Ok {
+		t.Fatal("expected expired synthetic event to remain a benign span outcome")
+	}
+	if strings.Contains(logs.String(), "WARNING") {
+		t.Fatalf("expired synthetic event must not be logged as an invalid message: %s", logs.String())
+	}
+}
+
+func TestHandleMessageLogsAndMarksInvalidCorrelationIDAsError(t *testing.T) {
+	persistence := &stubPersistence{saveErr: ErrInvalidCorrelationID}
+	srv, recorder, logs, provider := instrumentedServer(persistence)
+	defer func() { _ = provider.Shutdown(context.Background()) }()
+	msg := amqp.Delivery{Body: []byte(`{"id":"invalid-correlation","meterId":"SM-9","reading":37,"correlationId":"bad/id"}`)}
+	if err := srv.handleMessage(context.Background(), msg); err != nil {
+		t.Fatalf("invalid correlation ID is poison data and should not be requeued, got %v", err)
+	}
+	if spanStatusCode(t, recorder, "dispatch.consume") != codes.Error {
+		t.Fatal("expected invalid correlation ID to record an error span")
+	}
+	if !strings.Contains(logs.String(), "WARNING: discarding message with invalid correlation id") {
+		t.Fatalf("expected operator-visible invalid correlation warning, got %s", logs.String())
 	}
 }
 
@@ -129,6 +157,16 @@ func TestIsIdempotentDuplicateRequiresMatchingEventIdentity(t *testing.T) {
 	}
 }
 
+func TestValidateCorrelationIDCreatesOnlyValidatedLookupValues(t *testing.T) {
+	valid, err := validateCorrelationID("synthetic-01")
+	if err != nil || string(valid) != "synthetic-01" {
+		t.Fatalf("expected validated correlation ID, got %q / %v", valid, err)
+	}
+	if _, err := validateCorrelationID("invalid/id"); !errors.Is(err, ErrInvalidCorrelationID) {
+		t.Fatalf("expected invalid correlation ID error, got %v", err)
+	}
+}
+
 func TestTransactionsHandlerReturnsSafeMetadata(t *testing.T) {
 	persistence := &stubPersistence{lookupResult: &TransactionRecord{CorrelationID: "corr-3", Status: "completed", PersistedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Synthetic: true}}
 	srv := NewServer(persistence, "meter-events")
@@ -163,4 +201,25 @@ func TestTransactionsHandlerRejectsMalformedCorrelationIDs(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rec.Code)
 	}
+}
+
+func instrumentedServer(persistence Persistence) (*Server, *tracetest.SpanRecorder, *bytes.Buffer, *sdktrace.TracerProvider) {
+	recorder := tracetest.NewSpanRecorder()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+	var logs bytes.Buffer
+	server := NewServer(persistence, "meter-events")
+	server.tracer = provider.Tracer("dispatch-service-test")
+	server.logger = log.New(&logs, "", 0)
+	return server, recorder, &logs, provider
+}
+
+func spanStatusCode(t *testing.T, recorder *tracetest.SpanRecorder, name string) codes.Code {
+	t.Helper()
+	for _, span := range recorder.Ended() {
+		if span.Name() == name {
+			return span.Status().Code
+		}
+	}
+	t.Fatalf("expected completed %s span", name)
+	return codes.Unset
 }

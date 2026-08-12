@@ -116,7 +116,7 @@ During deployment, the repo-managed Azure Managed Grafana incident dashboard is 
 **Narrative**: "The meter readings database goes offline. But the symptoms appear in three different services."
 
 1. **Break**: `kubectl apply -f k8s/scenarios/mongodb-down.yaml`
-2. **Show the customer-impact state**: the golden transaction should become `critical` with a `persistence_timeout` stage; the app can accept ingress while dispatch cannot confirm persistence.
+2. **Show the customer-impact state**: the golden transaction should become `critical` with a `persistence` stage; the detailed reason distinguishes a confirmation timeout, dispatch HTTP error, or connection failure while the app can still accept ingress.
 3. **Show the cascade**: MongoDB is at 0 replicas → the `mongodb` Service has no endpoints → dispatch-service cannot persist meter readings
 4. **Run the manual path first**:
    - Follow `DEMO-RUNBOOK.md` Step 4c: start with `kubectl get pods -n energy`, trace deployment readiness, check `mongodb` endpoints, confirm `dispatch-service` depends on `mongodb://mongodb:27017`, and use logs/events as corroborating evidence.

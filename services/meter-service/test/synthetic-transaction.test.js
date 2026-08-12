@@ -149,7 +149,7 @@ test("runSyntheticTransaction uses one correlation id across retries", async () 
   assert.ok(seen.every((entry) => entry.correlationId === correlationId));
 });
 
-test("runSyntheticTransaction times out when dispatch never completes", async () => {
+test("runSyntheticTransaction classifies 404 responses through the deadline as a persistence failure", async () => {
   let nowValue = 0;
   const result = await runSyntheticTransaction({
     fetch: async (url) => {
@@ -173,10 +173,12 @@ test("runSyntheticTransaction times out when dispatch never completes", async ()
     dispatchServiceBaseUrl: "http://dispatch-service"
   });
   assert.equal(result.success, false);
-  assert.equal(result.failureStage, "persistence_timeout");
+  assert.equal(result.failureStage, "persistence");
+  assert.equal(result.failureReason, "persistence_confirmation_timeout");
 });
 
-test("runSyntheticTransaction reports completion check errors", async () => {
+test("runSyntheticTransaction classifies dispatch HTTP failures as persistence failures", async () => {
+  const span = recordingSpan();
   const result = await runSyntheticTransaction({
     fetch: async (url) => {
       if (url.includes("/events")) {
@@ -192,10 +194,58 @@ test("runSyntheticTransaction reports completion check errors", async () => {
     pollIntervalMs: 0,
     backoffBaseMs: 0,
     meterServiceBaseUrl: "http://meter-service",
+    dispatchServiceBaseUrl: "http://dispatch-service",
+    tracer: { startSpan: () => span }
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failureStage, "persistence");
+  assert.equal(result.failureReason, "persistence_http_500");
+  assert.equal(span.attributes["synthetic.failure_stage"], "persistence");
+  assert.equal(span.attributes["synthetic.failure_reason"], "persistence_http_500");
+});
+
+test("runSyntheticTransaction classifies dispatch timeout as a persistence failure", async () => {
+  const result = await runSyntheticTransaction({
+    fetch: async (url) => {
+      if (url.includes("/events")) return { ok: true, status: 202, json: async () => ({}) };
+      const error = new Error("request timed out");
+      error.name = "TimeoutError";
+      throw error;
+    },
+    sleep: async () => {},
+    now: () => 0,
+    totalTimeoutMs: 10,
+    requestTimeoutMs: 1,
+    maxRetries: 0,
+    pollIntervalMs: 0,
+    backoffBaseMs: 0,
+    meterServiceBaseUrl: "http://meter-service",
     dispatchServiceBaseUrl: "http://dispatch-service"
   });
   assert.equal(result.success, false);
-  assert.equal(result.failureStage, "completion_check");
+  assert.equal(result.failureStage, "persistence");
+  assert.equal(result.failureReason, "persistence_timeout");
+});
+
+test("runSyntheticTransaction classifies dispatch connection refusal as a persistence failure", async () => {
+  const result = await runSyntheticTransaction({
+    fetch: async (url) => {
+      if (url.includes("/events")) return { ok: true, status: 202, json: async () => ({}) };
+      throw new Error("connect ECONNREFUSED dispatch-service");
+    },
+    sleep: async () => {},
+    now: () => 0,
+    totalTimeoutMs: 10,
+    requestTimeoutMs: 1,
+    maxRetries: 0,
+    pollIntervalMs: 0,
+    backoffBaseMs: 0,
+    meterServiceBaseUrl: "http://meter-service",
+    dispatchServiceBaseUrl: "http://dispatch-service"
+  });
+  assert.equal(result.success, false);
+  assert.equal(result.failureStage, "persistence");
+  assert.equal(result.failureReason, "persistence_request_error");
 });
 
 test("main writes a JSON result for the synthetic transaction runner", async () => {
@@ -264,6 +314,7 @@ test("main fails the job when telemetry cannot be flushed", async () => {
         throw new Error("export unavailable");
       }
     });
+
     assert.equal(result.success, false);
     assert.equal(result.failureStage, "telemetry_export");
     assert.equal(process.exitCode, 1);
@@ -273,3 +324,15 @@ test("main fails the job when telemetry cannot be flushed", async () => {
     process.exitCode = previousExitCode;
   }
 });
+
+function recordingSpan() {
+  return {
+    attributes: {},
+    setAttributes(values) {
+      Object.assign(this.attributes, values);
+    },
+    setStatus() {},
+    recordException() {},
+    end() {}
+  };
+}
