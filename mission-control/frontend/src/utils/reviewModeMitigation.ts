@@ -222,6 +222,30 @@ export function requiresLoudBanner(evidence: ReviewModeMitigationEvidence): bool
   );
 }
 
+export interface MitigationEvidenceRequest {
+  threadId?: string;
+  correlationId?: string;
+  incidentId?: string;
+  traceId?: string;
+}
+
+/** True when at least one identifier was observed; false means the backend must answer ambiguous + guardrails without guessing. */
+export function hasObservedMitigationCorrelation(correlation?: MitigationEvidenceRequest): boolean {
+  return !!correlation && Object.values(correlation).some(value => typeof value === 'string' && value.trim().length > 0);
+}
+
+/** Returns only the observed identifiers so a no-correlation poll still reaches the backend guardrail contract. */
+export function buildMitigationEvidenceRequest(correlation?: MitigationEvidenceRequest): Record<string, string> {
+  const request: Record<string, string> = {};
+  if (!correlation) return request;
+  for (const [key, value] of Object.entries(correlation)) {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      request[key] = value.trim();
+    }
+  }
+  return request;
+}
+
 /** Ordered rows for the correlation timeline; only identifiers that were actually observed. */
 export function correlationRows(evidence: ReviewModeMitigationEvidence): { label: string; value: string }[] {
   const rows: { label: string; value: string }[] = [];

@@ -537,6 +537,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useApi } from '@/composables/useApi';
 import { useWebSocket } from '@/composables/useWebSocket';
+import { buildMitigationEvidenceRequest } from '@/utils/reviewModeMitigation';
 import PortalValidation from './PortalValidation.vue';
 import RehearsalWorkflow from './RehearsalWorkflow.vue';
 import SreAgentPanel from './SreAgentPanel.vue';
@@ -853,17 +854,13 @@ async function loadMitigationEvidence() {
   // Correlate with the newest observed native thread/incident, if Mission Control has one.
   // Never invent an identifier: with none, the backend reports `ambiguous` rather than guessing.
   const correlated = incidentHandoffs.value.find(incident => incident.nativeEvidence?.threadId || incident.nativeEvidence?.incidentId);
-  if (!correlated?.nativeEvidence?.threadId && !correlated?.nativeEvidence?.incidentId) {
-    mitigationEvidence.value = undefined;
-    mitigationGuardrails.value = undefined;
-    mitigationError.value = '';
-    return;
-  }
+  const request = buildMitigationEvidenceRequest(correlated?.nativeEvidence ?? {});
+
+  // Keep the guardrail disclosure visible even when no native correlation exists. The backend
+  // intentionally answers an empty query with an `ambiguous` state plus `buildGuardrails()` rather
+  // than guessing, and it does not hit Azure/Kubernetes in that path.
   try {
-    const response = await getMitigationEvidence({
-      threadId: correlated.nativeEvidence.threadId,
-      incidentId: correlated.nativeEvidence.incidentId,
-    });
+    const response = await getMitigationEvidence(request);
     mitigationEvidence.value = response.evidence;
     mitigationGuardrails.value = response.guardrails;
   } catch (error) {

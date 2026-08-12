@@ -16,12 +16,14 @@ import { dirname, resolve } from 'node:path';
 import {
   PROBE_LABELS,
   REVIEW_MODE_MITIGATION_STATES,
+  buildMitigationEvidenceRequest,
   correlationRows,
   describeMitigationState,
   describeMutation,
   describeProbeStatus,
   describeRunMode,
   formatFreshness,
+  hasObservedMitigationCorrelation,
   requiresLoudBanner,
 } from './reviewModeMitigation.js';
 import type { ReviewModeMitigationEvidence, ReviewModeMitigationState } from '../types/api';
@@ -145,6 +147,13 @@ test('a loud banner is required for security findings, blocked run mode and sche
   assert.equal(requiresLoudBanner(evidence({ runModeBlocked: true })), true);
   assert.equal(requiresLoudBanner(evidence({ schemaMismatch: true })), true);
   assert.equal(requiresLoudBanner(evidence({ state: 'deny-violation' })), true);
+});
+
+test('no-correlation polls still build an empty request so the backend can return ambiguous evidence + guardrails', () => {
+  assert.deepEqual(buildMitigationEvidenceRequest({}), {});
+  assert.deepEqual(buildMitigationEvidenceRequest({ threadId: ' thread-1 ', incidentId: '  INC-1 ' }), { threadId: 'thread-1', incidentId: 'INC-1' });
+  assert.equal(hasObservedMitigationCorrelation({}), false);
+  assert.equal(hasObservedMitigationCorrelation({ threadId: 'thread-1' }), true);
 });
 
 test('correlation rows only include identifiers that were actually observed', () => {
