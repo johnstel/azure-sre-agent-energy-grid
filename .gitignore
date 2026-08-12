@@ -199,3 +199,7 @@ NUL
 
 # Local Copilot CLI/MCP configuration
 .copilot/
+
+# Allow deep-context test for secret scanning
+!tests/deep-context/test_secret_scan.py
+!tests/deep-context/test_secret_scan_regression.py
