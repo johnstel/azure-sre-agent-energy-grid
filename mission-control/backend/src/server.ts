@@ -17,6 +17,7 @@ import { registerPortalValidationRoutes } from './routes/portal-validations.js';
 import { registerAnalystRoutes } from './routes/analyst.js';
 import { registerIncidentRoutes } from './routes/incidents.js';
 import { registerRehearsalRoutes } from './routes/rehearsals.js';
+import { getSreAgentService, registerSreAgentRoutes } from './routes/sre-agent.js';
 import { addScenarioJsonBodyCompatibility } from './utils/jsonBodyCompatibility.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -88,6 +89,13 @@ async function start() {
   registerAnalystRoutes(app);
   registerIncidentRoutes(app);
   registerRehearsalRoutes(app);
+  registerSreAgentRoutes(app);
+
+  // The SRE Agent adapter owns a child MCP server process; stop it with the backend so
+  // no orphaned process keeps an Azure session open after shutdown.
+  app.addHook('onClose', async () => {
+    await getSreAgentService().shutdown();
+  });
 
   // SPA fallback — must be after API routes
   if (existsSync(frontendDist)) {
@@ -98,6 +106,21 @@ async function start() {
 
   await app.listen({ port: PORT, host: HOST });
   app.log.info(`Mission Control backend listening on http://${HOST}:${PORT}`);
+
+  // Fastify only runs onClose hooks from app.close(), so without these handlers the
+  // SRE Agent MCP child process would survive a Ctrl-C and keep an Azure session open.
+  let shuttingDown = false;
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.on(signal, () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      app.log.info(`Received ${signal}; shutting down Mission Control backend`);
+      app
+        .close()
+        .catch((err) => logger.error(err, 'Error during Mission Control shutdown'))
+        .finally(() => process.exit(0));
+    });
+  }
 
   // Auto-open browser in production mode (when serving built frontend)
   if (existsSync(frontendDist) && !process.env.NO_OPEN) {

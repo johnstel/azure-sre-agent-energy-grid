@@ -25,8 +25,37 @@ import type {
   Scenario,
   Service,
   ServiceEndpointsResponse,
+  SreAgentDiscoveryResponse,
+  SreAgentInvestigation,
+  SreAgentPortalHandoff,
+  SreAgentPreflightResult,
+  SreAgentScenarioPrompt,
+  SreAgentTargetSummary,
   UpdateRehearsalEvidenceRequest,
 } from '../types/api';
+
+/** Configuration snapshot for the Azure SRE Agent MCP path. */
+export interface SreAgentConfigResponse {
+  configured: boolean;
+  enabled: boolean;
+  configurationIssues: string[];
+  target: SreAgentTargetSummary;
+  portalHandoff: SreAgentPortalHandoff;
+  scenarioPrompts: SreAgentScenarioPrompt[];
+}
+
+/** Error that preserves the structured API error body (used for SRE Agent failures). */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly body: unknown;
+
+  constructor(status: number, message: string, body: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -37,13 +66,14 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   if (!response.ok) {
     const body = await response.text();
     let message = body;
+    let parsedBody: unknown;
     try {
-      const parsed = JSON.parse(body) as { error?: string };
-      message = parsed.error ?? body;
+      parsedBody = JSON.parse(body) as { error?: string };
+      message = (parsedBody as { error?: string }).error ?? body;
     } catch {
       // Keep the raw response text for non-JSON API errors.
     }
-    throw new Error(`API ${response.status}: ${message}`);
+    throw new ApiError(response.status, `API ${response.status}: ${message}`, parsedBody);
   }
 
   return response.json() as Promise<T>;
@@ -94,6 +124,26 @@ export function useApi() {
       } satisfies AssistantAskRequest),
     }),
     deploy: (params: DeployParams) => api<Job>('/api/deploy', { method: 'POST', body: JSON.stringify(params) }),
+
+    // --- Azure SRE Agent (real agent via supported MCP path) ---------------
+    // These call the real Azure SRE Agent. They are deliberately separate from
+    // askAssistant (Local Analyst) and must never be used as a fallback for it.
+    getSreAgentConfig: () => api<SreAgentConfigResponse>('/api/sre-agent/config'),
+    getSreAgentPreflight: (skipMcpProbe = false) =>
+      api<SreAgentPreflightResult>(`/api/sre-agent/preflight${skipMcpProbe ? '?skipMcpProbe=true' : ''}`),
+    getSreAgents: () => api<SreAgentDiscoveryResponse>('/api/sre-agent/agents'),
+    startSreAgentInvestigation: (body: { scenarioName?: string; prompt?: string; correlationId?: string }) =>
+      api<SreAgentInvestigation>('/api/sre-agent/investigations', { method: 'POST', body: JSON.stringify(body) }),
+    continueSreAgentInvestigation: (body: { threadId: string; prompt: string; correlationId?: string }) =>
+      api<SreAgentInvestigation>('/api/sre-agent/investigations/continue', { method: 'POST', body: JSON.stringify(body) }),
+    getSreAgentThreadStatus: (threadId: string) =>
+      api<SreAgentInvestigation>(`/api/sre-agent/investigations/${encodeURIComponent(threadId)}`),
+    cancelSreAgentInvestigation: (correlationId: string) =>
+      api<{ cancelled: boolean; message: string; limitation: string }>('/api/sre-agent/investigations/cancel', {
+        method: 'POST',
+        body: JSON.stringify({ correlationId }),
+      }),
+
     destroy: (params: DestroyParams) => api<Job>('/api/destroy', { method: 'POST', body: JSON.stringify(params) }),
     enableScenario: (name: string) => api<{ ok: boolean }>(`/api/scenarios/${name}/enable`, { method: 'POST' }),
     disableScenario: (name: string) => api<{ ok: boolean }>(`/api/scenarios/${name}/disable`, { method: 'POST' }),

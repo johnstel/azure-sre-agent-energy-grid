@@ -92,6 +92,17 @@ Each successful response includes source, collection timestamp, limitations, con
 | Arbitrary file access | source files, hidden logs, local filesystem browsing outside the bounded snapshot | Reject. Use documented state sources only. |
 | Direct Azure SRE Agent automation | private Preview APIs, unverified approval APIs, assumed remediation endpoints | Reject unless there is verified product evidence and a separate governance review. |
 
+> [!NOTE]
+> **Azure SRE Agent is now reachable from Mission Control through a separate, governed surface.**
+>
+> Issue #77 added a supported Azure SRE Agent MCP adapter (see [SRE Agent MCP Integration](SRE-AGENT-MCP-INTEGRATION.md)). It is **not** part of Local Analyst and does not relax any rule on this page:
+>
+> - Local Analyst remains a local, read-only explainer with the single `get_mission_control_state` tool.
+> - The SRE Agent adapter is a distinct backend service, a distinct API namespace (`/api/sre-agent/*`), and a distinct UI panel (`SreAgentPanel.vue`).
+> - Local Analyst output is **never** substituted when the SRE Agent path fails; the UI shows an honest error plus the portal handoff.
+> - The adapter is limited to six allowlisted MCP tools, blocks `investigate_yolo` and every auto-approval path, and never auto-approves a write action.
+> - Approvals remain operator-driven in the Azure SRE Agent portal.
+
 ### Fail-closed default
 
 Local Analyst must fail closed when tool policy cannot prove an action is safe.
@@ -221,6 +232,8 @@ When data is missing, do not infer it:
 | Remediation recommendations | Defers | Owns recommendation flow when portal evidence supports it |
 | Remediation execution | Not allowed | Operator-approved only unless real approval UI/API evidence is captured and separately reviewed |
 | Safe-language enforcement | Owns for analyst responses | Must still follow project safe-language guardrails |
+| Investigation threads via MCP | Not allowed | Owns, through the governed adapter in [SRE Agent MCP Integration](SRE-AGENT-MCP-INTEGRATION.md) |
+| Approving a proposed action | Not allowed | Operator-only, in the Azure SRE Agent portal; Mission Control never auto-approves |
 
 Use this boundary in reviews:
 

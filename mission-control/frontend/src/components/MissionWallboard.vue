@@ -172,6 +172,7 @@
       <Terminal :lines="jobLines" :title="jobStreamTitle" :tone="jobStreamKind === 'destroy' ? 'danger' : 'default'" />
     </div>
 
+    <SreAgentPanel v-if="controlPanelOpen" />
     <PortalValidation v-if="controlPanelOpen" />
     <RehearsalWorkflow v-if="controlPanelOpen" />
     
@@ -532,6 +533,7 @@ import { useApi } from '@/composables/useApi';
 import { useWebSocket } from '@/composables/useWebSocket';
 import PortalValidation from './PortalValidation.vue';
 import RehearsalWorkflow from './RehearsalWorkflow.vue';
+import SreAgentPanel from './SreAgentPanel.vue';
 import ScenarioNarrationPanel from './ScenarioNarrationPanel.vue';
 import Terminal from './Terminal.vue';
 import type {

@@ -5,6 +5,23 @@
 > **Date**: 2026-04-27
 > **Status**: Azure SRE Agent is GA. This lab now pins `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`; subscriptions that expose only older preview provider metadata skip SRE Agent deployment instead of falling back.
 
+> [!IMPORTANT]
+> **Superseded in part by [SRE Agent MCP Integration](SRE-AGENT-MCP-INTEGRATION.md) (issue #77), 2026-08-12.**
+>
+> The verdict below — "portal fallback only; direct integration blocked" — was correct for the **REST** surface reviewed in April 2026. Microsoft has since documented the **SRE Agent MCP server**, which provides a supported path for a third-party client to discover agents, create threads, run standard approval-gated investigations, send follow-ups, and read thread state, using the host Azure identity:
+>
+> - <https://learn.microsoft.com/azure/sre-agent/mcp-server>
+> - <https://learn.microsoft.com/azure/sre-agent/setup-mcp-server>
+> - <https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-sre-agent>
+>
+> Mission Control now uses that supported MCP path. The following sections remain accurate and still apply:
+>
+> - §3 (Application Insights `customEvents` as read-only audit evidence) — used for audit correlation.
+> - §6 (API-version and breaking-change risk) — the MCP surface is preview-stage; pin the server version.
+> - §5 (portal fallback) — still the required behaviour whenever MCP is unavailable, and still the source of truth for demo evidence until the embedded path is live-validated.
+>
+> These conclusions are **no longer current**: "Chat/thread/conversation start or send message — Not verified", "Do not build direct Mission Control → SRE Agent chat/thread/message calls", and the blocked status of issue #12. Approve/deny of a proposed action from an external caller remains **not documented**, so Mission Control still routes approvals to the portal.
+
 ## Executive verdict
 
 **Recommendation: use the portal/deep-link fallback for the customer demo; do not implement direct Mission Control → Azure SRE Agent chat/conversation/action API integration yet.**
