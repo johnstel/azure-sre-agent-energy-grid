@@ -111,6 +111,12 @@ param userMaxPods int = 50
 @description('Optional CIDR ranges allowed to reach the AKS API server public endpoint for external demos. Leave empty to preserve current public-access behavior.')
 param aksApiServerAuthorizedIpRanges array = []
 
+@description('Kubernetes namespace hosting the workload identity service account.')
+param workloadIdentityServiceAccountNamespace string = 'energy'
+
+@description('Service account name bound to the federation subject for Key Vault secret access. Default matches the RabbitMQ-consuming energy workload.')
+param workloadIdentityServiceAccountName string = 'meter-service'
+
 @description('Enable ACR admin user account (not required for default deploy path)')
 param acrAdminUserEnabled bool = false
 
@@ -266,6 +272,21 @@ module keyVault 'modules/key-vault.bicep' = {
   }
 }
 
+// Dedicated user-assigned identity for Key Vault read-only secret access in the energy namespace.
+module energyWorkloadIdentity 'modules/energy-workload-identity.bicep' = {
+  scope: resourceGroup
+  name: 'deploy-energy-workload-identity'
+  params: {
+    identityName: names.managedIdentity
+    location: location
+    tags: tags
+    aksOidcIssuerUrl: aks.outputs.oidcIssuerUrl
+    keyVaultResourceId: keyVault.outputs.keyVaultId
+    serviceAccountNamespace: workloadIdentityServiceAccountNamespace
+    serviceAccountName: workloadIdentityServiceAccountName
+  }
+}
+
 // Azure SRE Agent (optional)
 module sreAgent 'modules/sre-agent.bicep' = if (deploySreAgent) {
   scope: resourceGroup
@@ -356,6 +377,13 @@ output appInsightsConnectionString string = appInsights.outputs.connectionString
 output keyVaultUri string = keyVault.outputs.vaultUri
 output keyVaultPurgeProtectionEnabled bool = keyVault.outputs.keyVaultPurgeProtectionEnabled
 output keyVaultPurgeProtectionStatus string = keyVault.outputs.keyVaultPurgeProtectionStatus
+output energyWorkloadIdentityName string = energyWorkloadIdentity.outputs.identityName
+output energyWorkloadIdentityResourceId string = energyWorkloadIdentity.outputs.resourceId
+output energyWorkloadIdentityClientId string = energyWorkloadIdentity.outputs.clientId
+output energyWorkloadIdentityPrincipalId string = energyWorkloadIdentity.outputs.principalId
+output energyWorkloadIdentityFederatedSubject string = energyWorkloadIdentity.outputs.federatedSubject
+output energyWorkloadIdentityServiceAccountNamespace string = energyWorkloadIdentity.outputs.serviceAccountNamespace
+output energyWorkloadIdentityServiceAccountName string = energyWorkloadIdentity.outputs.serviceAccountName
 output grafanaName string = deployObservability ? observability!.outputs.grafanaName : ''
 output grafanaDashboardUrl string = deployObservability ? observability!.outputs.grafanaEndpoint : ''
 output azureMonitorWorkspaceId string = deployObservability ? observability!.outputs.azureMonitorWorkspaceId : ''
