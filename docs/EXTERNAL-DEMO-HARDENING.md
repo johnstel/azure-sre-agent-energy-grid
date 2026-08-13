@@ -67,13 +67,13 @@ The SRE Agent managed identity previously held Contributor at resource-group sco
 | Container Registry | AcrPull |
 
 The `High` level (adds Contributor + AKS admin roles) must be explicitly requested:
-- In Bicep: `sreAgentAccessLevel = 'High'` in `infra/bicep/main.bicepparam` (set for internal lab runs only)
-- In scripts: `-SreAgentAccessLevel High` passed to `deploy.ps1` or `configure-rbac.ps1`
+- In Bicep: set `sreAgentAccessLevel = 'High'` in `infra/bicep/main.bicepparam` for internal lab runs only; the checked-in default remains `Low`
+- In scripts: pass `-SreAgentAccessLevel High` to `deploy.ps1` or `configure-rbac.ps1`
 
 ### Operator pre-demo checklist (H-3)
 
 - [ ] Confirm the deployment used `Low` access level (default when using `deploy.ps1` without `-SreAgentAccessLevel High`)
-- [ ] Or verify that `main.bicepparam` was **not** used as-is for this external deploy (it sets `High` for internal lab)
+- [ ] Or verify that `main.bicepparam` was **not** used as-is for this external deploy (the checked-in default is `Low`, and any `High` override must be intentional)
 - [ ] Confirm the SRE Agent managed identity does **not** hold Contributor on the resource group:
   ```bash
   az role assignment list --assignee <sre-agent-principal-id> --output table

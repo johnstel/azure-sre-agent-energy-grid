@@ -15,9 +15,9 @@ param location string
 @description('Tags to apply to resources')
 param tags object
 
-@description('The access level for the SRE Agent. High = Reader + Contributor + Log Analytics Reader (broad, legacy lab flows). Low = Reader + Log Analytics Reader (diagnosis only). Mitigation = Reader + Log Analytics Reader ONLY at resource-group scope, with the narrow AKS-scoped custom role supplied separately by modules/sre-agent-mitigation-role.bicep (issue #80, docs/REVIEW-MODE-MITIGATION.md §3 Layer 3). Mitigation deliberately grants NO Contributor.')
+@description('The access level for the SRE Agent. Low = Reader + Log Analytics Reader (diagnosis only, secure default). High = adds Contributor + AKS admin roles for internal remediation flows. Mitigation = Reader + Log Analytics Reader ONLY at resource-group scope, with the narrow AKS-scoped custom role supplied separately by modules/sre-agent-mitigation-role.bicep (issue #80, docs/REVIEW-MODE-MITIGATION.md §3 Layer 3). Mitigation deliberately grants NO Contributor.')
 @allowed(['High', 'Low', 'Mitigation'])
-param accessLevel string = 'High'
+param accessLevel string = 'Low'
 
 @description('Application Insights App ID')
 param appInsightsAppId string

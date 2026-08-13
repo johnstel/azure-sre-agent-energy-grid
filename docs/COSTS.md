@@ -21,7 +21,7 @@ The baseline estimate assumes the default `scripts/deploy.ps1 -Location eastus2`
 | Log retention | Log Analytics and Application Insights aligned to 90 days |
 | SRE Agent | `deploySreAgent=true` unless `-SkipSreAgent` is used |
 
-`deploy.ps1` defaults the SRE Agent access level to `Low` for diagnosis-only demos. `main.bicepparam` sets `High` for internal remediation demos. Access level affects permissions and demo risk more than the fixed infrastructure cost; SRE Agent usage/execution remains variable in either mode.
+`deploy.ps1` and `infra/bicep/main.bicepparam` default the SRE Agent to `Low` for diagnosis-only demos. `High` remains an explicit opt-in for internal remediation demos only, so the secure default does not grant Contributor at resource-group scope. Access level affects permissions and demo risk more than the fixed infrastructure cost; SRE Agent usage/execution remains variable in either mode.
 
 ## Quick Cost Summary
 

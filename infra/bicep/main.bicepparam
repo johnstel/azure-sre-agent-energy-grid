@@ -43,12 +43,11 @@ param aksApiServerAuthorizedIpRanges = []
 // ACR admin account is disabled by default; use role-based auth for pull/push.
 param acrAdminUserEnabled = false
 
-// SRE Agent access level for internal remediation demos.
-// 'High' = Reader + Log Analytics Reader + Contributor at RG scope (write access for remediation).
-// 'Low'  = Reader + Log Analytics Reader only (diagnosis-only; default for external/unknown contexts).
-// H-3: 'High' is intentional for the internal demo to allow SRE Agent remediation actions.
-// For external/customer-facing demos, omit this parameter or set to 'Low'.
-param sreAgentAccessLevel = 'High'
+// SRE Agent access level. Read-only is the secure default for all deployments.
+// 'Low' = Reader + Log Analytics Reader only (diagnosis-only; default for external/unknown contexts).
+// 'High' = adds Contributor at RG scope + AKS admin roles for internal remediation demos only.
+// Keep High explicit by parameter or switch; do not rely on an implicit fallback.
+param sreAgentAccessLevel = 'Low'
 
 // Connect Azure Monitor as the SRE Agent incident platform (issue #76).
 // This wires the documented Microsoft.App/agents incidentManagementConfiguration ARM property and
