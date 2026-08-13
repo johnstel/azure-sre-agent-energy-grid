@@ -20,6 +20,7 @@ import { registerRehearsalRoutes } from './routes/rehearsals.js';
 import { registerCustomerImpactRoutes } from './routes/customer-impact.js';
 import { getSreAgentService, registerSreAgentRoutes } from './routes/sre-agent.js';
 import { registerMitigationRoutes } from './routes/mitigation.js';
+import { registerAuthAllowlistGuard } from './auth/missionControlAuth.js';
 import { addScenarioJsonBodyCompatibility } from './utils/jsonBodyCompatibility.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -35,6 +36,7 @@ async function start() {
   const jobManager = new JobManager();
 
   addScenarioJsonBodyCompatibility(app);
+  registerAuthAllowlistGuard(app);
 
   // CORS — allow localhost origins in dev
   await app.register(fastifyCors, {

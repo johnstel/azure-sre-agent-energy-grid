@@ -175,6 +175,8 @@ Azure SRE Agent remains the cloud diagnostic/remediation experience for Azure re
 
 ## Security
 
+- Public Mission Control ingress is fail-closed: `MISSION_CONTROL_PUBLIC_INGRESS=true` requires EasyAuth plus a non-empty principal or group allowlist before any non-health request succeeds; `/api/health` remains the only documented public health endpoint
+- Local loopback (`localhost`/`127.0.0.1`) remains usable without fabricated EasyAuth headers
 - Backend binds to `127.0.0.1` only (localhost)
 - No `shell: true` — all commands use structured `spawn()` args
 - Ask Copilot is backend-only, read-only, and restricted to a single Mission Control state snapshot tool

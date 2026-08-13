@@ -48,6 +48,21 @@ param incidentWebhookServiceUri string = ''
 @description('Optional action group resource IDs to notify when alerts fire')
 param alertActionGroupIds array = []
 
+@description('Deploy Mission Control as a hosted application in the target resource group.')
+param deployMissionControl bool = false
+
+@description('Expose Mission Control through public ingress. This must not be enabled without Entra auth and a non-empty allowlist.')
+param missionControlExternalIngress bool = false
+
+@description('Enable EasyAuth for Mission Control when public ingress is enabled.')
+param missionControlAuthEnabled bool = false
+
+@description('Entra principal object IDs permitted to access Mission Control through public ingress.')
+param missionControlAllowedPrincipals array = []
+
+@description('Entra group object IDs permitted to access Mission Control through public ingress.')
+param missionControlAllowedGroups array = []
+
 @description('AKS Kubernetes version')
 param kubernetesVersion string = '1.34'
 
@@ -151,8 +166,12 @@ var names = {
   keyVault: 'kv-${workloadName}-${take(uniqueSuffix, 6)}'
   managedIdentity: 'id-${workloadName}'
   vnet: 'vnet-${workloadName}'
+  missionControl: 'mission-control-${workloadName}'
+  missionControlEnvironment: 'cae-${workloadName}'
   sreAgent: 'sre-${workloadName}'
 }
+
+assert missionControlPublicIngressGuard = !(missionControlExternalIngress && (!missionControlAuthEnabled || (empty(missionControlAllowedPrincipals) && empty(missionControlAllowedGroups))))
 
 // =============================================================================
 // RESOURCE GROUP
@@ -259,6 +278,20 @@ module keyVault 'modules/key-vault.bicep' = {
     location: location
     tags: tags
     enableRbacAuthorization: true
+  }
+}
+
+module missionControl 'modules/mission-control-container-app.bicep' = if (deployMissionControl) {
+  scope: resourceGroup
+  name: 'deploy-mission-control'
+  params: {
+    appName: names.missionControl
+    containerAppEnvironmentId: '/subscriptions/${subscription().subscriptionId}/resourceGroups/${resourceGroup.name}/providers/Microsoft.App/managedEnvironments/${names.missionControlEnvironment}'
+    location: location
+    externalIngress: missionControlExternalIngress
+    authEnabled: missionControlAuthEnabled
+    allowedPrincipals: missionControlAllowedPrincipals
+    allowedGroups: missionControlAllowedGroups
   }
 }
 
