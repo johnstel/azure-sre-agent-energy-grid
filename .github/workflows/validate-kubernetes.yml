@@ -22,10 +22,6 @@ jobs:
     env:
       KUBECONFORM_VERSION: v0.6.7
       KUBERNETES_VERSION: '1.30.0'
-      # SecretProviderClass is an Azure Key Vault CSI custom resource that is intentionally
-      # outside this issue's scope. We skip only this explicit custom kind instead of
-      # ignoring all unknown kinds silently.
-      KUBE_SKIP_TYPES: 'SecretProviderClass'
 
     steps:
       - name: Checkout repository
@@ -56,5 +52,4 @@ jobs:
             -strict \
             -summary \
             -kubernetes-version "${KUBERNETES_VERSION}" \
-            -skip "${KUBE_SKIP_TYPES}" \
             $MANIFESTS
