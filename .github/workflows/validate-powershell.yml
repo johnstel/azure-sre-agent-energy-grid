@@ -56,11 +56,44 @@ jobs:
 
           Write-Host "PowerShell AST parser passed for $($scriptFiles.Count) file(s)."
 
-      - name: Install PSScriptAnalyzer
+      - name: Install and load exact PSScriptAnalyzer version
         shell: pwsh
         run: |
-          Set-PSRepository PSGallery -InstallationPolicy Trusted
-          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion '1.23.0'
+          $moduleVersion = '1.23.0'
+          $repositoryName = 'PSGallery'
+
+          $psGallery = Get-PSRepository -Name $repositoryName -ErrorAction Stop
+          if ($psGallery.InstallationPolicy -ne 'Trusted') {
+            Set-PSRepository -Name $repositoryName -InstallationPolicy Trusted -ErrorAction Stop
+          }
+
+          Install-Module `
+            -Name PSScriptAnalyzer `
+            -Repository $repositoryName `
+            -Scope CurrentUser `
+            -RequiredVersion $moduleVersion `
+            -Force `
+            -AcceptLicense `
+            -ErrorAction Stop
+
+          $installedModule = Get-Module -ListAvailable -Name PSScriptAnalyzer |
+            Where-Object { $_.Version -eq [version]$moduleVersion } |
+            Sort-Object Version -Descending |
+            Select-Object -First 1
+
+          if (-not $installedModule) {
+            throw "PSScriptAnalyzer $moduleVersion is not installed from $repositoryName."
+          }
+
+          Get-Module -Name PSScriptAnalyzer -All | Remove-Module -Force -ErrorAction SilentlyContinue
+          Import-Module $installedModule.Path -Force -RequiredVersion $moduleVersion -ErrorAction Stop
+
+          $loadedModule = Get-Module PSScriptAnalyzer | Select-Object -First 1
+          if (-not $loadedModule -or $loadedModule.Version.ToString() -ne $moduleVersion) {
+            throw "Expected PSScriptAnalyzer version $moduleVersion to be loaded, but got $($loadedModule.Version.ToString())."
+          }
+
+          Write-Host "Loaded PSScriptAnalyzer $($loadedModule.Version) from $($loadedModule.Path)"
 
       - name: Run PSScriptAnalyzer
         shell: pwsh
