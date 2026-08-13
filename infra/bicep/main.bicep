@@ -34,6 +34,9 @@ param deployAlerts bool = true
 @description('Deploy Azure SRE Agent for AI-powered diagnostics and remediation')
 param deploySreAgent bool = true
 
+@description('Enable Azure Key Vault purge protection for the lab vault. Defaults to true for secure-by-default deploys. Set to false only for a disposable demo lab where rapid delete/recreate is intentionally accepted and the retained deleted vault name behavior is understood.')
+param keyVaultPurgeProtection bool = true
+
 @description('Deploy default Action Group for alert notifications and incident routing')
 param deployActionGroup bool = false
 
@@ -249,6 +252,7 @@ module keyVault 'modules/key-vault.bicep' = {
     location: location
     tags: tags
     enableRbacAuthorization: true
+    enablePurgeProtection: keyVaultPurgeProtection
   }
 }
 
@@ -321,6 +325,8 @@ output logAnalyticsWorkspaceId string = logAnalytics.outputs.workspaceId
 output appInsightsId string = appInsights.outputs.appInsightsId
 output appInsightsConnectionString string = appInsights.outputs.connectionString
 output keyVaultUri string = keyVault.outputs.vaultUri
+output keyVaultPurgeProtectionEnabled bool = keyVault.outputs.keyVaultPurgeProtectionEnabled
+output keyVaultPurgeProtectionStatus string = keyVault.outputs.keyVaultPurgeProtectionStatus
 output grafanaDashboardUrl string = deployObservability ? observability!.outputs.grafanaEndpoint : ''
 output azureMonitorWorkspaceId string = deployObservability ? observability!.outputs.azureMonitorWorkspaceId : ''
 output prometheusDataCollectionEndpointId string = deployObservability
