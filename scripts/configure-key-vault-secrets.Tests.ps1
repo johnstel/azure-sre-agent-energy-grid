@@ -10,8 +10,8 @@ Describe 'RabbitMQ Key Vault bootstrap' {
             Mock Get-KeyVaultSecretMetadata { $null }
             Mock New-RabbitMqPassword { 'generated-secret-password-0123456789' }
             Mock New-RabbitMqAmqpUri {
-                param([string]$Username, [string]$Password)
-                "amqp://${Username}:${Password}@rabbitmq:5672/"
+                param([string]$AccountName, [string]$SecretToken)
+                "amqp://${AccountName}:${SecretToken}@rabbitmq:5672/"
             }
             Mock az {
                 param([Parameter(ValueFromRemainingArguments)] [string[]]$Arguments)
@@ -136,8 +136,8 @@ Describe 'RabbitMQ Key Vault bootstrap' {
             }
             Mock New-RabbitMqPassword { 'new-rotated-password-9876543210' }
             Mock New-RabbitMqAmqpUri {
-                param([string]$Username, [string]$Password)
-                "amqp://${Username}:${Password}@rabbitmq:5672/"
+                param([string]$AccountName, [string]$SecretToken)
+                "amqp://${AccountName}:${SecretToken}@rabbitmq:5672/"
             }
             Mock az {
                 param([Parameter(ValueFromRemainingArguments)] [string[]]$Arguments)
@@ -167,8 +167,8 @@ Describe 'RabbitMQ Key Vault bootstrap' {
             Mock Get-KeyVaultSecretMetadata { $null }
             Mock New-RabbitMqPassword { 'generated-secret-password-0123456789' }
             Mock New-RabbitMqAmqpUri {
-                param([string]$Username, [string]$Password)
-                "amqp://${Username}:${Password}@rabbitmq:5672/"
+                param([string]$AccountName, [string]$SecretToken)
+                "amqp://${AccountName}:${SecretToken}@rabbitmq:5672/"
             }
             Mock az {
                 $global:LASTEXITCODE = 1
@@ -220,8 +220,8 @@ Describe 'RabbitMQ Key Vault bootstrap' {
             }
             Mock New-RabbitMqPassword { 'rotated-password-xyz-1234567890' }
             Mock New-RabbitMqAmqpUri {
-                param([string]$Username, [string]$Password)
-                "amqp://${Username}:${Password}@rabbitmq:5672/"
+                param([string]$AccountName, [string]$SecretToken)
+                "amqp://${AccountName}:${SecretToken}@rabbitmq:5672/"
             }
             Mock az {
                 param([Parameter(ValueFromRemainingArguments)] [string[]]$Arguments)

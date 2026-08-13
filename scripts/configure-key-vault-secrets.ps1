@@ -72,14 +72,14 @@ function New-RabbitMqAmqpUri {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [string]$Username,
+        [string]$AccountName,
 
         [Parameter(Mandatory)]
-        [string]$Password
+        [string]$SecretToken
     )
 
-    $escapedUsername = [System.Uri]::EscapeDataString($Username)
-    $escapedPassword = [System.Uri]::EscapeDataString($Password)
+    $escapedUsername = [System.Uri]::EscapeDataString($AccountName)
+    $escapedPassword = [System.Uri]::EscapeDataString($SecretToken)
     return "amqp://${escapedUsername}:${escapedPassword}@rabbitmq:5672/"
 }
 
@@ -108,24 +108,24 @@ function Test-RabbitMqSecretSetConsistency {
     param(
         [Parameter()]
         [AllowEmptyString()]
-        [string]$Username,
+        [string]$AccountName,
 
         [Parameter()]
         [AllowEmptyString()]
-        [string]$Password,
+        [string]$SecretToken,
 
         [Parameter()]
         [AllowEmptyString()]
         [string]$AmqpUri
     )
 
-    if ([string]::IsNullOrWhiteSpace($Username) -or
-        [string]::IsNullOrWhiteSpace($Password) -or
+    if ([string]::IsNullOrWhiteSpace($AccountName) -or
+        [string]::IsNullOrWhiteSpace($SecretToken) -or
         [string]::IsNullOrWhiteSpace($AmqpUri)) {
         return $false
     }
 
-    $expectedAmqpUri = New-RabbitMqAmqpUri -Username $Username -Password $Password
+    $expectedAmqpUri = New-RabbitMqAmqpUri -AccountName $AccountName -SecretToken $SecretToken
     return ($AmqpUri.Trim() -eq $expectedAmqpUri)
 }
 
@@ -377,7 +377,7 @@ function Get-RabbitMqSecretState {
 
     $isConsistent = $false
     if ($presentNames.Count -eq 3) {
-        $isConsistent = Test-RabbitMqSecretSetConsistency -Username $state['username'] -Password $state['password'] -AmqpUri $state['amqpUri']
+        $isConsistent = Test-RabbitMqSecretSetConsistency -AccountName $state['username'] -SecretToken $state['password'] -AmqpUri $state['amqpUri']
         if (-not $isConsistent) {
             $status = 'inconsistent'
         }
@@ -421,7 +421,7 @@ function Invoke-RabbitMqKeyVaultBootstrap {
 
     if ($Rotate -or $secretState.Status -eq 'missing') {
         $desiredPassword = New-RabbitMqPassword
-        $desiredAmqpUri = New-RabbitMqAmqpUri -Username $desiredUsername -Password $desiredPassword
+        $desiredAmqpUri = New-RabbitMqAmqpUri -AccountName $desiredUsername -SecretToken $desiredPassword
     }
     elseif ($secretState.Status -eq 'complete') {
         $desiredPassword = $secretState.Password
