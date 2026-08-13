@@ -4,9 +4,9 @@
 
 .DESCRIPTION
     Creates or preserves the RabbitMQ Key Vault secrets used by the deployment.
-    The default behavior is fail-safe: preserve a complete secret set; reject
-    partial state instead of writing inconsistent pairs; and require explicit
-    rotation for replacement.
+    The default behavior is fail-safe: preserve a complete, trusted secret set;
+    reject partial or inconsistent secret state instead of writing broken pairs;
+    and require explicit rotation for replacement.
 
     This helper intentionally does not create or mutate the Kubernetes Secret
     resource. Kubernetes consumption remains a separate follow-up scope.
@@ -103,6 +103,32 @@ function Test-KeyVaultSecretNotFound {
         $normalized.Contains('404'))
 }
 
+function Test-RabbitMqSecretSetConsistency {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [AllowEmptyString()]
+        [string]$Username,
+
+        [Parameter()]
+        [AllowEmptyString()]
+        [string]$Password,
+
+        [Parameter()]
+        [AllowEmptyString()]
+        [string]$AmqpUri
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Username) -or
+        [string]::IsNullOrWhiteSpace($Password) -or
+        [string]::IsNullOrWhiteSpace($AmqpUri)) {
+        return $false
+    }
+
+    $expectedAmqpUri = New-RabbitMqAmqpUri -Username $Username -Password $Password
+    return ($AmqpUri.Trim() -eq $expectedAmqpUri)
+}
+
 function New-RabbitMqSecretFile {
     [CmdletBinding()]
     param(
@@ -113,27 +139,74 @@ function New-RabbitMqSecretFile {
         [string]$Value
     )
 
-    $secretDirectory = Join-Path $PSScriptRoot '.bootstrap-secrets'
+    $secretDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("rabbitmq-keyvault-bootstrap-{0}" -f [System.Guid]::NewGuid().ToString('N'))
     $null = New-Item -ItemType Directory -Path $secretDirectory -Force -ErrorAction Stop
-    $secretPath = Join-Path $secretDirectory ("{0}.secret" -f $SecretName)
 
-    [System.IO.File]::WriteAllText($secretPath, $Value, [System.Text.UTF8Encoding]::new($false))
-    return $secretPath
+    $secretPath = Join-Path $secretDirectory ("{0}.secret" -f $SecretName)
+    $stream = [System.IO.File]::Open($secretPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+
+    try {
+        $writer = [System.IO.StreamWriter]::new($stream, [System.Text.UTF8Encoding]::new($false))
+        $writer.Write($Value)
+        $writer.Flush()
+    }
+    finally {
+        if ($null -ne $writer) {
+            $writer.Dispose()
+        }
+        $stream.Dispose()
+    }
+
+    try {
+        & chmod 700 $secretDirectory 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to secure the secret bootstrap directory '$secretDirectory'."
+        }
+
+        & chmod 600 $secretPath 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to secure the secret bootstrap file '$secretPath'."
+        }
+    }
+    catch {
+        if (Test-Path -LiteralPath $secretDirectory) {
+            Remove-Item -LiteralPath $secretDirectory -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        throw
+    }
+
+    return [pscustomobject]@{
+        Path      = $secretPath
+        Directory = $secretDirectory
+    }
 }
 
 function Remove-RabbitMqSecretFile {
     [CmdletBinding()]
     param(
         [Parameter()]
-        [string]$Path
+        $SecretFile
     )
 
-    if ([string]::IsNullOrWhiteSpace($Path)) {
+    if ($null -eq $SecretFile) {
         return
     }
 
-    if (Test-Path -LiteralPath $Path) {
-        Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    $filePath = $SecretFile.Path
+    $directoryPath = $SecretFile.Directory
+
+    if ($filePath -and (Test-Path -LiteralPath $filePath)) {
+        Remove-Item -LiteralPath $filePath -Force -ErrorAction Stop
+        if (Test-Path -LiteralPath $filePath) {
+            throw "Failed to confirm cleanup for RabbitMQ secret temp file '$filePath'."
+        }
+    }
+
+    if ($directoryPath -and (Test-Path -LiteralPath $directoryPath)) {
+        Remove-Item -LiteralPath $directoryPath -Recurse -Force -ErrorAction Stop
+        if (Test-Path -LiteralPath $directoryPath) {
+            throw "Failed to confirm cleanup for RabbitMQ secret temp directory '$directoryPath'."
+        }
     }
 }
 
@@ -177,7 +250,7 @@ function Get-KeyVaultSecretMetadata {
         [string]$SecretName
     )
 
-    $rawMetadata = & az keyvault secret show --vault-name $VaultName --name $SecretName --query '{ name:name, version:properties.version, id:id }' --output json 2>&1
+    $rawMetadata = & az keyvault secret show --vault-name $VaultName --name $SecretName --query '{ name:name, version:properties.version, id:id, contentType:properties.contentType, tags:tags }' --output json 2>&1
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -ne 0) {
@@ -202,9 +275,28 @@ function Get-KeyVaultSecretMetadata {
     }
 
     return [pscustomobject]@{
-        Name    = [string]$metadata.name
-        Version = [string]$metadata.version
-        Id      = [string]$metadata.id
+        Name        = [string]$metadata.name
+        Version     = [string]$metadata.version
+        Id          = [string]$metadata.id
+        ContentType = [string]$metadata.contentType
+        Tags        = $metadata.tags
+    }
+}
+
+function Remove-KeyVaultSecret {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$VaultName,
+
+        [Parameter(Mandatory)]
+        [string]$SecretName
+    )
+
+    $stderr = & az keyvault secret delete --vault-name $VaultName --name $SecretName --output none 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $diagnostic = ($stderr | Out-String).Trim()
+        throw "Failed to delete RabbitMQ Key Vault secret '$SecretName' in vault '$VaultName': $diagnostic"
     }
 }
 
@@ -221,13 +313,17 @@ function Set-KeyVaultSecretValue {
         [string]$Value
     )
 
-    $secretPath = New-RabbitMqSecretFile -SecretName $SecretName -Value $Value
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "RabbitMQ Key Vault secret '$SecretName' cannot be written with an empty value."
+    }
+
+    $secretFile = New-RabbitMqSecretFile -SecretName $SecretName -Value $Value
     try {
         $azArgs = @(
             'keyvault', 'secret', 'set',
             '--vault-name', $VaultName,
             '--name', $SecretName,
-            '--file', $secretPath,
+            '--file', $secretFile.Path,
             '--encoding', 'utf-8',
             '--content-type', $script:RabbitMqDefaultContentType,
             '--tags'
@@ -245,7 +341,7 @@ function Set-KeyVaultSecretValue {
         }
     }
     finally {
-        Remove-RabbitMqSecretFile -Path $secretPath
+        Remove-RabbitMqSecretFile -SecretFile $secretFile
     }
 }
 
@@ -259,7 +355,7 @@ function Get-RabbitMqSecretState {
     $state = [ordered]@{
         Username = $null
         Password = $null
-        AmqpUri = $null
+        AmqpUri  = $null
     }
 
     foreach ($entry in $script:RabbitMqKeyVaultSecretNames.GetEnumerator()) {
@@ -279,13 +375,22 @@ function Get-RabbitMqSecretState {
         $status = 'partial'
     }
 
+    $isConsistent = $false
+    if ($presentNames.Count -eq 3) {
+        $isConsistent = Test-RabbitMqSecretSetConsistency -Username $state['username'] -Password $state['password'] -AmqpUri $state['amqpUri']
+        if (-not $isConsistent) {
+            $status = 'inconsistent'
+        }
+    }
+
     return [pscustomobject]@{
-        Username = $state['username']
-        Password = $state['password']
-        AmqpUri = $state['amqpUri']
-        Present = $presentNames
-        Missing = $missingNames
-        Status = $status
+        Username    = $state['username']
+        Password    = $state['password']
+        AmqpUri     = $state['amqpUri']
+        Present     = $presentNames
+        Missing     = $missingNames
+        Status      = $status
+        IsConsistent = $isConsistent
     }
 }
 
@@ -305,12 +410,16 @@ function Invoke-RabbitMqKeyVaultBootstrap {
         throw "RabbitMQ Key Vault bootstrap is incomplete: existing values are present for '$($secretState.Present -join ', ')', but missing '$($secretState.Missing -join ', ')'. Refuse to preserve a partial secret set. Delete the incomplete pair or rerun with -Rotate."
     }
 
+    if (-not $Rotate -and $secretState.Status -eq 'inconsistent') {
+        throw "RabbitMQ Key Vault secret set is inconsistent. The stored AMQP URI does not match the stored username/password. Re-run with -Rotate to replace the broken pair."
+    }
+
     $desiredUsername = $secretState.Username
     if ([string]::IsNullOrWhiteSpace($desiredUsername)) {
         $desiredUsername = $script:RabbitMqDefaultUsername
     }
 
-    if ($Rotate) {
+    if ($Rotate -or $secretState.Status -eq 'missing') {
         $desiredPassword = New-RabbitMqPassword
         $desiredAmqpUri = New-RabbitMqAmqpUri -Username $desiredUsername -Password $desiredPassword
     }
@@ -319,46 +428,76 @@ function Invoke-RabbitMqKeyVaultBootstrap {
         $desiredAmqpUri = $secretState.AmqpUri
     }
     else {
-        $desiredPassword = New-RabbitMqPassword
-        $desiredAmqpUri = New-RabbitMqAmqpUri -Username $desiredUsername -Password $desiredPassword
+        throw "Unsupported RabbitMQ Key Vault state '$($secretState.Status)' for vault '$VaultName'."
     }
 
     $results = [System.Collections.Generic.List[object]]::new()
+    $rollbackValues = [ordered]@{}
+    $writtenSecrets = [System.Collections.Generic.List[string]]::new()
 
-    foreach ($secretName in @(
-            $script:RabbitMqKeyVaultSecretNames.username,
-            $script:RabbitMqKeyVaultSecretNames.password,
-            $script:RabbitMqKeyVaultSecretNames.amqpUri
-        )) {
-
-        $existingValue = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $secretName
-        $desiredValue = switch ($secretName) {
-            $script:RabbitMqKeyVaultSecretNames.username { $desiredUsername }
-            $script:RabbitMqKeyVaultSecretNames.password { $desiredPassword }
-            $script:RabbitMqKeyVaultSecretNames.amqpUri { $desiredAmqpUri }
+    foreach ($secretEntry in $script:RabbitMqKeyVaultSecretNames.GetEnumerator()) {
+        $secretName = $secretEntry.Value
+        $desiredValue = switch ($secretEntry.Name) {
+            'username' { $desiredUsername }
+            'password' { $desiredPassword }
+            'amqpUri' { $desiredAmqpUri }
             default { $null }
         }
 
-        if (-not $Rotate -and -not [string]::IsNullOrWhiteSpace($existingValue) -and $secretState.Status -eq 'complete') {
+        $existingValue = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $secretName
+        $shouldPreserve = (-not $Rotate) -and ($secretState.Status -eq 'complete') -and (-not [string]::IsNullOrWhiteSpace($existingValue)) -and ($existingValue -eq $desiredValue)
+
+        if ($shouldPreserve) {
             $metadata = Get-KeyVaultSecretMetadata -VaultName $VaultName -SecretName $secretName
             [void]$results.Add([pscustomobject]@{
-                    Name    = $secretName
-                    Status  = 'preserved'
-                    Version = if ($metadata) { $metadata.Version } else { $null }
-                    Id      = if ($metadata) { $metadata.Id } else { $null }
+                    Name        = $secretName
+                    Status      = 'preserved'
+                    Version     = if ($metadata) { $metadata.Version } else { $null }
+                    Id          = if ($metadata) { $metadata.Id } else { $null }
+                    ContentType = if ($metadata) { $metadata.ContentType } else { $null }
                 })
             continue
         }
 
-        Set-KeyVaultSecretValue -VaultName $VaultName -SecretName $secretName -Value $desiredValue
+        $rollbackValues[$secretName] = $existingValue
 
-        $metadata = Get-KeyVaultSecretMetadata -VaultName $VaultName -SecretName $secretName
-        [void]$results.Add([pscustomobject]@{
-                Name    = $secretName
-                Status  = if ([string]::IsNullOrWhiteSpace($existingValue)) { 'created' } else { 'rotated' }
-                Version = if ($metadata) { $metadata.Version } else { $null }
-                Id      = if ($metadata) { $metadata.Id } else { $null }
-            })
+        try {
+            Set-KeyVaultSecretValue -VaultName $VaultName -SecretName $secretName -Value $desiredValue
+            [void]$writtenSecrets.Add($secretName)
+
+            $metadata = Get-KeyVaultSecretMetadata -VaultName $VaultName -SecretName $secretName
+            [void]$results.Add([pscustomobject]@{
+                    Name        = $secretName
+                    Status      = if ([string]::IsNullOrWhiteSpace($existingValue)) { 'created' } else { 'rotated' }
+                    Version     = if ($metadata) { $metadata.Version } else { $null }
+                    Id          = if ($metadata) { $metadata.Id } else { $null }
+                    ContentType = if ($metadata) { $metadata.ContentType } else { $null }
+                })
+        }
+        catch {
+            $rollbackErrors = @()
+            foreach ($writtenSecret in @($writtenSecrets)) {
+                try {
+                    $previousValue = $rollbackValues[$writtenSecret]
+                    if ($null -eq $previousValue) {
+                        Remove-KeyVaultSecret -VaultName $VaultName -SecretName $writtenSecret
+                        continue
+                    }
+
+                    Set-KeyVaultSecretValue -VaultName $VaultName -SecretName $writtenSecret -Value $previousValue
+                }
+                catch {
+                    $rollbackErrors += "'$writtenSecret': $($_.Exception.Message)"
+                }
+            }
+
+            $failureMessage = $_.Exception.Message
+            if ($rollbackErrors.Count -gt 0) {
+                throw "RabbitMQ Key Vault bootstrap failed while updating '$secretName'; rollback attempted but could not restore the prior values: $($rollbackErrors -join '; '). Original failure: $failureMessage"
+            }
+
+            throw "RabbitMQ Key Vault bootstrap failed while updating '$secretName': $failureMessage"
+        }
     }
 
     return @($results)

@@ -1111,9 +1111,15 @@ az aks get-credentials `
     --resource-group $resourceGroupName `
     --name $outputs.aksClusterName.value `
     --overwrite-existing
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to fetch AKS credentials for cluster '$($outputs.aksClusterName.value)' in resource group '$resourceGroupName'."
+}
 
 # Convert kubeconfig to use Azure CLI auth so kubelogin doesn't prompt for a client ID
 kubelogin convert-kubeconfig -l azurecli
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to convert the kubeconfig for Azure CLI authentication."
+}
 
 Write-Host "  ✅ kubectl configured for cluster: $($outputs.aksClusterName.value)" -ForegroundColor Green
 
@@ -1184,45 +1190,51 @@ catch {
 Write-Host "`n📦 Deploying demo application to AKS..." -ForegroundColor Yellow
 $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
 
-if (Test-Path $k8sPath) {
-    kubectl apply -f $k8sPath
-    Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
+if (-not (Test-Path $k8sPath)) {
+    throw "Kubernetes base manifest '$k8sPath' was not found."
+}
 
-    Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
-    $deploymentNamesRaw = kubectl get deployment -n energy -o jsonpath='{.items[*].metadata.name}' 2>$null
-    $deploymentNames = @()
-    if ($deploymentNamesRaw) {
-        $deploymentNames = $deploymentNamesRaw -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    }
+kubectl apply -f $k8sPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to apply the Kubernetes manifest '$k8sPath'."
+}
+Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
 
-    foreach ($deploymentName in $deploymentNames) {
-        kubectl rollout status "deployment/$deploymentName" -n energy --timeout=300s 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ⚠️  Rollout still in progress for deployment/$deploymentName" -ForegroundColor Yellow
-        }
-    }
+Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
+$deploymentNamesRaw = kubectl get deployment -n energy -o jsonpath='{.items[*].metadata.name}' 2>$null
+$deploymentNames = @()
+if ($deploymentNamesRaw) {
+    $deploymentNames = $deploymentNamesRaw -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+}
 
-    # Wait for LoadBalancer IP
-    Write-Host "⏳ Waiting for grid-dashboard external IP..." -ForegroundColor Yellow
-    $maxWait = 120
-    $waited = 0
-    $storeUrl = $null
-    while ($waited -lt $maxWait) {
-        $externalIp = kubectl get svc grid-dashboard -n energy -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
-        if ($externalIp) {
-            $storeUrl = "http://$externalIp"
-            break
-        }
-        Start-Sleep -Seconds 5
-        $waited += 5
+foreach ($deploymentName in $deploymentNames) {
+    kubectl rollout status "deployment/$deploymentName" -n energy --timeout=300s 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Deployment '$deploymentName' did not become healthy within the rollout timeout."
     }
+}
 
-    if ($storeUrl) {
-        Write-Host "  ✅ Grid Dashboard URL: $storeUrl" -ForegroundColor Green
+# Wait for LoadBalancer IP
+Write-Host "⏳ Waiting for grid-dashboard external IP..." -ForegroundColor Yellow
+$maxWait = 120
+$waited = 0
+$storeUrl = $null
+while ($waited -lt $maxWait) {
+    $externalIp = kubectl get svc grid-dashboard -n energy -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+    if ($externalIp) {
+        $storeUrl = "http://$externalIp"
+        break
     }
-    else {
-        Write-Host "  ⚠️  Grid Dashboard external IP is still pending. Check again with: kubectl get svc grid-dashboard -n energy" -ForegroundColor Yellow
-    }
+    Start-Sleep -Seconds 5
+    $waited += 5
+}
+
+if ($storeUrl) {
+    Write-Host "  ✅ Grid Dashboard URL: $storeUrl" -ForegroundColor Green
+}
+else {
+    Write-Host "  ⚠️  Grid Dashboard external IP is still pending. Check again with: kubectl get svc grid-dashboard -n energy" -ForegroundColor Yellow
+}
 }
 else {
     Write-Host "  ⚠️  Application manifest not found at: $k8sPath" -ForegroundColor Yellow
