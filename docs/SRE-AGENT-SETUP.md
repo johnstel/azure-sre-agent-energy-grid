@@ -31,7 +31,7 @@ The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using th
 - Assigns roles based on `sreAgentAccessLevel` (default `Low`: Reader + Log Analytics Reader only)
 - Grants the deploying user the **SRE Agent Administrator** role
 
-> **Access level**: the secure default is `sreAgentAccessLevel = 'Low'` in `main.bicepparam`. High remains an explicit opt-in for internal remediation demos only; pass `-SreAgentAccessLevel High` to `deploy.ps1` or set `sreAgentAccessLevel = 'High'` in the parameter file intentionally.
+> **Access level**: `main.bicepparam` sets `sreAgentAccessLevel = 'High'` for the internal remediation demo. This is intentional — see `docs/SRE-AGENT-SETUP.md` for the access-level guide. For external demos, pass `-SreAgentAccessLevel Low` (the parameter default) to `deploy.ps1`.
 
 > **API version pin**: This lab pins the latest documented GA ARM API, `Microsoft.App/agents@2026-01-01`, and does not fall back to the legacy preview API. If provider metadata in the active subscription has not exposed `2026-01-01` yet, `scripts/deploy.ps1` deploys the core lab and skips SRE Agent with a clear warning.
 > Use `.\scripts\check-sre-agent-api-rollout.ps1 -ResourceGroupName rg-srelab-eastus2 -MetadataOnly` to confirm provider metadata exposure before a demo.
@@ -64,7 +64,7 @@ When you create an SRE Agent, Azure automatically provisions:
 
 The SRE Agent needs access to your Azure resources to diagnose issues — and, for internal demos only, prepare operator-controlled Review-mode remediation.
 
-> **Note**: Read-only is the default posture for all deployments. In `Low` mode the agent can inspect diagnostics and logs, but it cannot deploy, destroy, rotate secrets, or retrieve cluster-admin Kubernetes credentials. Only an explicit `High` selection enables broader write access for internal remediation demos.
+> **Note**: When deployed via Bicep (default), the agent's managed identity receives roles determined by `sreAgentAccessLevel` (default `Low`). The script below can grant additional roles and aligns to the same access-level gate.
 
 ### Grant Access to Demo Resources
 
