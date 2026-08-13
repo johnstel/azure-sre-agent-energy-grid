@@ -1,0 +1,49 @@
+name: Validate Bicep
+
+on:
+  pull_request:
+    paths:
+      - 'infra/bicep/**/*.bicep'
+      - 'infra/bicep/**/*.bicepparam'
+      - '.github/workflows/validate-bicep.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-bicep:
+    name: Build Bicep templates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Azure CLI Bicep tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          az version
+          az bicep install
+
+      - name: Compile main template and modules
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Local equivalent commands:"
+          echo "  az bicep build --file infra/bicep/main.bicep --stdout >/dev/null"
+          echo "  for file in infra/bicep/modules/*.bicep; do az bicep build --file \"$file\" --stdout >/dev/null || exit 1; done"
+
+          az bicep build --file infra/bicep/main.bicep --stdout >/dev/null
+
+          for file in infra/bicep/modules/*.bicep; do
+            echo "Validating $file"
+            az bicep build --file "$file" --stdout >/dev/null || {
+              echo "::error file=$file,title=Bicep validation failed::Compilation failed for $file"
+              exit 1
+            }
+          done
+
+          echo "Bicep validation passed for the subscription template and all modules."
