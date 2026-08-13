@@ -37,8 +37,8 @@ Containers:
     Environment:
       ORDER_QUEUE_HOSTNAME:  rabbitmq
       ORDER_QUEUE_PORT:      5672
-      ORDER_QUEUE_USERNAME:  guest
-      ORDER_QUEUE_PASSWORD:  guest
+      ORDER_QUEUE_USERNAME:  [REDACTED]
+      ORDER_QUEUE_PASSWORD:  [REDACTED]
       ORDER_QUEUE_NAME:      meter-events
       FASTIFY_ADDRESS:       0.0.0.0
       NODE_OPTIONS:          --max-old-space-size=64

@@ -57,7 +57,7 @@ param aksApiServerAuthorizedIpRanges = [
 
 ### H-4 — RabbitMQ Credentials
 
-RabbitMQ credentials have been changed from the factory default `guest/guest` to `energy-grid-mq` / `energy-grid-mq-demo` (static demo values, stored as a Kubernetes Secret). The management UI (port 15672) is not exposed outside the cluster. No further rotation is required for internal demos.
+RabbitMQ credentials are bootstrapped at deploy time into Azure Key Vault and mirrored into the cluster as a runtime Kubernetes Secret. The values are not committed to Git and are rotated with `deploy.ps1 -RotateRabbitMqSecrets` only when required. The management UI (port 15672) is not exposed outside the cluster.
 
 For external demos where the cluster LoadBalancer IP is shared with attendees, confirm that port `15672` is **not** in any exposed Service spec before the session:
 ```bash

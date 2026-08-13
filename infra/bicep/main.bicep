@@ -320,7 +320,13 @@ output acrLoginServer string = containerRegistry.outputs.loginServer
 output logAnalyticsWorkspaceId string = logAnalytics.outputs.workspaceId
 output appInsightsId string = appInsights.outputs.appInsightsId
 output appInsightsConnectionString string = appInsights.outputs.connectionString
+output keyVaultName string = keyVault.outputs.keyVaultName
 output keyVaultUri string = keyVault.outputs.vaultUri
+output rabbitMqKeyVaultSecretNames array = [
+  'rabbitmq-username'
+  'rabbitmq-password'
+  'rabbitmq-amqp-uri'
+]
 output grafanaDashboardUrl string = deployObservability ? observability!.outputs.grafanaEndpoint : ''
 output azureMonitorWorkspaceId string = deployObservability ? observability!.outputs.azureMonitorWorkspaceId : ''
 output prometheusDataCollectionEndpointId string = deployObservability

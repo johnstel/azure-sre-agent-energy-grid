@@ -33,6 +33,9 @@
 .PARAMETER WhatIf
     Show what would be deployed without making changes
 
+.PARAMETER RotateRabbitMqSecrets
+    Explicitly rotate the RabbitMQ Key Vault secret versions. Existing values are preserved by default.
+
 .EXAMPLE
     .\deploy.ps1 -Location eastus2
 
@@ -69,6 +72,9 @@ param(
 
     [Parameter()]
     [switch]$WhatIf,
+
+    [Parameter()]
+    [switch]$RotateRabbitMqSecrets,
 
     [Parameter()]
     [switch]$Yes
@@ -878,6 +884,7 @@ Write-Host "  • Deployment Name: $deploymentName" -ForegroundColor White
 Write-Host "  • SRE Agent:       $(if ($deploySreAgent) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
 Write-Host "  • Agent Access:    $SreAgentAccessLevel$(if ($SreAgentAccessLevel -eq 'High') { ' ⚠️  (remediation; internal use only)' } else { ' ✅ (diagnosis-only)' })" -ForegroundColor White
 Write-Host "  • AKS API CIDRs:   $(if ($AksApiServerAuthorizedIpRanges.Count -gt 0) { $AksApiServerAuthorizedIpRanges -join ', ' } else { '(none - unrestricted public API endpoint)' })" -ForegroundColor White
+Write-Host "  • RabbitMQ secret bootstrap: $(if ($RotateRabbitMqSecrets) { 'rotate-on-deploy' } else { 'preserve-existing' })" -ForegroundColor White
 if ($sreAgentSkipReason) {
     Write-Host "  • SRE Agent Note:  $sreAgentSkipReason" -ForegroundColor Gray
 }
@@ -1049,13 +1056,15 @@ try {
     Write-Host "`n📋 Deployment Outputs:" -ForegroundColor Cyan
 
     $outputs = $deployment.properties.outputs
-    Write-Host "  • Resource Group:   $($outputs.resourceGroupName.value)" -ForegroundColor White
-    Write-Host "  • AKS Cluster:      $($outputs.aksClusterName.value)" -ForegroundColor White
-    Write-Host "  • AKS FQDN:         $($outputs.aksClusterFqdn.value)" -ForegroundColor White
-    Write-Host "  • ACR Login Server: $($outputs.acrLoginServer.value)" -ForegroundColor White
-    Write-Host "  • Key Vault URI:    $($outputs.keyVaultUri.value)" -ForegroundColor White
-    Write-Host "  • Log Analytics ID: $($outputs.logAnalyticsWorkspaceId.value)" -ForegroundColor White
-    Write-Host "  • App Insights ID:  $($outputs.appInsightsId.value)" -ForegroundColor White
+    Write-Host "  • Resource Group:       $($outputs.resourceGroupName.value)" -ForegroundColor White
+    Write-Host "  • AKS Cluster:          $($outputs.aksClusterName.value)" -ForegroundColor White
+    Write-Host "  • AKS FQDN:             $($outputs.aksClusterFqdn.value)" -ForegroundColor White
+    Write-Host "  • ACR Login Server:     $($outputs.acrLoginServer.value)" -ForegroundColor White
+    Write-Host "  • Key Vault Name:       $($outputs.keyVaultName.value)" -ForegroundColor White
+    Write-Host "  • Key Vault URI:        $($outputs.keyVaultUri.value)" -ForegroundColor White
+    Write-Host "  • RabbitMQ secret names: $($outputs.rabbitMqKeyVaultSecretNames.value -join ', ')" -ForegroundColor White
+    Write-Host "  • Log Analytics ID:     $($outputs.logAnalyticsWorkspaceId.value)" -ForegroundColor White
+    Write-Host "  • App Insights ID:      $($outputs.appInsightsId.value)" -ForegroundColor White
 
     if ($outputs.grafanaDashboardUrl.value) {
         Write-Host "  • Grafana:          $($outputs.grafanaDashboardUrl.value)" -ForegroundColor White
@@ -1138,6 +1147,19 @@ if (-not $SkipRbac) {
     else {
         Write-Host "  ⚠️  RBAC script not found, skipping..." -ForegroundColor Yellow
     }
+}
+
+# Bootstrap RabbitMQ secrets in Key Vault before application deployment
+Write-Host "`n🔐 Bootstrapping RabbitMQ Key Vault secrets..." -ForegroundColor Yellow
+$kvSecretScript = Join-Path $PSScriptRoot "configure-key-vault-secrets.ps1"
+if (Test-Path $kvSecretScript) {
+    & $kvSecretScript -VaultName $outputs.keyVaultName.value -Rotate:$RotateRabbitMqSecrets
+    if ($LASTEXITCODE -ne 0) {
+        throw "RabbitMQ Key Vault secret bootstrapping failed."
+    }
+}
+else {
+    Write-Host "  ⚠️  RabbitMQ Key Vault bootstrap script not found, skipping..." -ForegroundColor Yellow
 }
 
 # Deploy application
