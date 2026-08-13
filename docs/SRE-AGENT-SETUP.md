@@ -24,7 +24,7 @@ Before creating an SRE Agent, ensure you have:
 
 ### Automated via Bicep (Default)
 
-The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using the `Microsoft.App/agents@2025-05-01-preview` resource type. The deployment:
+The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using the `Microsoft.App/agents@2026-01-01` resource type and `upgradeChannel: 'Stable'`. The deployment:
 
 - Creates the SRE Agent resource
 - Creates a user-assigned managed identity
@@ -33,12 +33,8 @@ The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using th
 
 > **Access level**: `main.bicepparam` sets `sreAgentAccessLevel = 'High'` for the internal remediation demo. This is intentional — see `docs/SRE-AGENT-SETUP.md` for the access-level guide. For external demos, pass `-SreAgentAccessLevel Low` (the parameter default) to `deploy.ps1`.
 
-> **API version pin (issue #51)**: This lab uses `Microsoft.App/agents@2025-05-01-preview`. The `2026-01-01` GA version exists in ARM schema but has **not** been validated against this subscription. Track rollout in [SRE Agent API Rollout](SRE-AGENT-API-ROLLOUT.md), and do **not** change the API version until all three gates in issue #51 pass:
-> 1. `az provider show -n Microsoft.App --query "resourceTypes[?resourceType=='agents'].apiVersions"` lists `2026-01-01` for this subscription.
-> 2. `az deployment group validate` passes with a temporary `2026-01-01` candidate module.
-> 3. `az deployment group what-if` shows **no replacement or delete** of the existing SRE Agent resource.
-> Once gates pass, update the `resource sreAgent` declaration in `infra/bicep/modules/sre-agent.bicep` and remove the `#disable-next-line BCP081` suppression.
-> Use `.\scripts\check-sre-agent-api-rollout.ps1 -ResourceGroupName rg-srelab-eastus2` to run the repeatable gate check.
+> **API version pin**: This lab pins the latest documented GA ARM API, `Microsoft.App/agents@2026-01-01`, and does not fall back to the legacy preview API. If provider metadata in the active subscription has not exposed `2026-01-01` yet, `scripts/deploy.ps1` deploys the core lab and skips SRE Agent with a clear warning.
+> Use `.\scripts\check-sre-agent-api-rollout.ps1 -ResourceGroupName rg-srelab-eastus2 -MetadataOnly` to confirm provider metadata exposure before a demo.
 
 To skip SRE Agent deployment, set `deploySreAgent = false` in `infra/bicep/main.bicepparam`.
 
@@ -182,6 +178,57 @@ You can also connect:
 - Azure Monitor Workspace (Prometheus)
 - Managed Grafana
 
+## Step 3b: Connect Azure Monitor as the incident platform (issue #76)
+
+This wires alert-driven incident automation: an Energy Grid Azure Monitor alert can start a native
+SRE Agent investigation thread without a presenter composing a prompt, while the existing Action
+Group → Mission Control webhook keeps working as a fallback.
+
+1. **Bicep (default, automated)**: `infra/bicep/main.bicepparam` sets `sreAgentIncidentPlatform =
+   'AzureMonitor'` by default (this repo's own selector name). When `deploySreAgent = true`,
+   `scripts/deploy.ps1` sets the documented `Microsoft.App/agents` ARM property
+   `properties.incidentManagementConfiguration.type = 'AzMonitor'` (the literal Azure Monitor value
+   documented in the [Azure SRE Agent API reference](https://learn.microsoft.com/azure/sre-agent/api-reference#agent-properties):
+   `PagerDuty`, `AzMonitor`, `ServiceNow`, or `None`) and grants the agent's managed identity
+   **Monitoring Contributor** on the resource group (required for the agent to see Azure Monitor
+   alerts: https://learn.microsoft.com/azure/sre-agent/azure-monitor-alerts). Set
+   `sreAgentIncidentPlatform = 'None'` to opt out.
+
+   > ⚠️ **Immediately after connecting**: Microsoft Learn documents that connecting an incident
+   > platform auto-creates a **Quickstart** response plan, and that **new response plans default
+   > to Autonomous mode**, not Review (https://learn.microsoft.com/azure/sre-agent/response-plan).
+   > As soon as `incidentManagementConfiguration.type` is set, go to the portal and confirm or
+   > delete the Quickstart plan **before** any alert can fire — do not wait until after your first
+   > live test. `scripts/configure-sre-agent-incident-response.ps1` prints this warning prominently
+   > every run as a reminder.
+2. **Response plan (idempotent script + portal confirmation)**: run
+   ```powershell
+   .\scripts\configure-sre-agent-incident-response.ps1 -ResourceGroupName rg-srelab-eastus2
+   ```
+   This checks the incident-platform connection and Monitoring Contributor role (across every
+   identity attached to the agent, at a configurable scope — see `-MonitoringContributorScope`),
+   then uses the [Azure MCP Server SRE Agent tools](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-sre-agent)
+   (`azmcp sreagent incidents plans create`, when the `azmcp` CLI is available) to idempotently
+   create a named `energy-grid-response-plan` filtered to Energy Grid services in **Review** mode.
+   The script fails closed (does not attempt to create a plan) if it cannot first confirm the list
+   of existing plans, to avoid creating a duplicate on top of an unconfirmed state. It always
+   prints the exact portal steps for anything it cannot confirm or automate: Microsoft Learn
+   documents **reinvestigation cooldown** (default 3h, merges repeated alert firings into one
+   thread) and **custom-agent routing** only in the Builder → Incident response plans portal UI
+   (https://learn.microsoft.com/azure/sre-agent/response-plan) — neither is exposed by the ARM
+   schema or by the current Azure MCP Server response-plan tool, so confirm both there after
+   running the script. Also delete the auto-created "Quickstart" response plan from the table view
+   once your own plan is confirmed, so incidents aren't routed or processed twice.
+3. **Never enable Autonomous mode for this demo.** The script blocks `-AgentMode autonomous`
+   unless `-AllowAutonomous` is also passed, and even then this repo's safe-language contract
+   (`docs/CAPABILITY-CONTRACTS.md` §9) requires a separate security review before demoing it.
+4. **Evidence**: once a response plan has run, Mission Control's incident cards can reconcile
+   against native `IncidentActivitySnapshot`/`AgentExecution`/`AgentToolExecution`/
+   `ApprovalDecision` telemetry (see `docs/CAPABILITY-CONTRACTS.md` §17 and
+   `mission-control/backend/src/services/SreAgentEvidenceService.ts`). Cards read
+   `local-fallback-only` or `evidence-unavailable` until that telemetry is actually observed —
+   Mission Control never infers a native investigation from missing data.
+
 ## Step 4: Start Diagnosing!
 
 Once connected, you can interact with SRE Agent using natural language:
@@ -260,7 +307,7 @@ kubectl run -n energy test --image=curlimages/curl --rm -it -- \
 
 ## Supportability and troubleshooting summary
 
-The current lab supportability path is operator-led: deploy or connect SRE Agent, grant the selected RBAC level, ask diagnosis prompts, review cited evidence, and apply any fix deliberately in Review mode. Scheduled tasks, incident-triggered automatic diagnosis, and external tool integrations are not wired or validated in this repository, so they are not part of the current supportability path.
+The current lab supportability path is operator-led: deploy or connect SRE Agent, grant the selected RBAC level, ask diagnosis prompts, review cited evidence, and apply any fix deliberately in Review mode. As of issue #76, incident-triggered automatic diagnosis has a supported setup path (Bicep + `scripts/configure-sre-agent-incident-response.ps1` + a confirming portal step) rather than being entirely unwired, but end-to-end live proof (an injected alert producing a native investigation thread, observed via `IncidentActivitySnapshot` telemetry) is pending until it is run in a live Energy Grid environment — see `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md`. Scheduled tasks and external tool integrations beyond Azure Monitor remain unwired and unvalidated in this repository.
 
 For symptom-first diagnosis and setup validation, use these links:
 
@@ -268,12 +315,31 @@ For symptom-first diagnosis and setup validation, use these links:
 |------|------|
 | Full troubleshooting guide | [Troubleshooting Guide](TROUBLESHOOTING.md) |
 | SRE Agent setup issues | [Troubleshooting → SRE Agent Issues](TROUBLESHOOTING.md#sre-agent-issues) |
+| Mission Control MCP investigations | [Troubleshooting → Mission Control → Azure SRE Agent (MCP)](TROUBLESHOOTING.md#mission-control--azure-sre-agent-mcp-issues) |
 | Public LoadBalancer not responding | [Troubleshooting → Public LoadBalancer](TROUBLESHOOTING.md#public-loadbalancer-not-responding) |
 | Kubernetes service diagnostics | [Kubernetes Service Troubleshooting](KUBERNETES-SERVICE-TROUBLESHOOTING.md) |
 | Cost planning | [Cost Breakdown](COSTS.md) |
 
+## Step 5 (optional): Investigate from Mission Control
+
+Mission Control can start and continue a **real** SRE Agent investigation in-dashboard through the supported Azure MCP Server path, so a presenter does not have to switch to the portal to run a prompt.
+
+```bash
+export SRE_AGENT_NAME=<agentName>
+export SRE_AGENT_SUBSCRIPTION_ID=<subscriptionId>
+export SRE_AGENT_RESOURCE_GROUP=<resourceGroup>   # optional but recommended
+```
+
+Then open the **Investigate with Azure SRE Agent** panel under Controls. It requires **Reader** and **SRE Agent Administrator** on the agent resource (Step 2), Node.js LTS, and outbound access to `*.azuresre.ai`.
+
+Standard, approval-gated mode only: auto-approval (`investigate_yolo`) is blocked in code and absent from the MCP server surface. If MCP is unavailable the panel fails honestly and hands off to the portal — it never substitutes Local Analyst output.
+
+Full details, configuration, safety model, and the live validation runbook: [SRE Agent MCP Integration](SRE-AGENT-MCP-INTEGRATION.md).
+
 ## Additional Resources
 
 - [Azure SRE Agent Documentation](https://learn.microsoft.com/azure/sre-agent/)
+- [SRE Agent MCP server](https://learn.microsoft.com/azure/sre-agent/mcp-server)
+- [Set up the SRE Agent MCP server](https://learn.microsoft.com/azure/sre-agent/setup-mcp-server)
 - [SRE Agent FAQs](https://learn.microsoft.com/azure/sre-agent/faq)
 - [Supported Azure Services](https://learn.microsoft.com/azure/sre-agent/overview#supported-services)

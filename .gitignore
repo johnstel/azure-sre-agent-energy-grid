@@ -22,6 +22,8 @@ azureconfig.json
 # =============================================================================
 # Compiled ARM templates (can regenerate from Bicep)
 *.json
+!infra/grafana/energy-grid-incident-dashboard.json
+!infra/sre-agent/tool-access-policy.json
 !package.json
 !devcontainer.json
 !launch.json
@@ -152,6 +154,7 @@ node_modules/
 package-lock.json
 !mission-control/package-lock.json
 yarn.lock
+!services/meter-service/package-lock.json
 
 # Python
 __pycache__/
@@ -198,3 +201,7 @@ NUL
 
 # Local Copilot CLI/MCP configuration
 .copilot/
+
+# Allow deep-context test for secret scanning
+!tests/deep-context/test_secret_scan.py
+!tests/deep-context/test_secret_scan_regression.py

@@ -11,7 +11,7 @@
 
 > **This grid map is a demo topology visualization inside the deployed cloud demo, over Kubernetes service and application health signals.** It does not connect to real SCADA systems, GIS coordinates, utility telemetry, or production energy grids. All "substation," "transmission line," and "generator" labels are fictional energy-domain metaphors for the Kubernetes services deployed in the `energy` namespace.
 >
-> **Azure SRE Agent is generally available (GA).** This demo currently uses `Microsoft.App/agents@2025-05-01-preview` because this subscription provider metadata exposes only that API version. Move to `2026-01-01` after provider exposure and successful `what-if` validation.
+> **Azure SRE Agent is generally available (GA).** This demo pins `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`. If a subscription exposes only older preview provider metadata, deployment skips SRE Agent rather than falling back.
 >
 > The grid map must comply with the safe-language rules in [Safe Language Guardrails](SAFE-LANGUAGE-GUARDRAILS.md) and [Analyst Safe Language](ANALYST-SAFE-LANGUAGE.md). No element of this screen may claim real utility grid monitoring, autonomous remediation, or production-grade observability.
 
@@ -247,7 +247,7 @@ The detail panel is a right-side drawer that opens when a node or edge is select
 
 ### 3.6 Event Strip
 
-A horizontal strip at the bottom shows the 5 most recent events only if the Issue A cloud data contract exposes event data. If V1 does not expose events, the strip shows a safe unavailable state instead of implying Kubernetes event visibility. Each populated event row shows:
+A horizontal strip at the bottom shows the 5 most recent events only if the Issue A cloud data contract exposes event data. In the governed v1.2 contract, the map consumes a bounded read-only snapshot from `/api/grid-status/v1`, includes scenario-aware transient nodes, and uses explicit `unknown` handling rather than inferred root-cause claims. If the snapshot is unavailable, the strip shows a safe unavailable state instead of implying Kubernetes event visibility. Each populated event row shows:
 
 ```
 {timestamp} {severity-icon} {involvedObject.name}: {reason} — {message (truncated to 120 chars)}

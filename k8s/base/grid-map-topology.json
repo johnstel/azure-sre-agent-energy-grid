@@ -1,47 +1,17 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.2",
   "host": "ops-console",
   "namespace": "energy",
   "disclaimer": "Demo topology only. This map visualizes Kubernetes service/application health for the Azure SRE Agent demo and is not connected to real grid telemetry, SCADA, GIS, or utility infrastructure.",
   "dataContract": {
-    "version": "cloud-demo-v1",
-    "source": "ops-console nginx proxy and static topology config",
+    "version": "cloud-demo-v2",
+    "source": "governed read-only in-cluster status API",
     "refreshSeconds": 30,
     "severityOrder": ["healthy", "warning", "critical"],
     "unknownHandling": "Unknown is a separate non-propagating state. Do not treat unknown as worse than critical.",
-    "liveHealth": {
-      "asset-service": {
-        "method": "GET",
-        "path": "/api/assets/health",
-        "healthyWhen": "HTTP 2xx response"
-      },
-      "meter-service": {
-        "method": "GET",
-        "path": "/api/meter/health",
-        "healthyWhen": "HTTP 2xx response"
-      },
-      "dispatch-service": {
-        "method": "GET",
-        "path": "/api/dispatch/health",
-        "healthyWhen": "HTTP 2xx response"
-      }
-    },
-    "staticHealth": {
-      "mongodb": "in-cluster",
-      "rabbitmq": "in-cluster",
-      "grid-dashboard": "in-cluster",
-      "ops-console": "in-cluster",
-      "load-simulator": "in-cluster",
-      "grid-worker": "disabled-replicas-0",
-      "forecast-service": "optional-absent"
-    },
-    "unsupportedInV1": [
-      "direct local Mission Control API reads",
-      "Kubernetes pod listing from browser JavaScript",
-      "Kubernetes events in the browser",
-      "pod logs in the browser",
-      "write, exec, shell, secret, scale, patch, restart, or remediation actions"
-    ]
+    "allowlistedNamespaces": ["energy"],
+    "allowlistedResources": ["asset-service", "meter-service", "dispatch-service", "mongodb", "rabbitmq", "load-simulator", "grid-worker", "grid-dashboard", "ops-console"],
+    "transientScenarioCoverage": ["high-cpu", "pending-pods", "probe-failure", "missing-config"]
   },
   "nodes": [
     {
@@ -105,7 +75,7 @@
       "kind": "datastore",
       "icon": "queue",
       "position": { "x": 600, "y": 60 },
-      "healthSource": "static"
+      "healthSource": "status"
     },
     {
       "id": "mongodb",
@@ -115,7 +85,7 @@
       "kind": "datastore",
       "icon": "database",
       "position": { "x": 840, "y": 220 },
-      "healthSource": "static"
+      "healthSource": "status"
     },
     {
       "id": "load-simulator",
@@ -150,6 +120,54 @@
       "healthSource": "optional",
       "optional": true,
       "absentBehavior": "Render as unknown with label Optional service absent in current deployment"
+    },
+    {
+      "id": "frequency-calc-overload",
+      "label": "Frequency Calc Overload",
+      "resourceName": "frequency-calc-overload",
+      "metaphor": "CPU-heavy control loop",
+      "kind": "service",
+      "icon": "cpu",
+      "position": { "x": 1040, "y": 90 },
+      "healthSource": "status",
+      "transient": true,
+      "scenarioId": "high-cpu"
+    },
+    {
+      "id": "substation-monitor",
+      "label": "Substation Monitor",
+      "resourceName": "substation-monitor",
+      "metaphor": "Scheduling-sensitive monitor",
+      "kind": "service",
+      "icon": "monitor",
+      "position": { "x": 1040, "y": 250 },
+      "healthSource": "status",
+      "transient": true,
+      "scenarioId": "pending-pods"
+    },
+    {
+      "id": "grid-health-monitor",
+      "label": "Grid Health Monitor",
+      "resourceName": "grid-health-monitor",
+      "metaphor": "Probe-sensitive health watcher",
+      "kind": "service",
+      "icon": "probe",
+      "position": { "x": 1040, "y": 410 },
+      "healthSource": "status",
+      "transient": true,
+      "scenarioId": "probe-failure"
+    },
+    {
+      "id": "grid-zone-config",
+      "label": "Grid Zone Config",
+      "resourceName": "grid-zone-config",
+      "metaphor": "Scenario configuration source",
+      "kind": "service",
+      "icon": "config",
+      "position": { "x": 1040, "y": 560 },
+      "healthSource": "status",
+      "transient": true,
+      "scenarioId": "missing-config"
     }
   ],
   "edges": [
@@ -165,6 +183,22 @@
     { "source": "dispatch-service", "target": "asset-service", "label": "Asset lookups", "type": "sync" },
     { "source": "asset-service", "target": "forecast-service", "label": "Demand forecast", "type": "sync", "optional": true },
     { "source": "load-simulator", "target": "meter-service", "label": "Simulated meter usage", "type": "sync" },
-    { "source": "grid-worker", "target": "dispatch-service", "label": "Disabled dispatch processing path", "type": "sync", "disabled": true }
-  ]
+    { "source": "grid-worker", "target": "dispatch-service", "label": "Disabled dispatch processing path", "type": "sync", "disabled": true },
+    { "source": "dispatch-service", "target": "frequency-calc-overload", "label": "Control loop pressure", "type": "control", "transient": true, "scenarioId": "high-cpu" },
+    { "source": "dispatch-service", "target": "substation-monitor", "label": "Scheduling pressure", "type": "control", "transient": true, "scenarioId": "pending-pods" },
+    { "source": "dispatch-service", "target": "grid-health-monitor", "label": "Readiness probe watch", "type": "control", "transient": true, "scenarioId": "probe-failure" },
+    { "source": "dispatch-service", "target": "grid-zone-config", "label": "Configuration dependency", "type": "control", "transient": true, "scenarioId": "missing-config" }
+  ],
+  "scenarioMappings": {
+    "oom-killed": { "nodeId": "meter-service", "severity": "critical" },
+    "crash-loop": { "nodeId": "asset-service", "severity": "critical" },
+    "image-pull-backoff": { "nodeId": "dispatch-service", "severity": "critical" },
+    "high-cpu": { "nodeId": "frequency-calc-overload", "severity": "warning" },
+    "pending-pods": { "nodeId": "substation-monitor", "severity": "warning" },
+    "probe-failure": { "nodeId": "grid-health-monitor", "severity": "warning" },
+    "network-block": { "nodeId": "meter-service", "severity": "critical" },
+    "missing-config": { "nodeId": "grid-zone-config", "severity": "warning" },
+    "mongodb-down": { "nodeId": "mongodb", "severity": "critical" },
+    "service-mismatch": { "nodeId": "meter-service", "severity": "critical" }
+  }
 }

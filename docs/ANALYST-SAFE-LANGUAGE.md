@@ -124,7 +124,7 @@ For `node-capacity`, include the scope caveat:
 | Azure SRE Agent handoff | "For diagnosis and remediation recommendations, ask Azure SRE Agent in the portal and capture the transcript or screenshot as evidence." |
 | Read-only boundary | "Local Analyst is read-only and cannot deploy, destroy, patch, restart, or remediate resources." |
 | Missing data | "That data source is unavailable, so I cannot verify this from Local Analyst." |
-| Service/API status | "Azure SRE Agent is GA. This lab remains pinned to `Microsoft.App/agents@2025-05-01-preview` in this subscription until `2026-01-01` is exposed and validated." |
+| Service/API status | "Azure SRE Agent is GA. This lab pins `Microsoft.App/agents@2026-01-01` with the Stable channel." |
 
 ### Prohibited phrases unless backed by Azure SRE Agent evidence
 

@@ -2,14 +2,18 @@
   <section id="assistant" class="mission-panel">
     <div class="panel-heading">
       <div class="panel-heading__copy">
-        <span class="panel-eyebrow">Local analyst</span>
+        <span class="panel-eyebrow">
+          <span class="analyst-mark" aria-hidden="true">L</span>
+          Local analyst · not Azure SRE Agent
+        </span>
         <h2 class="panel-title">Explain This State</h2>
         <p class="panel-description">
           Ask the local analyst to explain a point-in-time Mission Control snapshot. It can triage and recommend safe next actions, but it does not deploy or repair.
+          It is <strong>not</strong> Azure SRE Agent — for a real cloud investigation use the Azure SRE Agent panel.
         </p>
       </div>
       <div class="panel-actions">
-        <span class="badge badge-info">Read-only</span>
+        <span class="badge badge-info">Local · read-only</span>
         <span class="badge" :class="answer ? 'badge-online' : 'badge-neutral'">
           {{ answer ? 'Answer ready' : 'Local only' }}
         </span>
@@ -328,3 +332,26 @@ async function ask() {
   }
 }
 </script>
+
+<style scoped>
+/* Cyan "L" mark pairs with the violet "A" mark on the Azure SRE Agent panel so the
+   two surfaces are distinguishable at a glance during a demo. */
+.panel-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.analyst-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 0.25rem;
+  background: rgb(34 211 238 / 0.85);
+  color: #0b1020;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+</style>

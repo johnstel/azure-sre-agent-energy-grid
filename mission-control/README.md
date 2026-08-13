@@ -9,9 +9,11 @@ A local single-page application for managing the Azure SRE Agent Energy Grid dem
 - **Destroy** — Tear down infrastructure with safety confirmation gate (type "DELETE")
 - **Monitor** — Live pod status grid with auto-refresh and K8s event stream
 - **Ask Copilot** — Local, read-only Copilot SDK explainer for point-in-time Mission Control state snapshots
+- **Investigate with Azure SRE Agent** — Start and continue a **real**, approval-gated Azure SRE Agent investigation through the supported Azure MCP Server path, with agent/thread identity and citations shown in-dashboard ([docs](../docs/SRE-AGENT-MCP-INTEGRATION.md))
 - **Scenarios** — Enable/disable 10 breakable SRE scenarios with one click
 - **Scenario Narration** — Read-only, hideable presenter guidance sourced from structured metadata; it does not show expected Azure SRE Agent responses
 - **Portal Validation** — Track and confirm Azure SRE Agent portal evidence for OOMKilled, MongoDBDown, and ServiceMismatch scenarios
+- **Rehearsal Workflow** — Capture rehearsal state machine progress, evidence paths, redaction findings, and timing for Mission Control handoffs ([docs](docs/REHEARSAL-WORKFLOW.md))
 - **WebSocket Streaming** — Real-time deploy/destroy output in a terminal viewer
 
 ## Quick Start
@@ -67,6 +69,14 @@ mission-control/
 | GET | `/api/events` | List K8s events |
 | GET | `/api/inventory` | Full namespace inventory (pods, services, deployments, events) |
 | POST | `/api/assistant/ask` | Ask Copilot about current Mission Control state |
+| GET | `/api/sre-agent/config` | SRE Agent config, masked target, tool allow/block lists, approved prompts |
+| GET | `/api/sre-agent/preflight` | SRE Agent auth/RBAC/network/tool-surface preflight |
+| GET | `/api/sre-agent/agents` | Discover SRE Agent resources |
+| GET | `/api/sre-agent/threads` | Recorded thread references (restart recovery) |
+| POST | `/api/sre-agent/investigations` | Start a standard, approval-gated SRE Agent investigation |
+| POST | `/api/sre-agent/investigations/continue` | Send a follow-up on the same thread |
+| GET | `/api/sre-agent/investigations/:threadId` | Read SRE Agent thread status |
+| POST | `/api/sre-agent/investigations/cancel` | Cancel an in-flight Mission Control SRE Agent operation |
 | GET | `/api/scenarios` | List all 10 scenarios with optional read-only narration metadata |
 | POST | `/api/scenarios/:name/enable` | Apply a breakable scenario |
 | POST | `/api/scenarios/:name/disable` | Revert a scenario |
@@ -140,9 +150,19 @@ This aligns with `docs/SAFE-LANGUAGE-GUARDRAILS.md` and `docs/evidence/wave5-liv
 
 ## Ask Copilot vs. Azure SRE Agent
 
+Mission Control has **two clearly separated assistants**. They are never interchangeable, and one is never used as a fallback for the other.
+
+| | **Ask Copilot** (Local Analyst) | **Investigate with Azure SRE Agent** |
+|---|---|---|
+| What it is | Local, read-only Copilot SDK explainer | The real Azure SRE Agent, via the supported Azure MCP Server path |
+| Data source | One point-in-time local Mission Control snapshot | A live Azure SRE Agent thread |
+| Panel | cyan **L** mark, "Local analyst · not Azure SRE Agent" | violet **A** mark, "Azure SRE Agent · cloud agent" |
+| Proof shown | snapshot timestamp | agent name, masked ARM ID, thread ID, status, elapsed time |
+| Can remediate | No | Recommends only; approvals happen in the SRE Agent portal |
+
 Ask Copilot is a **Technical Preview, local-only Mission Control explainer and triage assistant**. It answers from one explicit point-in-time state snapshot collected by the backend: preflight checks, Kubernetes `energy` namespace pods/services/deployments/events, scenario catalog/status, and job status without raw logs. It may explain state and suggest safe user-triggered next actions, but it does **not** deploy, destroy, repair, run shell commands, read arbitrary files, inspect secrets, or replace Azure SRE Agent.
 
-Azure SRE Agent remains the cloud diagnostic/remediation experience for Azure resources. Use Mission Control's assistant for local demo-state explanation; use Azure SRE Agent for cloud-side investigation.
+Azure SRE Agent remains the cloud diagnostic/remediation experience for Azure resources. Mission Control can now start and continue a real, approval-gated SRE Agent investigation in-dashboard; if that path is unavailable it fails honestly and hands off to the portal rather than showing Ask Copilot output in its place. See [SRE Agent MCP Integration](../docs/SRE-AGENT-MCP-INTEGRATION.md).
 
 ## Requirements
 
@@ -151,11 +171,14 @@ Azure SRE Agent remains the cloud diagnostic/remediation experience for Azure re
 - **Azure CLI** (`az`) — for Azure operations
 - **kubectl** — for K8s monitoring and scenarios
 - **GitHub Copilot CLI auth** — for the Ask Copilot assistant (`copilot --version`, then authenticate locally)
+- **Azure sign-in + SRE Agent RBAC** — optional, for real SRE Agent investigations (`az login`, plus Reader and SRE Agent Administrator on the agent resource)
 
 ## Security
 
 - Backend binds to `127.0.0.1` only (localhost)
 - No `shell: true` — all commands use structured `spawn()` args
 - Ask Copilot is backend-only, read-only, and restricted to a single Mission Control state snapshot tool
+- Azure SRE Agent access is limited to six allowlisted MCP tools; `investigate_yolo` and every auto-approval path are blocked in code and absent from the MCP server surface
+- Azure tokens stay server-side; subscription/tenant IDs are masked and raw tool payloads never reach the browser
 - Destroy requires explicit `"DELETE"` confirmation
 - One destructive job at a time (deploy OR destroy, not both)

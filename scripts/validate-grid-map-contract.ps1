@@ -43,13 +43,14 @@ $ErrorActionPreference = "Stop"
 # Configuration
 # ---------------------------------------------------------------------------
 
-$repoRoot       = Split-Path -Parent $PSScriptRoot
-$topologyPath   = Join-Path $repoRoot "k8s/base/grid-map-topology.json"
-$opsConsolePath = Join-Path $repoRoot "k8s/base/ops-console.html"
-$scenariosDir   = Join-Path $repoRoot "k8s/scenarios"
-$checklistPath  = Join-Path $repoRoot "docs/GRID-MAP-SMOKE-TESTS.md"
-$dataContractPath = Join-Path $repoRoot "docs/CLOUD-GRID-MAP-DATA-CONTRACT.md"
-$specPath       = Join-Path $repoRoot "docs/INTERACTIVE-GRID-MAP-SPEC.md"
+$repoRoot           = Split-Path -Parent $PSScriptRoot
+$topologyPath       = Join-Path $repoRoot "k8s/base/grid-map-topology.json"
+$opsConsolePath     = Join-Path $repoRoot "k8s/base/ops-console.html"
+$applicationYamlPath = Join-Path $repoRoot "k8s/base/application.yaml"
+$scenariosDir       = Join-Path $repoRoot "k8s/scenarios"
+$checklistPath      = Join-Path $repoRoot "docs/GRID-MAP-SMOKE-TESTS.md"
+$dataContractPath   = Join-Path $repoRoot "docs/CLOUD-GRID-MAP-DATA-CONTRACT.md"
+$specPath           = Join-Path $repoRoot "docs/INTERACTIVE-GRID-MAP-SPEC.md"
 
 # Required live health paths in topology JSON
 $requiredLiveHealthPaths = @(
@@ -147,12 +148,28 @@ if ($topology) {
     }
 
     # Check node count
-    if ($topology.nodes -and $topology.nodes.Count -eq 10) {
-        Pass "Topology has exactly 10 nodes"
+    if ($topology.nodes -and $topology.nodes.Count -ge 12) {
+        Pass "Topology has $($topology.nodes.Count) nodes (>= 12)"
     } elseif ($topology.nodes) {
-        Warn "Topology has $($topology.nodes.Count) nodes (expected 10)"
+        Warn "Topology has $($topology.nodes.Count) nodes (expected at least 12)"
     } else {
         Fail "Topology 'nodes' array is missing"
+    }
+
+    foreach ($requiredTransientNode in @('frequency-calc-overload', 'substation-monitor', 'grid-health-monitor', 'grid-zone-config')) {
+        if ($topology.nodes | Where-Object { $_.id -eq $requiredTransientNode }) {
+            Pass "Transient node '$requiredTransientNode' present in topology"
+        } else {
+            Fail "Transient node '$requiredTransientNode' missing from topology"
+        }
+    }
+
+    foreach ($scenarioName in @('high-cpu', 'pending-pods', 'probe-failure', 'missing-config')) {
+        if ($topology.scenarioMappings.$scenarioName) {
+            Pass "Scenario mapping '$scenarioName' present in topology"
+        } else {
+            Fail "Scenario mapping '$scenarioName' missing from topology"
+        }
     }
 } else {
     Warn "Skipping topology content checks — JSON parse failed"
@@ -215,10 +232,52 @@ if (-not (Test-Path $opsConsolePath)) {
 }
 
 # ---------------------------------------------------------------------------
-# Check 6 — All 10 scenario YAML files exist
+# Check 6 — Least-privilege RBAC for the ops-console status API
 # ---------------------------------------------------------------------------
 
-Write-Host "`n--- Check 6: All 10 scenario YAML files exist ---"
+Write-Host "`n--- Check 6: Least-privilege RBAC in application.yaml ---"
+
+if (-not (Test-Path $applicationYamlPath)) {
+    Fail "k8s/base/application.yaml not found at: $applicationYamlPath"
+} else {
+    Pass "k8s/base/application.yaml exists"
+    $applicationManifest = Get-Content $applicationYamlPath -Raw -Encoding UTF8
+    if ($applicationManifest -match 'serviceAccountName: ops-console-status-reader') {
+        Pass 'ops-console deployment uses the least-privilege ServiceAccount'
+    } else {
+        Fail 'ops-console deployment is missing serviceAccountName: ops-console-status-reader'
+    }
+
+    if ($applicationManifest -match 'name: ops-console-status-reader' -and $applicationManifest -match 'kind: Role' -and $applicationManifest -match 'kind: RoleBinding') {
+        Pass 'ServiceAccount, Role, and RoleBinding are present for the status API'
+    } else {
+        Fail 'ServiceAccount, Role, or RoleBinding is missing for the status API'
+    }
+
+    if ($applicationManifest -match 'resources: \["pods", "services", "endpoints", "events"\]' -and $applicationManifest -match 'resources: \["deployments", "statefulsets"\]') {
+        Pass 'Role grants only exact core/apps resources for the status API'
+    } else {
+        Fail 'Role is missing the exact allowed core/apps resources'
+    }
+
+    if ($applicationManifest -match 'verbs: \["get", "list"\]') {
+        Pass 'Role uses least-privilege get/list verbs only'
+    } else {
+        Fail 'Role does not use get/list verbs only'
+    }
+
+    if ($applicationManifest -match 'resources: \["secrets", "configmaps"\]') {
+        Fail 'Role should not grant secrets/configmaps access'
+    } else {
+        Pass 'Role does not grant secrets/configmaps access'
+    }
+}
+
+# ---------------------------------------------------------------------------
+# Check 7 — All 10 scenario YAML files exist
+# ---------------------------------------------------------------------------
+
+Write-Host "`n--- Check 7: All 10 scenario YAML files exist ---"
 
 if (-not (Test-Path $scenariosDir)) {
     Fail "k8s/scenarios/ directory not found at: $scenariosDir"
@@ -234,10 +293,10 @@ if (-not (Test-Path $scenariosDir)) {
 }
 
 # ---------------------------------------------------------------------------
-# Check 7 — All scenario YAML filenames referenced in smoke-test checklist
+# Check 8 — All scenario YAML filenames referenced in smoke-test checklist
 # ---------------------------------------------------------------------------
 
-Write-Host "`n--- Check 7: All scenario YAMLs referenced in GRID-MAP-SMOKE-TESTS.md ---"
+Write-Host "`n--- Check 8: All scenario YAMLs referenced in GRID-MAP-SMOKE-TESTS.md ---"
 
 if (-not (Test-Path $checklistPath)) {
     Warn "GRID-MAP-SMOKE-TESTS.md not found — skipping reference checks"
@@ -253,10 +312,10 @@ if (-not (Test-Path $checklistPath)) {
 }
 
 # ---------------------------------------------------------------------------
-# Check 8 — Required checklist sections present
+# Check 9 — Required checklist sections present
 # ---------------------------------------------------------------------------
 
-Write-Host "`n--- Check 8: Required checklist sections in GRID-MAP-SMOKE-TESTS.md ---"
+Write-Host "`n--- Check 9: Required checklist sections in GRID-MAP-SMOKE-TESTS.md ---"
 
 $requiredSections = @(
     "Multi-Scenario",

@@ -35,7 +35,7 @@ param deployAlerts bool = true
 param deploySreAgent bool = true
 
 @description('Deploy default Action Group for alert notifications and incident routing')
-param deployActionGroup bool = false
+param deployActionGroup bool = true
 
 @description('Action Group short name (max 12 characters)')
 @maxLength(12)
@@ -111,9 +111,19 @@ param aksApiServerAuthorizedIpRanges array = []
 @description('Enable ACR admin user account (not required for default deploy path)')
 param acrAdminUserEnabled bool = false
 
-@description('SRE Agent access level. Low = Reader + Log Analytics Reader (diagnosis only, default for external/unknown contexts). High = adds Contributor at resource-group scope (required for remediation demos). Set explicitly in main.bicepparam for internal demo runs.')
-@allowed(['High', 'Low'])
+@description('SRE Agent access level. Low = Reader + Log Analytics Reader (diagnosis only, default for external/unknown contexts). High = adds Contributor at resource-group scope (legacy broad remediation demos). Mitigation = Reader + Log Analytics Reader plus the narrow AKS-scoped custom role required by the issue #80 Review-mode mitigation path, with NO Contributor. Set explicitly in main.bicepparam for internal demo runs.')
+@allowed(['High', 'Low', 'Mitigation'])
 param sreAgentAccessLevel string = 'Low'
+
+@description('Deploy the least-privilege custom role for the issue #80 Review-mode mitigation path (docs/REVIEW-MODE-MITIGATION.md §3). Grants only managedClusters/read + listClusterUserCredential/action at the AKS resource scope.')
+param enableReviewModeMitigation bool = false
+
+@description('Opt in to Azure RBAC for Kubernetes so the mitigation boundary is enforced by the API server at namespace scope rather than only by the tool access policy (docs/REVIEW-MODE-MITIGATION.md §3 Layer 2). Off by default because enabling managed Entra integration changes how operators obtain a kubeconfig.')
+param enableAgentKubernetesRbac bool = false
+
+@description('Connect Azure Monitor as the SRE Agent incident platform via the documented Microsoft.App/agents incidentManagementConfiguration ARM property (issue #76). This is additive: the Action Group -> Mission Control webhook fallback (deployActionGroup/incidentWebhookServiceUri) keeps working whether or not this is enabled. Set to "None" to leave the agent disconnected from any incident platform.')
+@allowed(['AzureMonitor', 'None'])
+param sreAgentIncidentPlatform string = 'AzureMonitor'
 
 @description('Tags to apply to all resources')
 param tags object = {
@@ -264,7 +274,26 @@ module sreAgent 'modules/sre-agent.bicep' = if (deploySreAgent) {
     appInsightsAppId: appInsights.outputs.appId
     appInsightsConnectionString: appInsights.outputs.connectionString
     uniqueSuffix: uniqueSuffix
+    incidentPlatform: sreAgentIncidentPlatform
   }
+}
+
+// Least-privilege custom role for the Review-mode mitigation path (issue #80).
+// Deliberately separate from the accessLevel matrix so the narrow AKS-scoped grant is auditable
+// on its own and can be deployed without ever assigning Contributor.
+module sreAgentMitigationRole 'modules/sre-agent-mitigation-role.bicep' = if (deploySreAgent && enableReviewModeMitigation) {
+  scope: resourceGroup
+  name: 'deploy-sre-agent-mitigation-role'
+  params: {
+    aksClusterName: names.aks
+    principalId: sreAgent!.outputs.managedIdentityPrincipalId
+    uniqueSuffix: uniqueSuffix
+    enableKubernetesDataActions: enableAgentKubernetesRbac
+    namespaceName: 'energy'
+  }
+  dependsOn: [
+    aks
+  ]
 }
 
 // Observability Stack - Managed Grafana and Prometheus (optional)
@@ -321,6 +350,7 @@ output logAnalyticsWorkspaceId string = logAnalytics.outputs.workspaceId
 output appInsightsId string = appInsights.outputs.appInsightsId
 output appInsightsConnectionString string = appInsights.outputs.connectionString
 output keyVaultUri string = keyVault.outputs.vaultUri
+output grafanaName string = deployObservability ? observability!.outputs.grafanaName : ''
 output grafanaDashboardUrl string = deployObservability ? observability!.outputs.grafanaEndpoint : ''
 output azureMonitorWorkspaceId string = deployObservability ? observability!.outputs.azureMonitorWorkspaceId : ''
 output prometheusDataCollectionEndpointId string = deployObservability
@@ -334,11 +364,24 @@ output defaultActionGroupId string = deployActionGroup ? defaultActionGroup!.out
 output defaultActionGroupHasWebhook bool = deployActionGroup ? defaultActionGroup!.outputs.hasWebhookReceiver : false
 output podRestartAlertId string = deployAlerts ? alerts!.outputs.podRestartAlertId : ''
 output http5xxAlertId string = deployAlerts ? alerts!.outputs.http5xxAlertId : ''
+output dependencyFailureAlertId string = deployAlerts ? alerts!.outputs.dependencyFailureAlertId : ''
 output podFailureAlertId string = deployAlerts ? alerts!.outputs.podFailureAlertId : ''
 output crashLoopOomAlertId string = deployAlerts ? alerts!.outputs.crashLoopOomAlertId : ''
+output sloMeterIngestBurnAlertId string = deployAlerts ? alerts!.outputs.sloMeterIngestBurnAlertId : ''
+output sloMeterIngestCustomerImpactAlertId string = deployAlerts ? alerts!.outputs.sloMeterIngestCustomerImpactAlertId : ''
+output sloMeterIngestMongoPersistenceAlertId string = deployAlerts ? alerts!.outputs.sloMeterIngestMongoPersistenceAlertId : ''
+output sloMeterIngestIngressAlertId string = deployAlerts ? alerts!.outputs.sloMeterIngestIngressAlertId : ''
+output sloMeterIngestNoDataAlertId string = deployAlerts ? alerts!.outputs.sloMeterIngestNoDataAlertId : ''
 output sreAgentId string = deploySreAgent ? sreAgent!.outputs.agentId : ''
 output sreAgentPortalUrl string = deploySreAgent ? sreAgent!.outputs.agentPortalUrl : ''
 output sreAgentName string = deploySreAgent ? sreAgent!.outputs.agentName : ''
 output sreAgentManagedIdentityId string = deploySreAgent ? sreAgent!.outputs.managedIdentityId : ''
 output sreAgentManagedIdentityPrincipalId string = deploySreAgent ? sreAgent!.outputs.managedIdentityPrincipalId : ''
+output sreAgentIncidentPlatformType string = deploySreAgent ? sreAgent!.outputs.incidentPlatformType : 'None'
+output sreAgentIncidentPlatformConfigured bool = deploySreAgent ? sreAgent!.outputs.incidentPlatformConfigured : false
+output sreAgentContributorAssigned bool = deploySreAgent ? sreAgent!.outputs.contributorAssigned : false
+output sreAgentActionMode string = deploySreAgent ? sreAgent!.outputs.actionConfigurationMode : 'None'
+output reviewModeMitigationEnabled bool = deploySreAgent && enableReviewModeMitigation
+output reviewModeMitigationRoleId string = (deploySreAgent && enableReviewModeMitigation) ? sreAgentMitigationRole!.outputs.mitigationRoleDefinitionId : ''
+output agentKubernetesRbacEnabled bool = deploySreAgent && enableReviewModeMitigation && enableAgentKubernetesRbac
 output activityLogDiagnosticSettingName string = activityLogDiagnostics.outputs.diagnosticSettingName
