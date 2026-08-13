@@ -33,6 +33,9 @@
 .PARAMETER WhatIf
     Show what would be deployed without making changes
 
+.PARAMETER RotateRabbitMqSecrets
+    Explicitly rotate the RabbitMQ Key Vault secret versions. Existing values are preserved by default.
+
 .EXAMPLE
     .\deploy.ps1 -Location eastus2
 
@@ -69,6 +72,9 @@ param(
 
     [Parameter()]
     [switch]$WhatIf,
+
+    [Parameter()]
+    [switch]$RotateRabbitMqSecrets,
 
     [Parameter()]
     [switch]$Yes
@@ -975,6 +981,7 @@ Write-Host "  • Deployment Name: $deploymentName" -ForegroundColor White
 Write-Host "  • SRE Agent:       $(if ($deploySreAgent) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
 Write-Host "  • Agent Access:    $SreAgentAccessLevel$(if ($SreAgentAccessLevel -eq 'High') { ' ⚠️  (remediation; internal use only)' } else { ' ✅ (diagnosis-only)' })" -ForegroundColor White
 Write-Host "  • AKS API CIDRs:   $(if ($AksApiServerAuthorizedIpRanges.Count -gt 0) { $AksApiServerAuthorizedIpRanges -join ', ' } else { '(none - unrestricted public API endpoint)' })" -ForegroundColor White
+Write-Host "  • RabbitMQ secret bootstrap: $(if ($RotateRabbitMqSecrets) { 'rotate-on-deploy' } else { 'preserve-existing' })" -ForegroundColor White
 if ($sreAgentSkipReason) {
     Write-Host "  • SRE Agent Note:  $sreAgentSkipReason" -ForegroundColor Gray
 }
@@ -1159,13 +1166,15 @@ try {
     Write-Host "`n📋 Deployment Outputs:" -ForegroundColor Cyan
 
     $outputs = $deployment.properties.outputs
-    Write-Host "  • Resource Group:   $($outputs.resourceGroupName.value)" -ForegroundColor White
-    Write-Host "  • AKS Cluster:      $($outputs.aksClusterName.value)" -ForegroundColor White
-    Write-Host "  • AKS FQDN:         $($outputs.aksClusterFqdn.value)" -ForegroundColor White
-    Write-Host "  • ACR Login Server: $($outputs.acrLoginServer.value)" -ForegroundColor White
-    Write-Host "  • Key Vault URI:    $($outputs.keyVaultUri.value)" -ForegroundColor White
-    Write-Host "  • Log Analytics ID: $($outputs.logAnalyticsWorkspaceId.value)" -ForegroundColor White
-    Write-Host "  • App Insights ID:  $($outputs.appInsightsId.value)" -ForegroundColor White
+    Write-Host "  • Resource Group:       $($outputs.resourceGroupName.value)" -ForegroundColor White
+    Write-Host "  • AKS Cluster:          $($outputs.aksClusterName.value)" -ForegroundColor White
+    Write-Host "  • AKS FQDN:             $($outputs.aksClusterFqdn.value)" -ForegroundColor White
+    Write-Host "  • ACR Login Server:     $($outputs.acrLoginServer.value)" -ForegroundColor White
+    Write-Host "  • Key Vault Name:       $($outputs.keyVaultName.value)" -ForegroundColor White
+    Write-Host "  • Key Vault URI:        $($outputs.keyVaultUri.value)" -ForegroundColor White
+    Write-Host "  • RabbitMQ secret names: $($outputs.rabbitMqKeyVaultSecretNames.value -join ', ')" -ForegroundColor White
+    Write-Host "  • Log Analytics ID:     $($outputs.logAnalyticsWorkspaceId.value)" -ForegroundColor White
+    Write-Host "  • App Insights ID:      $($outputs.appInsightsId.value)" -ForegroundColor White
 
     if ($outputs.grafanaDashboardUrl.value) {
         Write-Host "  • Grafana:          $($outputs.grafanaDashboardUrl.value)" -ForegroundColor White
@@ -1324,9 +1333,15 @@ az aks get-credentials `
     --resource-group $resourceGroupName `
     --name $outputs.aksClusterName.value `
     --overwrite-existing
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to fetch AKS credentials for cluster '$($outputs.aksClusterName.value)' in resource group '$resourceGroupName'."
+}
 
 # Convert kubeconfig to use Azure CLI auth so kubelogin doesn't prompt for a client ID
 kubelogin convert-kubeconfig -l azurecli
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to convert the kubeconfig for Azure CLI authentication."
+}
 
 Write-Host "  ✅ kubectl configured for cluster: $($outputs.aksClusterName.value)" -ForegroundColor Green
 
@@ -1362,61 +1377,95 @@ if (-not $SkipRbac) {
     }
 }
 
+# Ensure the target namespace exists before any manifests are applied.
+$energyNamespace = 'energy'
+$namespaceExists = kubectl get namespace $energyNamespace --no-headers --output name 2>$null
+if (-not $namespaceExists) {
+    $namespaceManifest = @"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: $energyNamespace
+"@
+
+    $namespaceManifest | kubectl apply -f - 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create the '$energyNamespace' Kubernetes namespace before deployment."
+    }
+}
+
+# Bootstrap RabbitMQ secrets in Key Vault before application deployment.
+Write-Host "`n🔐 Bootstrapping RabbitMQ Key Vault secrets..." -ForegroundColor Yellow
+$kvSecretScript = Join-Path $PSScriptRoot "configure-key-vault-secrets.ps1"
+if (-not (Test-Path $kvSecretScript)) {
+    throw "RabbitMQ Key Vault bootstrap script not found: $kvSecretScript"
+}
+
+try {
+    & $kvSecretScript -VaultName $outputs.keyVaultName.value -Rotate:$RotateRabbitMqSecrets
+}
+catch {
+    throw "RabbitMQ Key Vault secret bootstrapping failed: $($_.Exception.Message)"
+}
+
 # Deploy application
 Write-Host "`n📦 Deploying demo application to AKS..." -ForegroundColor Yellow
 $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
 
-if (Test-Path $k8sPath) {
-    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-    $repoImageTag = (& git -C $repoRoot rev-parse --short HEAD 2>$null).Trim()
-    if ([string]::IsNullOrWhiteSpace($repoImageTag)) {
-        $repoImageTag = Get-Date -Format 'yyyyMMddHHmmss'
-    }
+if (-not (Test-Path $k8sPath)) {
+    throw "Kubernetes base manifest '$k8sPath' was not found."
+}
 
-    kubectl apply -f $k8sPath
-    Publish-RepoOwnedServiceImages -ResourceGroupName $resourceGroupName -AcrLoginServer $outputs.acrLoginServer.value -ImageTag $repoImageTag
-    Configure-TelemetrySecret -ResourceGroupName $resourceGroupName
-    Set-RepoServiceImages -AcrLoginServer $outputs.acrLoginServer.value -ImageTag $repoImageTag
-    Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$repoImageTag = (& git -C $repoRoot rev-parse --short HEAD 2>$null).Trim()
+if ([string]::IsNullOrWhiteSpace($repoImageTag)) {
+    $repoImageTag = Get-Date -Format 'yyyyMMddHHmmss'
+}
 
-    Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
-    $deploymentNamesRaw = kubectl get deployment -n energy -o jsonpath='{.items[*].metadata.name}' 2>$null
-    $deploymentNames = @()
-    if ($deploymentNamesRaw) {
-        $deploymentNames = $deploymentNamesRaw -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    }
+kubectl apply -f $k8sPath
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to apply the Kubernetes manifest '$k8sPath'."
+}
 
-    foreach ($deploymentName in $deploymentNames) {
-        kubectl rollout status "deployment/$deploymentName" -n energy --timeout=300s 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ⚠️  Rollout still in progress for deployment/$deploymentName" -ForegroundColor Yellow
-        }
-    }
+Publish-RepoOwnedServiceImages -ResourceGroupName $resourceGroupName -AcrLoginServer $outputs.acrLoginServer.value -ImageTag $repoImageTag
+Configure-TelemetrySecret -ResourceGroupName $resourceGroupName
+Set-RepoServiceImages -AcrLoginServer $outputs.acrLoginServer.value -ImageTag $repoImageTag
+Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
 
-    # Wait for LoadBalancer IP
-    Write-Host "⏳ Waiting for grid-dashboard external IP..." -ForegroundColor Yellow
-    $maxWait = 120
-    $waited = 0
-    $storeUrl = $null
-    while ($waited -lt $maxWait) {
-        $externalIp = kubectl get svc grid-dashboard -n energy -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
-        if ($externalIp) {
-            $storeUrl = "http://$externalIp"
-            break
-        }
-        Start-Sleep -Seconds 5
-        $waited += 5
-    }
+Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
+$deploymentNamesRaw = kubectl get deployment -n energy -o jsonpath='{.items[*].metadata.name}' 2>$null
+$deploymentNames = @()
+if ($deploymentNamesRaw) {
+    $deploymentNames = $deploymentNamesRaw -split '\s+' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+}
 
-    if ($storeUrl) {
-        Write-Host "  ✅ Grid Dashboard URL: $storeUrl" -ForegroundColor Green
-    }
-    else {
-        Write-Host "  ⚠️  Grid Dashboard external IP is still pending. Check again with: kubectl get svc grid-dashboard -n energy" -ForegroundColor Yellow
+foreach ($deploymentName in $deploymentNames) {
+    kubectl rollout status "deployment/$deploymentName" -n energy --timeout=300s 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Deployment '$deploymentName' did not become healthy within the rollout timeout."
     }
 }
+
+# Wait for LoadBalancer IP
+Write-Host "⏳ Waiting for grid-dashboard external IP..." -ForegroundColor Yellow
+$maxWait = 120
+$waited = 0
+$storeUrl = $null
+while ($waited -lt $maxWait) {
+    $externalIp = kubectl get svc grid-dashboard -n energy -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null
+    if ($externalIp) {
+        $storeUrl = "http://$externalIp"
+        break
+    }
+    Start-Sleep -Seconds 5
+    $waited += 5
+}
+
+if ($storeUrl) {
+    Write-Host "  ✅ Grid Dashboard URL: $storeUrl" -ForegroundColor Green
+}
 else {
-    Write-Host "  ⚠️  Application manifest not found at: $k8sPath" -ForegroundColor Yellow
+    Write-Host "  ⚠️  Grid Dashboard external IP is still pending. Check again with: kubectl get svc grid-dashboard -n energy" -ForegroundColor Yellow
 }
 
 # Provision the repo-managed Grafana dashboard

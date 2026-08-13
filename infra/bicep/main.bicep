@@ -374,7 +374,13 @@ output acrLoginServer string = containerRegistry.outputs.loginServer
 output logAnalyticsWorkspaceId string = logAnalytics.outputs.workspaceId
 output appInsightsId string = appInsights.outputs.appInsightsId
 output appInsightsConnectionString string = appInsights.outputs.connectionString
+output keyVaultName string = keyVault.outputs.keyVaultName
 output keyVaultUri string = keyVault.outputs.vaultUri
+output rabbitMqKeyVaultSecretNames array = [
+  'rabbitmq-username'
+  'rabbitmq-password'
+  'rabbitmq-amqp-uri'
+]
 output keyVaultPurgeProtectionEnabled bool = keyVault.outputs.keyVaultPurgeProtectionEnabled
 output keyVaultPurgeProtectionStatus string = keyVault.outputs.keyVaultPurgeProtectionStatus
 output energyWorkloadIdentityName string = energyWorkloadIdentity.outputs.identityName
