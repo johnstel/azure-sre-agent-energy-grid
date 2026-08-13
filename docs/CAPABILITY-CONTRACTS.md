@@ -444,7 +444,7 @@ Known TBD scope includes all fields emitted by the SRE Agent App Insights teleme
 
 | Shortcut | Location | Risk | Production Recommendation |
 |----------|----------|------|--------------------------|
-| ⚠️ DEMO ONLY — RabbitMQ secret material is not committed to Git | `scripts/configure-key-vault-secrets.ps1` + Azure Key Vault | Secret values are generated at deploy time and mirrored into the runtime Secret | Keep secrets in Key Vault and only sync to k8s when necessary |
+| ⚠️ DEMO ONLY — RabbitMQ secret material is not committed to Git | `scripts/configure-key-vault-secrets.ps1` + Azure Key Vault | Secret values are generated at deploy time and stored as Key Vault-managed runtime metadata | Keep secrets in Key Vault and avoid handling them in Git-tracked manifests |
 | ⚠️ DEMO ONLY — MongoDB without authentication | `k8s/base/application.yaml` | Any pod can read/write all data | Enable `--auth`, create service accounts |
 | ⚠️ DEMO ONLY — No pod `securityContext` | All deployments in `application.yaml` | Containers run as root with full capabilities | Set `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, drop all capabilities |
 | ⚠️ DEMO ONLY — No default-deny NetworkPolicy | `energy` namespace | Any pod can reach any pod | Add default-deny policy, allow only required paths |

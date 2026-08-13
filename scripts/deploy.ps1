@@ -1149,17 +1149,35 @@ if (-not $SkipRbac) {
     }
 }
 
-# Bootstrap RabbitMQ secrets in Key Vault before application deployment
-Write-Host "`n🔐 Bootstrapping RabbitMQ Key Vault secrets..." -ForegroundColor Yellow
-$kvSecretScript = Join-Path $PSScriptRoot "configure-key-vault-secrets.ps1"
-if (Test-Path $kvSecretScript) {
-    & $kvSecretScript -VaultName $outputs.keyVaultName.value -Rotate:$RotateRabbitMqSecrets
+# Ensure the target namespace exists before any manifests are applied.
+$energyNamespace = 'energy'
+$namespaceExists = kubectl get namespace $energyNamespace --no-headers --output name 2>$null
+if (-not $namespaceExists) {
+    $namespaceManifest = @"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: $energyNamespace
+"@
+
+    $namespaceManifest | kubectl apply -f - 2>$null
     if ($LASTEXITCODE -ne 0) {
-        throw "RabbitMQ Key Vault secret bootstrapping failed."
+        throw "Failed to create the '$energyNamespace' Kubernetes namespace before deployment."
     }
 }
-else {
-    Write-Host "  ⚠️  RabbitMQ Key Vault bootstrap script not found, skipping..." -ForegroundColor Yellow
+
+# Bootstrap RabbitMQ secrets in Key Vault before application deployment.
+Write-Host "`n🔐 Bootstrapping RabbitMQ Key Vault secrets..." -ForegroundColor Yellow
+$kvSecretScript = Join-Path $PSScriptRoot "configure-key-vault-secrets.ps1"
+if (-not (Test-Path $kvSecretScript)) {
+    throw "RabbitMQ Key Vault bootstrap script not found: $kvSecretScript"
+}
+
+try {
+    & $kvSecretScript -VaultName $outputs.keyVaultName.value -Rotate:$RotateRabbitMqSecrets
+}
+catch {
+    throw "RabbitMQ Key Vault secret bootstrapping failed: $($_.Exception.Message)"
 }
 
 # Deploy application

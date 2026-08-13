@@ -3,22 +3,20 @@
     Bootstraps RabbitMQ credentials into Azure Key Vault.
 
 .DESCRIPTION
-    Creates or preserves Key Vault secrets needed by the RabbitMQ deployment.
-    Secret values are generated at deployment time and never written to tracked
-    files or normal console output.
+    Creates or preserves the RabbitMQ Key Vault secrets used by the deployment.
+    The default behavior is fail-safe: preserve a complete secret set; reject
+    partial state instead of writing inconsistent pairs; and require explicit
+    rotation for replacement.
+
+    This helper intentionally does not create or mutate the Kubernetes Secret
+    resource. Kubernetes consumption remains a separate follow-up scope.
 
 .PARAMETER VaultName
     Name of the Azure Key Vault instance.
 
 .PARAMETER Rotate
-    Explicitly rotate every RabbitMQ secret version, creating new versions even
-    when the original secret already exists.
-
-.PARAMETER KubernetesNamespace
-    Namespace used for the generated RabbitMQ Kubernetes Secret.
-
-.PARAMETER KubernetesSecretName
-    Name of the Kubernetes Secret that mirrors the Key Vault values.
+    Explicitly rotate the RabbitMQ password and AMQP URI while preserving the
+    stable username if it already exists.
 
 .EXAMPLE
     .\configure-key-vault-secrets.ps1 -VaultName "kv-srelab-abc123"
@@ -33,13 +31,7 @@ param(
     [string]$VaultName,
 
     [Parameter()]
-    [switch]$Rotate,
-
-    [Parameter()]
-    [string]$KubernetesNamespace = 'energy',
-
-    [Parameter()]
-    [string]$KubernetesSecretName = 'rabbitmq-credentials'
+    [switch]$Rotate
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +41,15 @@ $script:RabbitMqKeyVaultSecretNames = [ordered]@{
     password = 'rabbitmq-password'
     amqpUri  = 'rabbitmq-amqp-uri'
 }
+
+$script:RabbitMqDefaultUsername = 'energy-grid-mq'
+$script:RabbitMqDefaultContentType = 'text/plain'
+$script:RabbitMqTagSet = @(
+    'app=energy-grid-demo'
+    'purpose=rabbitmq'
+    'source=keyvault-bootstrap'
+    'managed-by=deploy.ps1'
+)
 
 function New-RabbitMqPassword {
     [CmdletBinding()]
@@ -82,6 +83,60 @@ function New-RabbitMqAmqpUri {
     return "amqp://${escapedUsername}:${escapedPassword}@rabbitmq:5672/"
 }
 
+function Test-KeyVaultSecretNotFound {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [AllowNull()]
+        [string]$Output
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Output)) {
+        return $false
+    }
+
+    $normalized = $Output.ToLowerInvariant()
+    return ($normalized.Contains('not found') -or
+        $normalized.Contains('secretnotfound') -or
+        $normalized.Contains('does not exist') -or
+        $normalized.Contains('resource not found') -or
+        $normalized.Contains('404'))
+}
+
+function New-RabbitMqSecretFile {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$SecretName,
+
+        [Parameter(Mandatory)]
+        [string]$Value
+    )
+
+    $secretDirectory = Join-Path $PSScriptRoot '.bootstrap-secrets'
+    $null = New-Item -ItemType Directory -Path $secretDirectory -Force -ErrorAction Stop
+    $secretPath = Join-Path $secretDirectory ("{0}.secret" -f $SecretName)
+
+    [System.IO.File]::WriteAllText($secretPath, $Value, [System.Text.UTF8Encoding]::new($false))
+    return $secretPath
+}
+
+function Remove-RabbitMqSecretFile {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [string]$Path
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return
+    }
+
+    if (Test-Path -LiteralPath $Path) {
+        Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Get-KeyVaultSecretValue {
     [CmdletBinding()]
     param(
@@ -92,8 +147,20 @@ function Get-KeyVaultSecretValue {
         [string]$SecretName
     )
 
-    $value = az keyvault secret show --vault-name $VaultName --name $SecretName --query 'value' --output tsv 2>$null
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($value)) {
+    $commandResult = & az keyvault secret show --vault-name $VaultName --name $SecretName --query 'value' --output tsv 2>&1
+    $exitCode = $LASTEXITCODE
+
+    if ($exitCode -ne 0) {
+        $diagnostic = ($commandResult | Out-String).Trim()
+        if (Test-KeyVaultSecretNotFound -Output $diagnostic) {
+            return $null
+        }
+
+        throw "Failed to read RabbitMQ Key Vault secret '$SecretName' in vault '$VaultName': $diagnostic"
+    }
+
+    $value = ($commandResult | Out-String).Trim()
+    if ([string]::IsNullOrWhiteSpace($value)) {
         return $null
     }
 
@@ -110,13 +177,25 @@ function Get-KeyVaultSecretMetadata {
         [string]$SecretName
     )
 
-    $rawMetadata = az keyvault secret show --vault-name $VaultName --name $SecretName --query '{ name:name, version:properties.version, id:id }' --output json 2>$null
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($rawMetadata)) {
+    $rawMetadata = & az keyvault secret show --vault-name $VaultName --name $SecretName --query '{ name:name, version:properties.version, id:id }' --output json 2>&1
+    $exitCode = $LASTEXITCODE
+
+    if ($exitCode -ne 0) {
+        $diagnostic = ($rawMetadata | Out-String).Trim()
+        if (Test-KeyVaultSecretNotFound -Output $diagnostic) {
+            return $null
+        }
+
+        throw "Failed to read metadata for RabbitMQ Key Vault secret '$SecretName' in vault '$VaultName': $diagnostic"
+    }
+
+    $jsonText = ($rawMetadata | Out-String).Trim()
+    if ([string]::IsNullOrWhiteSpace($jsonText)) {
         return $null
     }
 
     try {
-        $metadata = $rawMetadata | ConvertFrom-Json
+        $metadata = $jsonText | ConvertFrom-Json -ErrorAction Stop
     }
     catch {
         return $null
@@ -126,6 +205,87 @@ function Get-KeyVaultSecretMetadata {
         Name    = [string]$metadata.name
         Version = [string]$metadata.version
         Id      = [string]$metadata.id
+    }
+}
+
+function Set-KeyVaultSecretValue {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$VaultName,
+
+        [Parameter(Mandatory)]
+        [string]$SecretName,
+
+        [Parameter(Mandatory)]
+        [string]$Value
+    )
+
+    $secretPath = New-RabbitMqSecretFile -SecretName $SecretName -Value $Value
+    try {
+        $azArgs = @(
+            'keyvault', 'secret', 'set',
+            '--vault-name', $VaultName,
+            '--name', $SecretName,
+            '--file', $secretPath,
+            '--encoding', 'utf-8',
+            '--content-type', $script:RabbitMqDefaultContentType,
+            '--tags'
+        )
+
+        $azArgs += $script:RabbitMqTagSet
+        $azArgs += @('--output', 'none')
+
+        $stderr = & az @azArgs 2>&1
+        $exitCode = $LASTEXITCODE
+
+        if ($exitCode -ne 0) {
+            $diagnostic = ($stderr | Out-String).Trim()
+            throw "Failed to configure RabbitMQ Key Vault secret '$SecretName' in vault '$VaultName'. $diagnostic"
+        }
+    }
+    finally {
+        Remove-RabbitMqSecretFile -Path $secretPath
+    }
+}
+
+function Get-RabbitMqSecretState {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$VaultName
+    )
+
+    $state = [ordered]@{
+        Username = $null
+        Password = $null
+        AmqpUri = $null
+    }
+
+    foreach ($entry in $script:RabbitMqKeyVaultSecretNames.GetEnumerator()) {
+        $key = $entry.Name
+        $secretName = $entry.Value
+        $state[$key] = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $secretName
+    }
+
+    $presentNames = @($state.Keys | Where-Object { -not [string]::IsNullOrWhiteSpace($state[$_]) })
+    $missingNames = @($state.Keys | Where-Object { [string]::IsNullOrWhiteSpace($state[$_]) })
+
+    $status = 'missing'
+    if ($presentNames.Count -eq 3) {
+        $status = 'complete'
+    }
+    elseif ($presentNames.Count -gt 0) {
+        $status = 'partial'
+    }
+
+    return [pscustomobject]@{
+        Username = $state['username']
+        Password = $state['password']
+        AmqpUri = $state['amqpUri']
+        Present = $presentNames
+        Missing = $missingNames
+        Status = $status
     }
 }
 
@@ -139,19 +299,28 @@ function Invoke-RabbitMqKeyVaultBootstrap {
         [switch]$Rotate
     )
 
-    $username = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $script:RabbitMqKeyVaultSecretNames.username
-    if ([string]::IsNullOrWhiteSpace($username)) {
-        $username = 'energy-grid-mq'
+    $secretState = Get-RabbitMqSecretState -VaultName $VaultName
+
+    if (-not $Rotate -and $secretState.Status -eq 'partial') {
+        throw "RabbitMQ Key Vault bootstrap is incomplete: existing values are present for '$($secretState.Present -join ', ')', but missing '$($secretState.Missing -join ', ')'. Refuse to preserve a partial secret set. Delete the incomplete pair or rerun with -Rotate."
     }
 
-    $password = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $script:RabbitMqKeyVaultSecretNames.password
-    if ([string]::IsNullOrWhiteSpace($password) -or $Rotate) {
-        $password = New-RabbitMqPassword
+    $desiredUsername = $secretState.Username
+    if ([string]::IsNullOrWhiteSpace($desiredUsername)) {
+        $desiredUsername = $script:RabbitMqDefaultUsername
     }
 
-    $amqpUri = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $script:RabbitMqKeyVaultSecretNames.amqpUri
-    if ([string]::IsNullOrWhiteSpace($amqpUri) -or $Rotate) {
-        $amqpUri = New-RabbitMqAmqpUri -Username $username -Password $password
+    if ($Rotate) {
+        $desiredPassword = New-RabbitMqPassword
+        $desiredAmqpUri = New-RabbitMqAmqpUri -Username $desiredUsername -Password $desiredPassword
+    }
+    elseif ($secretState.Status -eq 'complete') {
+        $desiredPassword = $secretState.Password
+        $desiredAmqpUri = $secretState.AmqpUri
+    }
+    else {
+        $desiredPassword = New-RabbitMqPassword
+        $desiredAmqpUri = New-RabbitMqAmqpUri -Username $desiredUsername -Password $desiredPassword
     }
 
     $results = [System.Collections.Generic.List[object]]::new()
@@ -164,13 +333,13 @@ function Invoke-RabbitMqKeyVaultBootstrap {
 
         $existingValue = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $secretName
         $desiredValue = switch ($secretName) {
-            $script:RabbitMqKeyVaultSecretNames.username { $username }
-            $script:RabbitMqKeyVaultSecretNames.password { $password }
-            $script:RabbitMqKeyVaultSecretNames.amqpUri { $amqpUri }
+            $script:RabbitMqKeyVaultSecretNames.username { $desiredUsername }
+            $script:RabbitMqKeyVaultSecretNames.password { $desiredPassword }
+            $script:RabbitMqKeyVaultSecretNames.amqpUri { $desiredAmqpUri }
             default { $null }
         }
 
-        if (-not $Rotate -and -not [string]::IsNullOrWhiteSpace($existingValue)) {
+        if (-not $Rotate -and -not [string]::IsNullOrWhiteSpace($existingValue) -and $secretState.Status -eq 'complete') {
             $metadata = Get-KeyVaultSecretMetadata -VaultName $VaultName -SecretName $secretName
             [void]$results.Add([pscustomobject]@{
                     Name    = $secretName
@@ -181,10 +350,7 @@ function Invoke-RabbitMqKeyVaultBootstrap {
             continue
         }
 
-        $null = & az keyvault secret set --vault-name $VaultName --name $secretName --value $desiredValue --output none 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to configure RabbitMQ Key Vault secret '$secretName' in vault '$VaultName'."
-        }
+        Set-KeyVaultSecretValue -VaultName $VaultName -SecretName $secretName -Value $desiredValue
 
         $metadata = Get-KeyVaultSecretMetadata -VaultName $VaultName -SecretName $secretName
         [void]$results.Add([pscustomobject]@{
@@ -198,67 +364,9 @@ function Invoke-RabbitMqKeyVaultBootstrap {
     return @($results)
 }
 
-function Set-KubernetesRabbitMqSecret {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory)]
-        [string]$Namespace,
-
-        [Parameter(Mandatory)]
-        [string]$SecretName,
-
-        [Parameter(Mandatory)]
-        [string]$Username,
-
-        [Parameter(Mandatory)]
-        [string]$Password,
-
-        [Parameter(Mandatory)]
-        [string]$AmqpUri
-    )
-
-    $secretYaml = & kubectl create secret generic $SecretName --namespace $Namespace `
-        --from-literal "rabbitmq-username=$Username" `
-        --from-literal "rabbitmq-password=$Password" `
-        --from-literal "rabbitmq-amqp-uri=$AmqpUri" `
-        --dry-run=client -o yaml 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to render the RabbitMQ Kubernetes Secret '$SecretName' in namespace '$Namespace'."
-    }
-
-    $secretYaml | kubectl apply -f - 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to apply the RabbitMQ Kubernetes Secret '$SecretName' in namespace '$Namespace'."
-    }
-
-    return [pscustomobject]@{
-        Name      = $SecretName
-        Namespace = $Namespace
-        Status    = 'applied'
-    }
-}
-
 if ($MyInvocation.InvocationName -ne '.') {
     $bootstrapResults = Invoke-RabbitMqKeyVaultBootstrap -VaultName $VaultName -Rotate:$Rotate
     foreach ($item in $bootstrapResults) {
         Write-Host "  • $($item.Name): $($item.Status)$(if ($item.Version) { " (version: $($item.Version))" })" -ForegroundColor Green
     }
-
-    $username = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $script:RabbitMqKeyVaultSecretNames.username
-    if ([string]::IsNullOrWhiteSpace($username)) {
-        $username = 'energy-grid-mq'
-    }
-
-    $password = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $script:RabbitMqKeyVaultSecretNames.password
-    if ([string]::IsNullOrWhiteSpace($password) -or $Rotate) {
-        $password = New-RabbitMqPassword
-    }
-
-    $amqpUri = Get-KeyVaultSecretValue -VaultName $VaultName -SecretName $script:RabbitMqKeyVaultSecretNames.amqpUri
-    if ([string]::IsNullOrWhiteSpace($amqpUri) -or $Rotate) {
-        $amqpUri = New-RabbitMqAmqpUri -Username $username -Password $password
-    }
-
-    $kubernetesResult = Set-KubernetesRabbitMqSecret -Namespace $KubernetesNamespace -SecretName $KubernetesSecretName -Username $username -Password $password -AmqpUri $amqpUri
-    Write-Host "  • $($kubernetesResult.Name): $($kubernetesResult.Status)" -ForegroundColor Green
 }
