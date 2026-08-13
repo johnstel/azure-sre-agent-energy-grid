@@ -17,7 +17,7 @@ param tags object
 @description('Enable RBAC authorization (recommended)')
 param enableRbacAuthorization bool = true
 
-@description('Enable Azure Key Vault purge protection. Set to false only for a disposable demo lab where name reuse is intentionally required; once enabled, Azure retains the deleted vault name and purge protection cannot be reversed.')
+@description('Enable Azure Key Vault purge protection. Defaults to true. Set to false only before deployment for a disposable demo lab where name reuse is intentionally accepted. This is a pre-deployment opt-out; once a vault is created with purge protection enabled, Azure does not permit turning it off and deleted vault names remain reserved for the retention period.')
 param enablePurgeProtection bool = true
 
 @description('SKU for Key Vault')
@@ -45,7 +45,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
     enablePurgeProtection: enablePurgeProtection
-    // Purge protection is irreversible once enabled; deleted vault names remain reserved for retention.
+    // Purge protection can only be disabled before enablement; once enabled it cannot be turned off and deleted vault names remain reserved.
     publicNetworkAccess: 'Enabled'
     networkAcls: {
       bypass: 'AzureServices'

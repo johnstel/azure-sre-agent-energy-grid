@@ -1,0 +1,18 @@
+[package]
+name = "asset-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.8", features = ["macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-opentelemetry = "0.30"
+opentelemetry = { version = "0.30", features = ["trace"] }
+opentelemetry_sdk = { version = "0.30", features = ["trace", "rt-tokio"] }
+opentelemetry-stdout = { version = "0.30", features = ["trace"] }
+opentelemetry-otlp = { version = "0.30", features = ["http-proto", "trace"] }
+

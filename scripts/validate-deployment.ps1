@@ -55,6 +55,32 @@ function Write-Section {
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 }
 
+function Invoke-LogAnalyticsQuery {
+    param(
+        [Parameter(Mandatory)]
+        [string]$WorkspaceId,
+
+        [Parameter(Mandatory)]
+        [string]$Query
+    )
+
+    if ([string]::IsNullOrWhiteSpace($WorkspaceId)) {
+        return $null
+    }
+
+    $rawQuery = az monitor log-analytics query --workspace $WorkspaceId --analytics-query $Query --output json 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($rawQuery)) {
+        return $null
+    }
+
+    try {
+        return $rawQuery | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+}
+
 # Returns all unique DaemonSets found for the given label selectors (kube-system).
 function Get-KubeSystemDaemonSet {
     param([string[]]$LabelSelectors)
@@ -164,6 +190,43 @@ $grafana = $resources | Where-Object { $_.type -eq "Microsoft.Dashboard/grafana"
 if ($grafana) {
     $totalChecks++
     if (Write-Check "Managed Grafana exists" $true $grafana.name) {
+        $passedChecks++
+    }
+
+    $grafanaName = $grafana.name
+
+    $dashboardTitle = 'Energy Grid — Incident Overview'
+    $dashboardListRaw = az grafana dashboard list --resource-group $ResourceGroupName --name $grafanaName --output json 2>$null
+    $dashboardList = @()
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($dashboardListRaw)) {
+        try {
+            $dashboardList = @($dashboardListRaw | ConvertFrom-Json)
+        }
+        catch {
+            $dashboardList = @()
+        }
+    }
+
+    $dashboardFound = ($dashboardList | Where-Object { $_.title -eq $dashboardTitle }).Count -gt 0
+    $totalChecks++
+    if (Write-Check "Managed Grafana incident dashboard provisioned" $dashboardFound "Expected dashboard: $dashboardTitle") {
+        $passedChecks++
+    }
+
+    $dataSourcesRaw = az grafana data-source list --resource-group $ResourceGroupName --name $grafanaName --output json 2>$null
+    $dataSources = @()
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($dataSourcesRaw)) {
+        try {
+            $dataSources = @($dataSourcesRaw | ConvertFrom-Json)
+        }
+        catch {
+            $dataSources = @()
+        }
+    }
+
+    $dataSourcesResolved = $dataSources.Count -gt 0
+    $totalChecks++
+    if (Write-Check "Grafana data sources resolve" $dataSourcesResolved "Found $($dataSources.Count) data source(s)") {
         $passedChecks++
     }
 }
@@ -365,6 +428,56 @@ else {
     }
     else {
         Write-Host "  ℹ️  No Container Insights agent detected" -ForegroundColor Gray
+    }
+}
+
+# Check App Insights request and dependency telemetry for repo-owned services.
+if ($la) {
+    $workspaceId = az monitor log-analytics workspace show --resource-group $ResourceGroupName --name $la.name --query customerId --output tsv 2>$null
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($workspaceId)) {
+        $requestQuery = @'
+AppRequests
+| where TimeGenerated > ago(15m)
+| extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"])
+| where namespace == "energy"
+| where service in ("meter-service", "asset-service", "dispatch-service")
+| summarize Requests = count()
+'@
+        $dependencyQuery = @'
+AppDependencies
+| where TimeGenerated > ago(15m)
+| extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"]), dependencyType = tostring(Type)
+| where namespace == "energy"
+| where service in ("meter-service", "asset-service", "dispatch-service")
+| where dependencyType in ("RabbitMQ", "MongoDB")
+| summarize Dependencies = count()
+'@
+
+        $requestResult = Invoke-LogAnalyticsQuery -WorkspaceId $workspaceId -Query $requestQuery
+        $dependencyResult = Invoke-LogAnalyticsQuery -WorkspaceId $workspaceId -Query $dependencyQuery
+
+        $requestCount = 0
+        if ($requestResult -and $requestResult.tables -and $requestResult.tables[0].rows -and $requestResult.tables[0].rows.Count -gt 0) {
+            $requestCount = [int]$requestResult.tables[0].rows[0][0]
+        }
+
+        $dependencyCount = 0
+        if ($dependencyResult -and $dependencyResult.tables -and $dependencyResult.tables[0].rows -and $dependencyResult.tables[0].rows.Count -gt 0) {
+            $dependencyCount = [int]$dependencyResult.tables[0].rows[0][0]
+        }
+
+        $totalChecks++
+        if (Write-Check "AppRequests telemetry arrived for repo-owned services" ($requestCount -gt 0) "Requests observed: $requestCount") {
+            $passedChecks++
+        }
+
+        $totalChecks++
+        if (Write-Check "AppDependencies telemetry arrived for RabbitMQ/MongoDB" ($dependencyCount -gt 0) "Dependencies observed: $dependencyCount") {
+            $passedChecks++
+        }
+    }
+    else {
+        Write-Host "  ⚠️  Could not query Log Analytics for AppRequests/AppDependencies telemetry" -ForegroundColor Yellow
     }
 }
 

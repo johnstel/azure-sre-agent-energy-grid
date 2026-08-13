@@ -5,7 +5,7 @@
 .DESCRIPTION
     This script deploys all Azure infrastructure needed for the SRE Agent demo,
     including AKS, Container Registry, Key Vault, observability tools, and
-    Azure SRE Agent (Microsoft.App/agents@2025-05-01-preview).
+    Azure SRE Agent (Microsoft.App/agents@2026-01-01, GA stable channel).
     It uses device code authentication by default for dev container support.
 
 .PARAMETER Location
@@ -75,6 +75,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+$SreAgentTargetApiVersion = '2026-01-01'
+$SreAgentLegacyPreviewApiVersion = '2025-05-01-preview'
 
 if ($AksApiServerAuthorizedIpRanges.Count -gt 0) {
     $cidrPattern = '^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\/([0-9]|[12][0-9]|3[0-2])$'
@@ -535,6 +538,58 @@ function Write-SubscriptionDeploymentFailureSummary {
     }
 }
 
+function Test-AlertWorkspaceReadinessFailure {
+    [CmdletBinding()]
+    param(
+        [Parameter()]
+        [string]$ErrorText
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ErrorText)) {
+        return $false
+    }
+
+    return $ErrorText -match '(?i)deploy-alerts' -and $ErrorText -match '(?i)workspace could not be found'
+}
+
+function Wait-LogAnalyticsWorkspaceReady {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName,
+
+        [Parameter(Mandatory)]
+        [string]$WorkspaceName,
+
+        [Parameter()]
+        [int]$TimeoutSeconds = 180
+    )
+
+    Write-Host "`n⏳ Azure Monitor could not resolve the new Log Analytics workspace yet." -ForegroundColor Yellow
+    Write-Host "  Waiting for workspace readiness before retrying alert deployment: $WorkspaceName" -ForegroundColor Gray
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    do {
+        $workspaceState = az resource show `
+            --resource-group $ResourceGroupName `
+            --resource-type 'Microsoft.OperationalInsights/workspaces' `
+            --name $WorkspaceName `
+            --query 'properties.provisioningState' `
+            --output tsv 2>$null
+
+        if ($LASTEXITCODE -eq 0 -and $workspaceState -eq 'Succeeded') {
+            Write-Host "  ✅ Log Analytics workspace is provisioned. Giving Azure Monitor a short propagation window..." -ForegroundColor Green
+            Start-Sleep -Seconds 30
+            return $true
+        }
+
+        Start-Sleep -Seconds 10
+    } while ((Get-Date) -lt $deadline)
+
+    Write-Host "  ⚠️  Timed out waiting for Log Analytics workspace readiness." -ForegroundColor Yellow
+    return $false
+}
+
 function Get-DeletedKeyVaultConflict {
     [CmdletBinding()]
     param(
@@ -648,8 +703,9 @@ function Get-SreAgentProviderStatus {
         return [pscustomobject]@{
             RegistrationState  = 'Unknown'
             HasAgentsResource  = $false
-            SupportsPreviewApi = $false
+            SupportsTargetApi  = $false
             DefaultApiVersion  = ''
+            ApiVersions        = @()
         }
     }
 
@@ -660,8 +716,9 @@ function Get-SreAgentProviderStatus {
         return [pscustomobject]@{
             RegistrationState  = 'Unknown'
             HasAgentsResource  = $false
-            SupportsPreviewApi = $false
+            SupportsTargetApi  = $false
             DefaultApiVersion  = ''
+            ApiVersions        = @()
         }
     }
 
@@ -674,8 +731,44 @@ function Get-SreAgentProviderStatus {
     return [pscustomobject]@{
         RegistrationState  = $provider.registrationState
         HasAgentsResource  = $null -ne $agentsResource
-        SupportsPreviewApi = $apiVersions -contains '2025-05-01-preview'
+        SupportsTargetApi  = $apiVersions -contains $SreAgentTargetApiVersion
         DefaultApiVersion  = if ($agentsResource -and $agentsResource.PSObject.Properties.Name -contains 'defaultApiVersion') { $agentsResource.defaultApiVersion } else { '' }
+        ApiVersions        = $apiVersions
+    }
+}
+
+function Import-GrafanaDashboardDefinition {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName,
+
+        [Parameter()]
+        [string]$GrafanaName = ''
+    )
+
+    $provisionScript = Join-Path $PSScriptRoot 'provision-grafana-dashboard.ps1'
+    $validatorScript = Join-Path $PSScriptRoot 'validate-grafana-dashboard.ps1'
+    if (-not (Test-Path $provisionScript)) {
+        throw "Grafana dashboard provisioning script not found at '$provisionScript'."
+    }
+    if (-not (Test-Path $validatorScript)) {
+        throw "Grafana dashboard validator script not found at '$validatorScript'."
+    }
+
+    & pwsh -NoLogo -NoProfile -File $validatorScript
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Grafana dashboard definition validation failed.'
+    }
+
+    $arguments = @('-NoLogo', '-NoProfile', '-File', $provisionScript, '-ResourceGroupName', $ResourceGroupName)
+    if (-not [string]::IsNullOrWhiteSpace($GrafanaName)) {
+        $arguments += @('-GrafanaName', $GrafanaName)
+    }
+
+    & pwsh @arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Grafana dashboard provisioning failed.'
     }
 }
 
@@ -755,15 +848,18 @@ if ($deploySreAgent) {
         $sreAgentProvider = Get-SreAgentProviderStatus
     }
 
-    if (-not $sreAgentProvider.HasAgentsResource -or -not $sreAgentProvider.SupportsPreviewApi) {
+    if (-not $sreAgentProvider.HasAgentsResource -or -not $sreAgentProvider.SupportsTargetApi) {
         $deploySreAgent = $false
-        $sreAgentSkipReason = 'Microsoft.App/agents@2025-05-01-preview is not available for this subscription.'
+        $availableApiVersions = if ($sreAgentProvider.ApiVersions.Count -gt 0) { $sreAgentProvider.ApiVersions -join ', ' } else { 'none reported' }
+        $sreAgentSkipReason = "Microsoft.App/agents@$SreAgentTargetApiVersion is not available for this subscription. Not falling back to legacy preview API $SreAgentLegacyPreviewApiVersion. Available versions: $availableApiVersions."
         Write-Host "  ⚠️  $sreAgentSkipReason" -ForegroundColor Yellow
         Write-Host "      Continuing with core infrastructure deployment." -ForegroundColor Gray
     }
     else {
-        $apiVersion = if ($sreAgentProvider.DefaultApiVersion) { $sreAgentProvider.DefaultApiVersion } else { '2025-05-01-preview' }
-        Write-Host "  ✅ Microsoft.App/agents is available (API: $apiVersion)" -ForegroundColor Green
+        Write-Host "  ✅ Microsoft.App/agents is available (API: $SreAgentTargetApiVersion, Stable channel)" -ForegroundColor Green
+        if ($sreAgentProvider.DefaultApiVersion -and $sreAgentProvider.DefaultApiVersion -ne $SreAgentTargetApiVersion) {
+            Write-Host "      Provider default API is $($sreAgentProvider.DefaultApiVersion); deployment remains pinned to $SreAgentTargetApiVersion." -ForegroundColor Gray
+        }
     }
 }
 else {
@@ -788,6 +884,7 @@ else {
 
 # Set variables
 $resourceGroupName = "rg-$WorkloadName-$Location"
+$logAnalyticsWorkspaceName = "log-$WorkloadName"
 $deploymentName = "sre-demo-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
 $bicepFile = Join-Path $PSScriptRoot "..\infra\bicep\main.bicep"
 $parametersFile = Join-Path $PSScriptRoot "..\infra\bicep\main.bicepparam"
@@ -987,7 +1084,7 @@ try {
     )
 
     $deployment = $null
-    for ($attempt = 1; $attempt -le 2; $attempt++) {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
         $create = Invoke-AzCliJsonArgs -Arguments $createArgs
 
         if ($create.ExitCode -eq 0 -and $create.Json) {
@@ -995,9 +1092,12 @@ try {
             break
         }
 
+        $deploymentErrorText = [System.Collections.Generic.List[string]]::new()
+
         Write-Host "`nAzure CLI deployment command failed." -ForegroundColor Red
         if ($create.Raw) {
             Write-Host "Azure CLI output:`n$($create.Raw.Trim())" -ForegroundColor Red
+            [void]$deploymentErrorText.Add($create.Raw)
         }
 
         # Best-effort: if a deployment record exists, pull structured error details.
@@ -1016,6 +1116,7 @@ try {
             if ($show.Json.properties.error) {
                 Write-Host "`nDeployment error (structured):" -ForegroundColor Yellow
                 Write-Host ($show.Json.properties.error | ConvertTo-Json -Depth 50) -ForegroundColor Yellow
+                [void]$deploymentErrorText.Add(($show.Json.properties.error | ConvertTo-Json -Depth 50))
             }
         }
 
@@ -1030,6 +1131,15 @@ try {
                     continue
                 }
             }
+        }
+
+        if (
+            $attempt -lt 3 -and
+            (Test-AlertWorkspaceReadinessFailure -ErrorText ($deploymentErrorText -join "`n")) -and
+            (Wait-LogAnalyticsWorkspaceReady -ResourceGroupName $resourceGroupName -WorkspaceName $logAnalyticsWorkspaceName)
+        ) {
+            Write-Host "`n🔁 Retrying deployment after Log Analytics workspace propagation..." -ForegroundColor Yellow
+            continue
         }
 
         throw "Deployment failed (see output above)."
@@ -1096,6 +1206,118 @@ catch {
     exit 1
 }
 
+function Publish-RepoOwnedServiceImages {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName,
+
+        [Parameter(Mandatory)]
+        [string]$AcrLoginServer,
+
+        [Parameter()]
+        [string]$ImageTag = ''
+    )
+
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    if ([string]::IsNullOrWhiteSpace($ImageTag)) {
+        $ImageTag = (& git -C $repoRoot rev-parse --short HEAD 2>$null).Trim()
+        if ([string]::IsNullOrWhiteSpace($ImageTag)) {
+            $ImageTag = (Get-Date -Format 'yyyyMMddHHmmss')
+        }
+    }
+
+    $acrName = az acr list --resource-group $ResourceGroupName --query "[0].name" --output tsv 2>$null
+    if ([string]::IsNullOrWhiteSpace($acrName)) {
+        throw "Unable to find an Azure Container Registry in resource group '$ResourceGroupName'."
+    }
+
+    $services = @(
+        [pscustomobject]@{ Name = 'meter-service'; DockerFile = 'services/meter-service/Dockerfile'; Context = 'services/meter-service' },
+        [pscustomobject]@{ Name = 'asset-service'; DockerFile = 'services/asset-service/Dockerfile'; Context = 'services/asset-service' },
+        [pscustomobject]@{ Name = 'dispatch-service'; DockerFile = 'services/dispatch-service/Dockerfile'; Context = 'services/dispatch-service' }
+    )
+
+    foreach ($service in $services) {
+        Write-Host "  🐳 Building $($service.Name) image ($ImageTag)..." -ForegroundColor Yellow
+        $imageRef = "$AcrLoginServer/$($service.Name):$ImageTag"
+        $latestRef = "$AcrLoginServer/$($service.Name):latest"
+        az acr build `
+            --registry $acrName `
+            --image "$($service.Name):$ImageTag" `
+            --image "$($service.Name):latest" `
+            --file $service.DockerFile `
+            $service.Context 2>$null | Out-Null
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to build and push image for $($service.Name) to ACR '$acrName'."
+        }
+
+        Write-Host "  ✅ Published $imageRef and $latestRef" -ForegroundColor Green
+    }
+}
+
+function Set-RepoServiceImages {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$AcrLoginServer,
+
+        [Parameter()]
+        [string]$ImageTag = ''
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ImageTag)) {
+        $ImageTag = 'latest'
+    }
+
+    $images = @(
+        [pscustomobject]@{ Workload = 'deployment/meter-service'; Container = 'meter-service'; ImageName = 'meter-service' },
+        [pscustomobject]@{ Workload = 'deployment/asset-service'; Container = 'asset-service'; ImageName = 'asset-service' },
+        [pscustomobject]@{ Workload = 'deployment/dispatch-service'; Container = 'dispatch-service'; ImageName = 'dispatch-service' },
+        [pscustomobject]@{ Workload = 'cronjob/synthetic-meter-ingest-probe'; Container = 'synthetic-meter-ingest-probe'; ImageName = 'meter-service' }
+    )
+
+    foreach ($image in $images) {
+        $registryImage = "$AcrLoginServer/$($image.ImageName):$ImageTag"
+        kubectl set image $image.Workload "$($image.Container)=$registryImage" -n energy 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  ⚠️  Could not update image for $($image.Workload)" -ForegroundColor Yellow
+        }
+    }
+}
+
+function Configure-TelemetrySecret {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$ResourceGroupName
+    )
+
+    $appInsightsName = az resource list --resource-group $ResourceGroupName --resource-type 'Microsoft.Insights/components' --query "[0].name" --output tsv 2>$null
+    if ([string]::IsNullOrWhiteSpace($appInsightsName)) {
+        Write-Host "  ⚠️  No Application Insights resource found; skipping telemetry secret injection." -ForegroundColor Yellow
+        return
+    }
+
+    $connectionString = az monitor app-insights component show --app $appInsightsName --resource-group $ResourceGroupName --query connectionString --output tsv 2>$null
+    if ([string]::IsNullOrWhiteSpace($connectionString)) {
+        Write-Host "  ⚠️  Application Insights connection string was not returned; skipping telemetry secret injection." -ForegroundColor Yellow
+        return
+    }
+
+    $secretManifest = kubectl create secret generic telemetry-credentials -n energy --from-literal=applicationinsights-connection-string=$connectionString --dry-run=client -o yaml 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($secretManifest)) {
+        Write-Host "  ⚠️  Unable to render telemetry secret manifest." -ForegroundColor Yellow
+        return
+    }
+
+    $secretManifest | kubectl apply -f - 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  ⚠️  Unable to apply telemetry secret manifest." -ForegroundColor Yellow
+    }
+}
+
 # Get AKS credentials
 Write-Host "`n🔑 Getting AKS credentials..." -ForegroundColor Yellow
 az aks get-credentials `
@@ -1145,7 +1367,16 @@ Write-Host "`n📦 Deploying demo application to AKS..." -ForegroundColor Yellow
 $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
 
 if (Test-Path $k8sPath) {
+    $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    $repoImageTag = (& git -C $repoRoot rev-parse --short HEAD 2>$null).Trim()
+    if ([string]::IsNullOrWhiteSpace($repoImageTag)) {
+        $repoImageTag = Get-Date -Format 'yyyyMMddHHmmss'
+    }
+
     kubectl apply -f $k8sPath
+    Publish-RepoOwnedServiceImages -ResourceGroupName $resourceGroupName -AcrLoginServer $outputs.acrLoginServer.value -ImageTag $repoImageTag
+    Configure-TelemetrySecret -ResourceGroupName $resourceGroupName
+    Set-RepoServiceImages -AcrLoginServer $outputs.acrLoginServer.value -ImageTag $repoImageTag
     Write-Host "  ✅ Demo application deployed" -ForegroundColor Green
 
     Write-Host "`n⏳ Waiting for workloads to roll out..." -ForegroundColor Yellow
@@ -1186,6 +1417,20 @@ if (Test-Path $k8sPath) {
 }
 else {
     Write-Host "  ⚠️  Application manifest not found at: $k8sPath" -ForegroundColor Yellow
+}
+
+# Provision the repo-managed Grafana dashboard
+Write-Host "`n📊 Provisioning repo-managed Grafana dashboard..." -ForegroundColor Yellow
+try {
+    $grafanaName = az grafana list --resource-group $resourceGroupName --query "[0].name" --output tsv 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($grafanaName)) {
+        throw 'Unable to resolve the Managed Grafana workspace name.'
+    }
+
+    Import-GrafanaDashboardDefinition -ResourceGroupName $resourceGroupName -GrafanaName $grafanaName
+}
+catch {
+    throw "Grafana dashboard provisioning failed: $($_.Exception.Message)"
 }
 
 # Run validation
