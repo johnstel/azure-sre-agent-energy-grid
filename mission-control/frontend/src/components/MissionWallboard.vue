@@ -175,7 +175,7 @@
     <SreAgentPanel v-if="controlPanelOpen" />
     <PortalValidation v-if="controlPanelOpen" />
     <RehearsalWorkflow v-if="controlPanelOpen" />
-    
+
     <div class="wallboard__main">
       <section class="inventory-panel" aria-labelledby="inventory-heading">
         <div class="wallboard-panel__heading">

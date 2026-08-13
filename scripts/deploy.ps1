@@ -76,6 +76,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+. "$PSScriptRoot/key-vault-lifecycle.ps1"
+
 $SreAgentTargetApiVersion = '2026-01-01'
 $SreAgentLegacyPreviewApiVersion = '2025-05-01-preview'
 
@@ -594,7 +596,10 @@ function Get-DeletedKeyVaultConflict {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [string]$ResourceGroupName
+        [string]$ResourceGroupName,
+
+        [Parameter(Mandatory)]
+        [string]$Location
     )
 
     $deployment = Invoke-AzCliJsonArgs -Arguments @(
@@ -646,8 +651,15 @@ function Get-DeletedKeyVaultConflict {
         return $null
     }
 
+    $deletedState = Wait-ForKeyVaultDeletedState -VaultName $vaultName -Location $Location -WaitSeconds 30 -PollingIntervalSeconds 5
+
     return [pscustomobject]@{
-        VaultName = $vaultName
+        VaultName                    = $vaultName
+        Status                      = $deletedState.Status
+        PurgeProtectionEnabled      = $deletedState.PurgeProtectionEnabled
+        RedeployImmediatelyAvailable = $deletedState.RedeployImmediatelyAvailable
+        RetainedUntil               = $deletedState.RetainedUntil
+        Message                     = $deletedState.Message
     }
 }
 
@@ -661,36 +673,40 @@ function Resolve-DeletedKeyVaultConflict {
         [string]$Location
     )
 
-    Write-Host "`n🧹 Found soft-deleted Key Vault blocking redeploy: $VaultName" -ForegroundColor Yellow
-    Write-Host "  Purging deleted Key Vault entry so the deployment can continue..." -ForegroundColor Gray
+    $deletedState = Wait-ForKeyVaultDeletedState -VaultName $VaultName -Location $Location -WaitSeconds 30 -PollingIntervalSeconds 5
+    if ($deletedState.Status -eq 'NotFound') {
+        Write-Host "`nℹ️  Deleted Key Vault '$VaultName' is absent from Azure's deleted-vault cache after verification. Same-name redeploy is available." -ForegroundColor Green
+        return $true
+    }
 
-    $purgeOutput = az keyvault purge --name $VaultName --location $Location 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) {
-        $deletedVaultCount = az keyvault list-deleted --query "[?name=='$VaultName'] | length(@)" --output tsv 2>$null
-        if ($purgeOutput -match 'DeletedVaultNotFound' -and $LASTEXITCODE -eq 0 -and $deletedVaultCount -eq '0') {
-            Write-Host "  ℹ️  Deleted Key Vault entry is already gone. Waiting for Azure to release the name..." -ForegroundColor Yellow
-            Start-Sleep -Seconds 20
-            return $true
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($purgeOutput)) {
-            Write-Host $purgeOutput.Trim() -ForegroundColor Red
+    if ($deletedState.Status -eq 'Unknown') {
+        Write-Host "`n⚠️  Azure could not verify the deleted-vault state for '$VaultName'; same-name redeploy remains unavailable until the state is confirmed." -ForegroundColor Yellow
+        if (-not [string]::IsNullOrWhiteSpace($deletedState.Message)) {
+            Write-Host "  $($deletedState.Message)" -ForegroundColor Gray
         }
         return $false
     }
 
-    $deadline = (Get-Date).AddMinutes(2)
-    do {
-        Start-Sleep -Seconds 5
-        $deletedVaultCount = az keyvault list-deleted --query "[?name=='$VaultName'] | length(@)" --output tsv 2>$null
-        if ($LASTEXITCODE -eq 0 -and $deletedVaultCount -eq '0') {
-            Write-Host "  ✅ Deleted Key Vault entry purged" -ForegroundColor Green
-            Start-Sleep -Seconds 20
-            return $true
+    Write-Host "`n🧹 Found soft-deleted Key Vault blocking redeploy: $VaultName" -ForegroundColor Yellow
+    if ($deletedState.PurgeProtectionEnabled) {
+        if ($null -ne $deletedState.RetainedUntil) {
+            Write-Host "  🛡️  Purge protection is enabled until $($deletedState.RetainedUntil.ToString('yyyy-MM-ddTHH:mm:ssK')). Azure is retaining the deleted vault name and same-name redeploy is not available until the retention window expires." -ForegroundColor Yellow
         }
-    } while ((Get-Date) -lt $deadline)
+        else {
+            Write-Host "  🛡️  Purge protection is enabled. Azure is retaining the deleted vault name and same-name redeploy is not available until the retention window is authoritatively confirmed." -ForegroundColor Yellow
+        }
+        Write-Host "  🔐 No purge call was attempted because Azure would reject it. Use a different workload name or wait until the retention window ends." -ForegroundColor Gray
+        return $false
+    }
 
-    Write-Host "  ⚠️  Purge request completed, but Azure has not removed the deleted vault entry yet." -ForegroundColor Yellow
+    Write-Host "  Purging deleted Key Vault entry so the deployment can continue..." -ForegroundColor Gray
+    $purgeResult = Resolve-KeyVaultPurgeForReuse -VaultName $VaultName -Location $Location -WaitSeconds 120 -PollingIntervalSeconds 5
+    if ($purgeResult.Resolved) {
+        Write-Host "  ✅ Deleted Key Vault entry purged. Same-name redeploy is available immediately." -ForegroundColor Green
+        return $true
+    }
+
+    Write-Host "  ⚠️  $($purgeResult.Message)" -ForegroundColor Yellow
     return $false
 }
 
@@ -1123,13 +1139,15 @@ try {
         Write-SubscriptionDeploymentFailureSummary -DeploymentName $deploymentName -ResourceGroupName $resourceGroupName
 
         if ($attempt -eq 1) {
-            $deletedKeyVaultConflict = Get-DeletedKeyVaultConflict -ResourceGroupName $resourceGroupName
+            $deletedKeyVaultConflict = Get-DeletedKeyVaultConflict -ResourceGroupName $resourceGroupName -Location $Location
             if ($deletedKeyVaultConflict) {
                 $resolved = Resolve-DeletedKeyVaultConflict -VaultName $deletedKeyVaultConflict.VaultName -Location $Location
                 if ($resolved) {
                     Write-Host "`n🔁 Retrying deployment after Key Vault purge..." -ForegroundColor Yellow
                     continue
                 }
+
+                throw "Deployment failed because the retained Key Vault name cannot be reused immediately. Use a different workload name or wait for the purge-protection retention window to expire."
             }
         }
 

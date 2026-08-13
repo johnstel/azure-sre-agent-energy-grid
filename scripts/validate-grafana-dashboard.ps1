@@ -50,7 +50,7 @@ foreach ($requiredVariable in $requiredVariables) {
 
 $environmentVariable = @($dashboardDefinition.templating.list | Where-Object { $_.name -eq 'environment' }) | Select-Object -First 1
 if ($environmentVariable -and $environmentVariable.hide -ne 2) {
-    throw 'The environment variable must remain non-interactive context (hide = 2).' 
+    throw 'The environment variable must remain non-interactive context (hide = 2).'
 }
 
 $scenarioVariable = @($dashboardDefinition.templating.list | Where-Object { $_.name -eq 'scenario' }) | Select-Object -First 1

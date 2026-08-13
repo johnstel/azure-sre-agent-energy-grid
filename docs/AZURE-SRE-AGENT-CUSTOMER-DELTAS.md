@@ -394,7 +394,7 @@ graph TD
 |-------|------------|-----------|----------|
 | **Log Analytics** | Container Insights: pod lifecycle, resource metrics, K8s events | 30 days (configurable 30-730) | `log-analytics.bicep:43` |
 | **Application Insights** | Application telemetry + SRE Agent operational telemetry. Exact SRE Agent schema is TBD: `logConfiguration` is configured in Bicep, but emitted fields depend on the deployed API version. | 90 days | `app-insights.bicep:43`, `sre-agent.bicep:97-101` |
-| **Key Vault** | Soft delete enabled; purge protection **enabled by default** and any disposable-demo opt-out is an explicit pre-deployment choice that omits the property instead of setting `false` | 7-day soft delete + retained deleted vault names while purge protection remains enabled | `key-vault.bicep:42-49` |
+| **Key Vault** | Soft delete enabled, purge protection **enabled by default**; any disposable override is explicit and must be documented before deployment because retained deleted names remain unavailable until purge/retention completes | 7-day soft delete + retention while purge protection remains enabled | `key-vault.bicep:28-48` |
 | **Mission Control** | No persistent data store — K8s state is read-only, jobs are in-memory | Session-only | `server.ts:19` |
 | **Ask Copilot** | System message prohibits requesting secrets, tokens, and kubeconfig. `redactSensitiveText()` strips Bearer tokens, password/secret/key values, `AccountKey` credentials, and URI-embedded credentials. | Session-only | `AssistantService.ts:23-27`, `KubeClient.ts:631-636` |
 | **Azure SRE Agent** | Conversations are managed by the Azure-hosted service; SRE Agent operational telemetry is configured to use App Insights. Exact conversation/audit schema is opaque to this repo. | Opaque to this repo | `sre-agent.bicep:97-101` |
@@ -405,7 +405,7 @@ graph TD
 | ✅ | kubectl output redaction is solid for Bearer tokens, password/secret/key values, `AccountKey` credentials, and URI-embedded credentials |
 | ✅ | No customer PII exists in the demo by design (simulated energy grid data) |
 | ✅ | Application Insights IP masking remains enabled (`DisableIpMasking: false`) |
-| ✅ | Key Vault purge protection is enabled by default; any disposable-lab opt-out must be explicit and documented in the deployment parameters |
+| ✅ | Key Vault purge protection is enabled by default; any disposable override must be explicit and documented in deployment parameters before deployment |
 | ⚠️ | App Insights connection string is exposed as a Bicep deployment output — acceptable for demo, route through Key Vault for production |
 | ⚠️ | No data classification statement in the repo |
 | ❌ | Azure SRE Agent conversation data retention policy is not documented or linked |
@@ -575,7 +575,7 @@ graph TB
 | P1-7 | `managedResources: []` — IaC doesn't complete AKS ↔ SRE Agent connection | Setup | Document as current API-version limitation in this subscription; cite RBAC script and portal step as workaround |
 | P1-8 | No SRE Agent reasoning chain visibility | Explainability | Investigate App Insights tracing in `logConfiguration`; document what's visible |
 | P1-9 | No data classification statement | Compliance | Add explicit statement: demo contains zero PII/PHI (simulated energy grid data) |
-| P1-10 | Key Vault purge protection default is secure | Security | Keep default enabled; document the disposable-lab override explicitly |
+| P1-10 | Key Vault purge protection default is secure; any disposable override requires explicit documentation before deployment | Security | Keep `keyVaultPurgeProtection = true` as the default and document any disposable override before deployment |
 | P1-11 | Azure SRE Agent conversation retention undocumented | Compliance | Link to Microsoft's data handling policy for the service/API version in use |
 | P1-12 | No documented escalation/reject flow | HITL | Document what happens when operator rejects a proposed action |
 | P1-13 | Public AKS API server | Security | Document as current deployment-path requirement; note private cluster + private endpoint as production path |
@@ -615,7 +615,7 @@ graph TB
 | `infra/bicep/modules/alerts.bicep` | 4 scheduled-query alert rules: pod restarts, HTTP 5xx, pod failures, CrashLoop/OOM |
 | `infra/bicep/modules/log-analytics.bicep` | Log Analytics: 30-day retention, per-GB pricing |
 | `infra/bicep/modules/app-insights.bicep` | App Insights: 90-day retention, wired to Log Analytics workspace |
-| `infra/bicep/modules/key-vault.bicep` | Key Vault: soft delete enabled, purge protection enabled by default, explicit disposable-lab opt-out documented, RBAC authorization |
+| `infra/bicep/modules/key-vault.bicep` | Key Vault: soft delete enabled, purge protection enabled by default with explicit disposable override documentation, RBAC authorization |
 
 ### Documentation
 

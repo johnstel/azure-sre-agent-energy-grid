@@ -18,9 +18,9 @@ param deployAlerts = true
 param deploySreAgent = true
 
 // Secure-by-default: keep purge protection enabled. Set false only before deployment for a disposable demo lab
-// where rapid delete/recreate and name reuse are deliberately accepted. When false, the generated Key Vault resource
-// omits enablePurgeProtection entirely because Azure rejects an explicit false value. Once enabled for a vault,
-// Azure does not allow turning purge protection off and deleted vault names remain retained for the retention period.
+// where rapid delete/recreate and same-name reuse are deliberately accepted. When false, the generated Key Vault
+// resource omits enablePurgeProtection entirely because Azure rejects an explicit false value. Once enabled for a
+// vault, Azure does not allow turning purge protection off and deleted vault names remain retained for the retention period.
 param keyVaultPurgeProtection = true
 
 // Default action group for incident routing (add webhook at deploy time)
