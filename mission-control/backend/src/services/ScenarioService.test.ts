@@ -97,6 +97,8 @@ describe('ScenarioService scenario registry', () => {
     ]);
     assert.deepEqual(kubectlCommands, [
       ['delete', 'networkpolicy', 'deny-meter-service', '-n', 'energy', '--ignore-not-found=true'],
+      ['delete', 'networkpolicy', 'deny-grid-dashboard', '-n', 'energy', '--ignore-not-found=true'],
+      ['delete', 'networkpolicy', 'deny-ops-console', '-n', 'energy', '--ignore-not-found=true'],
     ]);
     assert.equal(getScenarios().find(scenario => scenario.name === 'network-block')?.enabled, false);
     assert.equal(getScenarios().find(scenario => scenario.name === 'mongodb-down')?.enabled, true);
@@ -133,6 +135,8 @@ describe('ScenarioService scenario registry', () => {
       ['delete', 'deployment', 'substation-monitor', '-n', 'energy', '--ignore-not-found=true'],
       ['delete', 'deployment', 'grid-health-monitor', '-n', 'energy', '--ignore-not-found=true'],
       ['delete', 'networkpolicy', 'deny-meter-service', '-n', 'energy', '--ignore-not-found=true'],
+      ['delete', 'networkpolicy', 'deny-grid-dashboard', '-n', 'energy', '--ignore-not-found=true'],
+      ['delete', 'networkpolicy', 'deny-ops-console', '-n', 'energy', '--ignore-not-found=true'],
       ['delete', 'deployment', 'grid-zone-config', '-n', 'energy', '--ignore-not-found=true'],
     ]);
     assert.equal(getScenarios().some(scenario => scenario.enabled), false);

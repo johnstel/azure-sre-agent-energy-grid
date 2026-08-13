@@ -1,7 +1,7 @@
 # Supportability Guide
 
 > **Audience**: Customer support engineers, SRE teams, and operators responsible for this demo lab
-> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
 > **Trust model**: Agent recommends, operator executes — unless real portal approval UI/API evidence is captured
 
 This document is the starting point for anyone supporting the Azure SRE Agent Energy Grid demo lab. It defines what is supportable, how to verify health, when to escalate, and how to restore a working state.
@@ -35,7 +35,7 @@ This document is the starting point for anyone supporting the Azure SRE Agent En
 | Auto-remediation (`mode: 'Auto'`) | Not demonstrated; requires separate security review |
 | Production workloads | This is a demo/sandbox environment |
 | Multi-tenant isolation | Single resource group, single namespace |
-| Alert-to-agent triggers | Not wired in current deployment |
+| Alert-to-agent triggers | Setup automation exists (Bicep `incidentManagementConfiguration` + `scripts/configure-sre-agent-incident-response.ps1`, issue #76), but live end-to-end proof (alert → native investigation thread, observed via `IncidentActivitySnapshot`) is pending -- see `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md` |
 | Application-level App Insights telemetry | Demo apps do not emit custom telemetry |
 | Private AKS clusters | SRE Agent requires network access to the API server |
 
@@ -196,7 +196,7 @@ When communicating with customers or documenting support activities for this lab
 
 - SRE Agent "fixed" or "automatically resolved" anything (unless portal evidence is captured)
 - Specific MTTR reductions (no measurement infrastructure exists)
-- Alert-to-agent triggers are configured (they are not in this deployment)
+- Alert-to-agent triggers have been proven end-to-end live (setup automation exists as of issue #76; live proof of an alert producing a native investigation is pending)
 - Production-grade RBAC (demo uses broad permissions for convenience)
 
 For the complete guardrail table, see [Safe Language Guardrails](SAFE-LANGUAGE-GUARDRAILS.md).
@@ -207,13 +207,15 @@ For the complete guardrail table, see [Safe Language Guardrails](SAFE-LANGUAGE-G
 
 | Limitation | Impact | Workaround | Reference |
 |------------|--------|------------|-----------|
-| API version pinned to `2025-05-01-preview` | Cannot use `2026-01-01` GA features until provider validates | Wait for issue #51 gates to pass | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
+| Subscription provider metadata may expose only preview API versions | SRE Agent deployment is skipped instead of falling back to a legacy preview API | Wait for `Microsoft.App/agents@2026-01-01` provider exposure, then rerun deployment | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
 | `maxPods=30` on existing node pools | Pod scheduling pressure at scale | Maintenance-window node pool replacement | [AKS maxPods Runbook](AKS-MAXPODS-MAINTENANCE-RUNBOOK.md) |
 | `SCHEMA_TBD` telemetry fields | SRE Agent App Insights dimensions may change | Do not build production dashboards against these fields | [Capability Contracts §8](CAPABILITY-CONTRACTS.md) |
 | Private clusters not supported | SRE Agent cannot access private API servers | Use public or authorized-IP clusters | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
 | Region constraints | SRE Agent only in East US 2, Sweden Central, Australia East | Deploy to supported region | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
 | Firewall requirements | Agent needs `*.azuresre.ai` access | Allowlist the domain in corporate firewall/proxy | [Troubleshooting → SRE Agent](TROUBLESHOOTING.md#sre-agent-issues) |
 | Demo RBAC overprovisioning | Broad roles for convenience, not production-ready | See demo vs. production matrix | [Capability Contracts §10](CAPABILITY-CONTRACTS.md) |
+| Reinvestigation cooldown and custom-agent routing are portal-only | Not exposed by the ARM schema or current Azure MCP Server response-plan tool | Confirm/set in Builder → Incident response plans after running the setup script | [SRE Agent Setup → Step 3b](SRE-AGENT-SETUP.md), [Capability Contracts §16](CAPABILITY-CONTRACTS.md) |
+| Native incident-response live validation is pending | No live Energy Grid Azure environment was reachable to run OOMKilled ×2 / MongoDBDown ×1 end-to-end | Run `scripts/configure-sre-agent-incident-response.ps1` and the live validation steps once an environment is available | [Native Incident Platform Spike](SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md) |
 
 ---
 
@@ -223,11 +225,12 @@ For the complete guardrail table, see [Safe Language Guardrails](SAFE-LANGUAGE-G
 |----------|---------|-------------|
 | [Troubleshooting Guide](TROUBLESHOOTING.md) | Symptom-first diagnosis and fix procedures | Something is broken and you need to fix it |
 | [Breakable Scenarios](BREAKABLE-SCENARIOS.md) | Scenario definitions, prompts, pass/fail criteria | Understanding or injecting a specific scenario |
-| [SRE Agent Setup](SRE-AGENT-SETUP.md) | Initial setup, RBAC configuration, portal connection | First-time deployment or reconfiguration |
+| [SRE Agent Setup](SRE-AGENT-SETUP.md) | Initial setup, RBAC configuration, portal connection, native incident platform wiring | First-time deployment or reconfiguration |
+| [Native Incident Platform Spike](SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md) | Capability spike findings and live-validation status for issue #76 | Understanding what is automated vs. portal-only for native incident response |
 | [Capability Contracts](CAPABILITY-CONTRACTS.md) | Shared contracts: telemetry, evidence, RBAC, SLOs | Architecture decisions and schema references |
 | [Safe Language Guardrails](SAFE-LANGUAGE-GUARDRAILS.md) | What to claim and what not to claim | Before any customer-facing communication |
 | [AKS maxPods Maintenance Runbook](AKS-MAXPODS-MAINTENANCE-RUNBOOK.md) | Node pool replacement for maxPods drift | Scheduling pressure from immutable maxPods |
 
 ---
 
-*Last updated: 2026-05-06 · Maintainer: SRE Lab Team*
+*Last updated: 2026-08-12 · Maintainer: SRE Lab Team*

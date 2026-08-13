@@ -112,7 +112,7 @@ The active wallboard surface is `MissionWallboard.vue`, where scenario buttons l
 
 The narration panel is customer-facing presenter support. It must inherit the constraints in `docs/SAFE-LANGUAGE-GUARDRAILS.md`, especially:
 
-- Azure SRE Agent is GA, while this lab remains pinned to `Microsoft.App/agents@2025-05-01-preview` in the current subscription.
+- Azure SRE Agent is GA, while this lab pins `Microsoft.App/agents@2026-01-01` with the Stable channel and skips SRE Agent deployment if a subscription exposes only older preview provider metadata.
 - Say "diagnoses issues you point it to" rather than "autonomously detects incidents."
 - Say "recommends; operator executes" for this demo unless real approval evidence exists.
 - Do not claim production readiness, production-grade RBAC, full audit trail, or quantified MTTR reduction.

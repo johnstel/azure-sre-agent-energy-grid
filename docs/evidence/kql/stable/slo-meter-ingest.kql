@@ -1,0 +1,74 @@
+// Demo-only customer-impact SLO evidence query.
+// Source: repo-owned synthetic OpenTelemetry SERVER spans in AppRequests.
+// This is not Azure SRE Agent preview telemetry and does not use SCHEMA_TBD fields.
+//
+// PARAMETERS -- modify before running
+let TimeRange = 10m;
+let freshnessLimit = 5m;
+let sloName = "slo-meter-ingest";
+let sloMode = "demo";
+let rawRuns =
+    AppRequests
+    | where TimeGenerated > ago(TimeRange)
+    | where Name == "slo.meter-ingest.transaction"
+    | extend
+        SyntheticName = tostring(Properties["synthetic.name"]),
+        SyntheticMode = tostring(Properties["synthetic.mode"]),
+        CorrelationId = tostring(Properties["synthetic.correlation_id"]),
+        FailureStage = tostring(Properties["synthetic.failure_stage"]),
+        FailureReason = tostring(Properties["synthetic.failure_reason"])
+    | where SyntheticName == sloName and SyntheticMode == sloMode and isnotempty(CorrelationId)
+    | project TimeGenerated, CorrelationId, Success, DurationMs, FailureStage, FailureReason, _ResourceId;
+let logicalRuns =
+    rawRuns
+    | summarize arg_max(TimeGenerated, Success, DurationMs, FailureStage, FailureReason, _ResourceId) by CorrelationId;
+logicalRuns
+| extend
+    CriticalFailureAt = iff(Success == false and FailureStage in ("persistence", "ingress"), TimeGenerated, datetime(null))
+| extend
+    CriticalFailureStage = iff(isnull(CriticalFailureAt), "", FailureStage),
+    CriticalFailureReason = iff(isnull(CriticalFailureAt), "", FailureReason)
+| summarize
+    RunCount = count(),
+    SuccessCount = countif(Success == true),
+    FailureCount = countif(Success == false),
+    SuccessRatePct = iff(count() == 0, real(null), 100.0 * countif(Success == true) / count()),
+    P95LatencyMs = percentile(DurationMs, 95),
+    LastSuccess = maxif(TimeGenerated, Success == true),
+    FailureStages = make_set_if(FailureStage, Success == false and isnotempty(FailureStage), 5),
+    FailureReasons = make_set_if(FailureReason, Success == false and isnotempty(FailureReason), 5),
+    ResourceId = take_any(_ResourceId),
+    CorrelationId = take_any(CorrelationId),
+    arg_max(CriticalFailureAt, CriticalFailureStage, CriticalFailureReason)
+| extend
+    TimeBucket = bin(now(), 1m),
+    Freshness = iff(isnull(LastSuccess), timespan(null), now() - LastSuccess),
+    DataState = case(
+        RunCount == 0, "NO_DATA",
+        SuccessCount == 0, "ALL_RUNS_FAILED",
+        "DATA"),
+    DemoStatus = case(
+        RunCount == 0, "NO_DATA",
+        not(isnull(CriticalFailureAt)) and (isnull(LastSuccess) or LastSuccess <= CriticalFailureAt), "CRITICAL",
+        SuccessCount == 0, "CRITICAL",
+        isnull(LastSuccess) or now() - LastSuccess > freshnessLimit, "CRITICAL",
+        SuccessRatePct < 95.0 or P95LatencyMs > 30000.0, "DEGRADED",
+        "HEALTHY")
+| project
+    TimeBucket,
+    ResourceId,
+    CorrelationId,
+    RunCount,
+    SuccessCount,
+    FailureCount,
+    SuccessRatePct,
+    P95LatencyMs,
+    LastSuccess,
+    LatestCriticalFailure = CriticalFailureAt,
+    LatestCriticalFailureStage = CriticalFailureStage,
+    LatestCriticalFailureReason = CriticalFailureReason,
+    Freshness,
+    FailureStages,
+    FailureReasons,
+    DataState,
+    DemoStatus

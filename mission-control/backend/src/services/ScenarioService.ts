@@ -29,7 +29,7 @@ const SCENARIO_REGISTRY: ScenarioDefinition[] = [
   { name: 'high-cpu', file: 'high-cpu.yaml', description: 'Grid frequency calculation overload — CPU contention' },
   { name: 'pending-pods', file: 'pending-pods.yaml', description: 'Substation monitor can\'t schedule — Pending pods' },
   { name: 'probe-failure', file: 'probe-failure.yaml', description: 'Grid health monitor misconfigured — Probe failure' },
-  { name: 'network-block', file: 'network-block.yaml', description: 'Meter service isolated by bad security policy — Network block' },
+  { name: 'network-block', file: 'network-block.yaml', description: 'Meter service and public portals isolated by bad security policy — Network block' },
   { name: 'missing-config', file: 'missing-config.yaml', description: 'Grid zone configuration missing — ConfigMap missing' },
   { name: 'mongodb-down', file: 'mongodb-down.yaml', description: 'Meter database outage — Cascading failure' },
   { name: 'service-mismatch', file: 'service-mismatch.yaml', description: 'Meter service routing failure after v2 upgrade — Selector mismatch' },
@@ -53,7 +53,11 @@ const SCENARIO_REPAIR_PLANS: Record<string, ScenarioRepairPlan> = {
   },
   'network-block': {
     applyBase: false,
-    deleteResources: [{ resource: 'networkpolicy', name: 'deny-meter-service', namespace: ENERGY_NAMESPACE }],
+    deleteResources: [
+      { resource: 'networkpolicy', name: 'deny-meter-service', namespace: ENERGY_NAMESPACE },
+      { resource: 'networkpolicy', name: 'deny-grid-dashboard', namespace: ENERGY_NAMESPACE },
+      { resource: 'networkpolicy', name: 'deny-ops-console', namespace: ENERGY_NAMESPACE },
+    ],
   },
   'missing-config': {
     applyBase: false,

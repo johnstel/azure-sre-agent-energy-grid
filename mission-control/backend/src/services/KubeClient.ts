@@ -263,6 +263,8 @@ function toService(item: any): Service {
     externalIP,
     externalHostname,
     publicUrl: item.spec.type === 'LoadBalancer' ? buildPublicUrl(externalHostname ?? externalIP, portDetails) : undefined,
+    labels: item.metadata.labels ?? {},
+    annotations: item.metadata.annotations ?? {},
   } satisfies Service;
 }
 
