@@ -21,10 +21,21 @@ param allowedPrincipals array = []
 @description('Allowed Entra group IDs for hosted Mission Control access.')
 param allowedGroups array = []
 
+@description('Microsoft Entra tenant ID for Mission Control auth.')
+param authTenantId string = ''
+
+@description('Microsoft Entra application client ID for Mission Control auth.')
+param authClientId string = ''
+
+@secure()
+@description('Microsoft Entra application client secret for Mission Control auth.')
+param authClientSecret string = ''
+
 @description('Container image to deploy for Mission Control')
 param containerImage string = 'mcr.microsoft.com/azuredocs/containerapps-helloworld:latest'
 
-var publicIngressRequiresAuth = externalIngress && (!authEnabled || (empty(allowedPrincipals) && empty(allowedGroups)))
+var authSecretName = 'microsoft-provider-authentication-secret'
+var publicIngressRequiresAuth = externalIngress && (!authEnabled || ((empty(allowedPrincipals) && empty(allowedGroups)) || contains(allowedPrincipals, '') || contains(allowedGroups, '')))
 
 assert missionControlPublicIngressGuard = !publicIngressRequiresAuth
 
@@ -35,6 +46,14 @@ resource missionControl 'Microsoft.App/containerApps@2024-03-01' = {
     managedEnvironmentId: containerAppEnvironmentId
     configuration: {
       activeRevisionsMode: 'Single'
+      secrets: authEnabled
+        ? [
+            {
+              name: authSecretName
+              value: authClientSecret
+            }
+          ]
+        : []
       ingress: {
         external: externalIngress
         targetPort: 3333
@@ -74,6 +93,47 @@ resource missionControl 'Microsoft.App/containerApps@2024-03-01' = {
       scale: {
         minReplicas: 1
         maxReplicas: 1
+      }
+    }
+  }
+}
+
+resource authConfig 'Microsoft.App/containerApps/authConfigs@2024-03-01' = if (authEnabled) {
+  parent: missionControl
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: true
+    }
+    globalValidation: {
+      unauthenticatedClientAction: 'RedirectToLoginPage'
+      redirectToProvider: 'azureActiveDirectory'
+      excludedPaths: [
+        '/api/health'
+      ]
+    }
+    httpSettings: {
+      requireHttps: true
+    }
+    identityProviders: {
+      azureActiveDirectory: {
+        enabled: true
+        registration: {
+          clientId: authClientId
+          clientSecretSettingName: authSecretName
+          openIdIssuer: '${environment().authentication.loginEndpoint}${authTenantId}/v2.0'
+        }
+        validation: {
+          allowedAudiences: [
+            authClientId
+            'api://${authClientId}'
+          ]
+        }
+      }
+    }
+    login: {
+      tokenStore: {
+        enabled: false
       }
     }
   }

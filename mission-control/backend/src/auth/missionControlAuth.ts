@@ -12,7 +12,33 @@ export type MissionControlAuthDecision = {
   reason: 'authorized' | 'local-dev' | 'health' | 'misconfigured' | 'missing-auth' | 'forbidden';
 };
 
-type RequestLike = Pick<FastifyRequest, 'headers' | 'hostname' | 'ip' | 'socket' | 'url'>;
+type RequestLike = Pick<FastifyRequest, 'headers' | 'ip' | 'method' | 'socket' | 'url'>;
+
+const principalClaimTypes = new Set([
+  'http://schemas.microsoft.com/identity/claims/objectidentifier',
+  'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier',
+  'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn',
+  'oid',
+  'sub',
+  'nameid',
+  'preferred_username',
+]);
+
+const groupClaimTypes = new Set([
+  'groups',
+  'roles',
+  'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups',
+  'http://schemas.microsoft.com/identity/claims/groups',
+]);
+
+const nameClaimTypes = new Set([
+  'name',
+  'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name',
+  'http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress',
+  'email',
+  'preferred_username',
+  'upn',
+]);
 
 const normalizeValue = (value: string | undefined): string => value?.trim().toLowerCase() ?? '';
 
@@ -32,7 +58,7 @@ const parseStringArray = (value: unknown): string[] => {
         return parseStringArray(JSON.parse(value));
       } catch {
         return value
-          .split(',')
+          .split(/[\r\n,]+/)
           .map(entry => entry.trim())
           .filter(Boolean);
       }
@@ -50,8 +76,7 @@ const parseStringArray = (value: unknown): string[] => {
 
   if (value !== null && typeof value === 'object') {
     const record = value as Record<string, unknown>;
-    const entries = [record.value, record.id, record.name, record.group, record.groups];
-    return entries.flatMap(entry => parseStringArray(entry));
+    return parseStringArray([record.value, record.id, record.name, record.group, record.groups]);
   }
 
   return [];
@@ -70,72 +95,81 @@ const isLoopbackAddress = (value?: string): boolean => {
     return false;
   }
 
-  const normalized = value.replace(/^::ffff:/, '').toLowerCase();
-  return normalized === '127.0.0.1' || normalized === 'localhost' || normalized === '::1' || normalized === '[::1]';
+  const normalized = value.replace(/^::ffff:/, '').replace(/^\[|\]$/g, '').toLowerCase();
+  return normalized === '127.0.0.1' || normalized === 'localhost' || normalized === '::1';
 };
 
 const isLoopbackRequest = (req: RequestLike): boolean => {
-  const hostname = req.hostname ?? '';
   const remoteAddress = req.socket?.remoteAddress ?? req.ip ?? '';
-  return isLoopbackAddress(hostname) || isLoopbackAddress(remoteAddress);
+  return isLoopbackAddress(remoteAddress);
+};
+
+const findClaimValue = (claims: Array<Record<string, unknown>>, allowedTypes: Set<string>): string | undefined => {
+  for (const claim of claims) {
+    const typ = typeof claim.typ === 'string' ? claim.typ : '';
+    const val = typeof claim.val === 'string' ? claim.val : typeof claim.value === 'string' ? claim.value : undefined;
+
+    if (!val) {
+      continue;
+    }
+
+    const normalizedType = typ.trim().toLowerCase();
+    if (allowedTypes.has(normalizedType)) {
+      return val.trim();
+    }
+  }
+
+  return undefined;
+};
+
+const findGroupClaimValues = (claims: Array<Record<string, unknown>>): string[] => {
+  const groups: string[] = [];
+
+  for (const claim of claims) {
+    const typ = typeof claim.typ === 'string' ? claim.typ : '';
+    const val = typeof claim.val === 'string' ? claim.val : typeof claim.value === 'string' ? claim.value : undefined;
+
+    if (!val) {
+      continue;
+    }
+
+    if (groupClaimTypes.has(typ.trim().toLowerCase())) {
+      groups.push(val.trim());
+    }
+  }
+
+  return groups;
 };
 
 const parseRequestIdentity = (req: RequestLike): { principalId?: string; principalName?: string; groups: string[] } => {
   const principalHeader = coalesceHeader(req.headers['x-ms-client-principal']);
-  const decodedPrincipal = principalHeader ? decodePrincipalHeader(principalHeader) : undefined;
+  if (!principalHeader) {
+    return { groups: [] };
+  }
 
-  const principalId = coalesceHeader(req.headers['x-ms-client-principal-id']) ?? decodedPrincipal?.principalId;
-  const principalName = coalesceHeader(req.headers['x-ms-client-principal-name']) ?? decodedPrincipal?.principalName;
-
-  const groupHeader = coalesceHeader(req.headers['x-ms-client-principal-groups']) ?? coalesceHeader(req.headers['x-ms-client-principal-group']);
-  const identityGroups = [
-    ...parseStringArray(decodedPrincipal?.groups ?? []),
-    ...parseStringArray(groupHeader ?? []),
-  ];
-
-  return {
-    principalId,
-    principalName,
-    groups: [...new Set(identityGroups.map(entry => entry.trim()).filter(Boolean))],
-  };
-};
-
-function decodePrincipalHeader(header: string): { principalId?: string; principalName?: string; groups: string[] } {
   try {
-    const decoded = Buffer.from(header, 'base64').toString('utf8');
+    const decoded = Buffer.from(principalHeader, 'base64').toString('utf8');
     const payload = JSON.parse(decoded) as Record<string, unknown>;
+    const claims = Array.isArray(payload.claims)
+      ? payload.claims.filter((claim): claim is Record<string, unknown> => !!claim && typeof claim === 'object')
+      : [];
 
-    const principalId = typeof payload.id === 'string'
-      ? payload.id
-      : typeof payload.userId === 'string'
-        ? payload.userId
-        : typeof payload.objectId === 'string'
-          ? payload.objectId
-          : typeof payload.sub === 'string'
-            ? payload.sub
-            : undefined;
-
-    const principalName = typeof payload.name === 'string'
-      ? payload.name
-      : typeof payload.preferred_username === 'string'
-        ? payload.preferred_username
-        : typeof payload.email === 'string'
-          ? payload.email
-          : undefined;
-
-    const groups = Array.isArray(payload.groups)
-      ? payload.groups.flatMap(entry => parseStringArray(entry))
-      : parseStringArray(payload.groups ?? []);
+    const principalId = findClaimValue(claims, principalClaimTypes);
+    const principalName = findClaimValue(claims, nameClaimTypes);
+    const decodedGroups = [
+      ...findGroupClaimValues(claims),
+      ...parseStringArray(payload.groups ?? []),
+    ];
 
     return {
       principalId,
       principalName,
-      groups,
+      groups: [...new Set(decodedGroups.map(entry => entry.trim()).filter(Boolean))],
     };
   } catch {
     return { groups: [] };
   }
-}
+};
 
 export function getMissionControlAuthConfig(): MissionControlAuthConfig {
   const publicIngress = parseBoolean(process.env.MISSION_CONTROL_PUBLIC_INGRESS ?? process.env.MISSION_CONTROL_EXTERNAL_INGRESS);
@@ -163,18 +197,22 @@ export function getMissionControlAuthConfig(): MissionControlAuthConfig {
 
 export function evaluateMissionControlAuthorization(req: RequestLike): MissionControlAuthDecision {
   const pathname = new URL(req.url, 'http://localhost').pathname;
+  const method = (req.method ?? 'GET').toUpperCase();
 
-  if (pathname === '/api/health' || pathname === '/health') {
+  if (pathname === '/api/health' && (method === 'GET' || method === 'HEAD')) {
     return { allowed: true, reason: 'health' };
   }
 
-  if (isLoopbackRequest(req)) {
-    return { allowed: true, reason: 'local-dev' };
+  if (pathname === '/health') {
+    return { allowed: false, reason: 'forbidden' };
   }
 
   const config = getMissionControlAuthConfig();
+
   if (!config.publicIngress) {
-    return { allowed: true, reason: 'local-dev' };
+    return isLoopbackRequest(req)
+      ? { allowed: true, reason: 'local-dev' }
+      : { allowed: false, reason: 'forbidden' };
   }
 
   if (!config.authEnabled || (config.allowedPrincipals.length === 0 && config.allowedGroups.length === 0)) {

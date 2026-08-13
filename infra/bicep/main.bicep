@@ -57,6 +57,16 @@ param missionControlExternalIngress bool = false
 @description('Enable EasyAuth for Mission Control when public ingress is enabled.')
 param missionControlAuthEnabled bool = false
 
+@description('Microsoft Entra tenant ID for Mission Control auth.')
+param missionControlAuthTenantId string = ''
+
+@description('Microsoft Entra application client ID for Mission Control auth.')
+param missionControlAuthClientId string = ''
+
+@secure()
+@description('Microsoft Entra application client secret for Mission Control auth.')
+param missionControlAuthClientSecret string = ''
+
 @description('Entra principal object IDs permitted to access Mission Control through public ingress.')
 param missionControlAllowedPrincipals array = []
 
@@ -171,7 +181,8 @@ var names = {
   sreAgent: 'sre-${workloadName}'
 }
 
-assert missionControlPublicIngressGuard = !(missionControlExternalIngress && (!missionControlAuthEnabled || (empty(missionControlAllowedPrincipals) && empty(missionControlAllowedGroups))))
+assert missionControlAuthConfigurationGuard = !missionControlAuthEnabled || (!empty(missionControlAuthTenantId) && !empty(missionControlAuthClientId) && !empty(missionControlAuthClientSecret))
+assert missionControlPublicIngressGuard = !(missionControlExternalIngress && (!missionControlAuthEnabled || ((empty(missionControlAllowedPrincipals) && empty(missionControlAllowedGroups)) || contains(missionControlAllowedPrincipals, '') || contains(missionControlAllowedGroups, '')) || empty(missionControlAuthTenantId) || empty(missionControlAuthClientId) || empty(missionControlAuthClientSecret)))
 
 // =============================================================================
 // RESOURCE GROUP
@@ -290,6 +301,9 @@ module missionControl 'modules/mission-control-container-app.bicep' = if (deploy
     location: location
     externalIngress: missionControlExternalIngress
     authEnabled: missionControlAuthEnabled
+    authTenantId: missionControlAuthTenantId
+    authClientId: missionControlAuthClientId
+    authClientSecret: missionControlAuthClientSecret
     allowedPrincipals: missionControlAllowedPrincipals
     allowedGroups: missionControlAllowedGroups
   }
