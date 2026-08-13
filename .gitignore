@@ -150,6 +150,7 @@ yarn-error.log*
 # Node
 node_modules/
 package-lock.json
+!mission-control/package-lock.json
 yarn.lock
 
 # Python

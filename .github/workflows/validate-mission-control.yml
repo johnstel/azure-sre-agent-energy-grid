@@ -1,0 +1,45 @@
+name: Validate Mission Control
+
+on:
+  pull_request:
+    paths:
+      - 'mission-control/**'
+      - '.github/workflows/validate-mission-control.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'mission-control/**'
+      - '.github/workflows/validate-mission-control.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Mission Control quality gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: mission-control/package-lock.json
+
+      - name: Install Mission Control dependencies
+        run: npm ci --prefix mission-control
+
+      - name: Run Mission Control lint
+        run: npm run lint --prefix mission-control
+
+      - name: Run Mission Control build
+        run: npm run build --prefix mission-control
+
+      - name: Run backend tests
+        run: npm run test -w backend --prefix mission-control
