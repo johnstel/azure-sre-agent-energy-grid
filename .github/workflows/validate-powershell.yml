@@ -56,7 +56,7 @@ jobs:
 
           Write-Host "PowerShell AST parser passed for $($scriptFiles.Count) file(s)."
 
-      - name: Install and load exact PSScriptAnalyzer version
+      - name: Install, import, and run exact PSScriptAnalyzer version
         shell: pwsh
         run: |
           $moduleVersion = '1.23.0'
@@ -88,16 +88,13 @@ jobs:
           Get-Module -Name PSScriptAnalyzer -All | Remove-Module -Force -ErrorAction SilentlyContinue
           Import-Module $installedModule.Path -Force -RequiredVersion $moduleVersion -ErrorAction Stop
 
-          $loadedModule = Get-Module PSScriptAnalyzer | Select-Object -First 1
+          $loadedModule = Get-Module -Name PSScriptAnalyzer | Select-Object -First 1
           if (-not $loadedModule -or $loadedModule.Version.ToString() -ne $moduleVersion) {
             throw "Expected PSScriptAnalyzer version $moduleVersion to be loaded, but got $($loadedModule.Version.ToString())."
           }
 
           Write-Host "Loaded PSScriptAnalyzer $($loadedModule.Version) from $($loadedModule.Path)"
 
-      - name: Run PSScriptAnalyzer
-        shell: pwsh
-        run: |
           $results = Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error
 
           if ($results) {
