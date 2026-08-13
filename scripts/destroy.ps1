@@ -47,31 +47,64 @@ Write-Host @"
 "@ -ForegroundColor Red
 
 # Check if resource group exists
-$rgShowOutput = az group show --name $ResourceGroupName --output json 2>$null
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($rgShowOutput)) {
-    Write-Host "❌ Resource group '$ResourceGroupName' not found." -ForegroundColor Yellow
-    exit 0
+$rgShowOutput = az group show --name $ResourceGroupName --output json 2>&1 | Out-String
+if ($LASTEXITCODE -ne 0) {
+    if ($rgShowOutput -match '(?i)(ResourceGroupNotFound|resource group.*not found|could not be found)') {
+        Write-Host "ℹ️  Resource group '$ResourceGroupName' is already absent. Nothing remains to clean up." -ForegroundColor Green
+        exit 0
+    }
+
+    Write-Host "❌ Azure CLI could not verify whether resource group '$ResourceGroupName' exists; cleanup safety is unknown." -ForegroundColor Red
+    if (-not [string]::IsNullOrWhiteSpace($rgShowOutput)) {
+        Write-Host "   $($rgShowOutput.Trim())" -ForegroundColor Gray
+    }
+    exit 1
 }
 
-$rg = $rgShowOutput | ConvertFrom-Json
+if ([string]::IsNullOrWhiteSpace($rgShowOutput)) {
+    Write-Host "❌ Azure CLI returned an empty response while checking '$ResourceGroupName'; cleanup safety is unknown." -ForegroundColor Red
+    exit 1
+}
+
+try {
+    $rg = $rgShowOutput | ConvertFrom-Json
+}
+catch {
+    Write-Host "❌ Azure CLI returned an unexpected resource-group payload for '$ResourceGroupName'; cleanup safety is unknown." -ForegroundColor Red
+    exit 1
+}
 
 Write-Host "📋 Resource Group: $ResourceGroupName" -ForegroundColor White
 Write-Host "📍 Location: $($rg.location)" -ForegroundColor White
 
 # List resources
 Write-Host "`n📦 Resources to be deleted:" -ForegroundColor Yellow
-$resourcesOutput = az resource list --resource-group $ResourceGroupName --output json 2>$null
+$resourcesOutput = az resource list --resource-group $ResourceGroupName --output json 2>&1 | Out-String
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resourcesOutput)) {
-    Write-Host "❌ Unable to list resources under '$ResourceGroupName'; aborting destroy." -ForegroundColor Red
+    Write-Host "❌ Unable to list resources under '$ResourceGroupName'; aborting destroy because cleanup safety is unknown." -ForegroundColor Red
+    if (-not [string]::IsNullOrWhiteSpace($resourcesOutput)) {
+        Write-Host "   $($resourcesOutput.Trim())" -ForegroundColor Gray
+    }
     exit 1
 }
 
-$resources = $resourcesOutput | ConvertFrom-Json
+try {
+    $resources = $resourcesOutput | ConvertFrom-Json
+}
+catch {
+    Write-Host "❌ Azure CLI returned an unexpected resource list for '$ResourceGroupName'; aborting destroy because cleanup safety is unknown." -ForegroundColor Red
+    exit 1
+}
+
 foreach ($resource in $resources) {
     Write-Host "   • $($resource.type) - $($resource.name)" -ForegroundColor Gray
 }
 
 $keyVaultNames = @($resources | Where-Object { $_.type -eq 'Microsoft.KeyVault/vaults' } | ForEach-Object { $_.name })
+$preDeleteKeyVaultStates = @{}
+foreach ($keyVaultName in $keyVaultNames) {
+    $preDeleteKeyVaultStates[$keyVaultName] = Get-KeyVaultActiveVaultState -VaultName $keyVaultName -ResourceGroupName $ResourceGroupName
+}
 
 Write-Host "`n  Total: $($resources.Count) resources" -ForegroundColor White
 
@@ -109,9 +142,15 @@ if ($keyVaultNames.Count -gt 0) {
     $deadline = (Get-Date).AddMinutes(20)
 
     do {
-        $groupExists = az group exists --name $ResourceGroupName --output tsv 2>$null
-        if ($LASTEXITCODE -eq 0 -and $groupExists -eq 'false') {
+        $groupExists = az group exists --name $ResourceGroupName --output tsv 2>&1 | Out-String
+        if ($LASTEXITCODE -eq 0 -and $groupExists.Trim() -eq 'false') {
             $groupDeleted = $true
+            break
+        }
+
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "   ⚠️  Azure CLI could not confirm whether '$ResourceGroupName' has finished deleting. Cleanup safety remains unknown." -ForegroundColor Yellow
+            $destroyExitCode = 1
             break
         }
 
@@ -124,7 +163,8 @@ if ($keyVaultNames.Count -gt 0) {
 
         $sameNameRedeployAvailable = $true
         foreach ($keyVaultName in $keyVaultNames) {
-            $deletedState = Get-KeyVaultDeletedVaultState -VaultName $keyVaultName -Location $($rg.location)
+            $preDeleteState = if ($preDeleteKeyVaultStates.ContainsKey($keyVaultName)) { $preDeleteKeyVaultStates[$keyVaultName] } else { [pscustomobject]@{ Status = 'Unknown'; PurgeProtectionEnabled = $false } }
+            $deletedState = Wait-ForKeyVaultDeletedState -VaultName $keyVaultName -Location $($rg.location) -WaitSeconds 120 -PollingIntervalSeconds 5
 
             if ($deletedState.Status -eq 'Unknown') {
                 $sameNameRedeployAvailable = $false
@@ -134,6 +174,13 @@ if ($keyVaultNames.Count -gt 0) {
             }
 
             if ($deletedState.Status -eq 'NotFound') {
+                if ($preDeleteState.Status -eq 'Found' -and $preDeleteState.PurgeProtectionEnabled) {
+                    $sameNameRedeployAvailable = $false
+                    $destroyExitCode = 1
+                    Write-Host "   ⚠️  $keyVaultName had purge protection enabled before deletion, but Azure did not confirm a retained deleted-vault record after the delete. Same-name redeploy remains unavailable until the retained state is authoritatively confirmed." -ForegroundColor Yellow
+                    continue
+                }
+
                 Write-Host "   ✅ $keyVaultName is already cleared from the deleted-vault cache. Same-name redeploy is available." -ForegroundColor Green
                 continue
             }
@@ -141,7 +188,12 @@ if ($keyVaultNames.Count -gt 0) {
             if ($deletedState.PurgeProtectionEnabled) {
                 $sameNameRedeployAvailable = $false
                 $destroyExitCode = 1
-                Write-Host "   🛡️  $keyVaultName is retained by purge protection. Same-name redeploy is unavailable until retention expires; no purge call was attempted." -ForegroundColor Yellow
+                if ($null -ne $deletedState.RetainedUntil) {
+                    Write-Host "   🛡️  $keyVaultName is retained by purge protection until $($deletedState.RetainedUntil.ToString('yyyy-MM-ddTHH:mm:ssK')). Same-name redeploy is unavailable until retention expires." -ForegroundColor Yellow
+                }
+                else {
+                    Write-Host "   🛡️  $keyVaultName is retained by purge protection. Azure did not report a scheduled purge date, so same-name redeploy remains unavailable until the retention window is authoritatively confirmed." -ForegroundColor Yellow
+                }
                 continue
             }
 
@@ -160,11 +212,11 @@ if ($keyVaultNames.Count -gt 0) {
             Write-Host "`n🔐 Key Vault name reuse status: same-name redeploy is available immediately." -ForegroundColor Green
         }
         else {
-            Write-Host "`n🔐 Key Vault name reuse status: same-name redeploy remains unavailable because at least one deleted vault is retained by purge protection or cannot be confirmed safe for reuse." -ForegroundColor Yellow
+            Write-Host "`n🔐 Key Vault name reuse status: same-name redeploy remains unavailable because at least one deleted vault is retained by purge protection or could not be verified safe for reuse." -ForegroundColor Yellow
         }
     }
     else {
-        Write-Host "  ⚠️  Resource group deletion is still in progress. Key Vault safety checks were not completed; cleanup is incomplete." -ForegroundColor Yellow
+        Write-Host "  ⚠️  Resource group deletion is still in progress or not verified complete. Key Vault safety checks were not completed; cleanup is incomplete." -ForegroundColor Yellow
         $destroyExitCode = 1
     }
 }

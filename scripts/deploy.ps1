@@ -651,13 +651,14 @@ function Get-DeletedKeyVaultConflict {
         return $null
     }
 
-    $deletedState = Get-KeyVaultDeletedVaultState -VaultName $vaultName -Location $Location
+    $deletedState = Wait-ForKeyVaultDeletedState -VaultName $vaultName -Location $Location -WaitSeconds 30 -PollingIntervalSeconds 5
 
     return [pscustomobject]@{
         VaultName                    = $vaultName
         Status                      = $deletedState.Status
         PurgeProtectionEnabled      = $deletedState.PurgeProtectionEnabled
         RedeployImmediatelyAvailable = $deletedState.RedeployImmediatelyAvailable
+        RetainedUntil               = $deletedState.RetainedUntil
         Message                     = $deletedState.Message
     }
 }
@@ -672,9 +673,9 @@ function Resolve-DeletedKeyVaultConflict {
         [string]$Location
     )
 
-    $deletedState = Get-KeyVaultDeletedVaultState -VaultName $VaultName -Location $Location
+    $deletedState = Wait-ForKeyVaultDeletedState -VaultName $VaultName -Location $Location -WaitSeconds 30 -PollingIntervalSeconds 5
     if ($deletedState.Status -eq 'NotFound') {
-        Write-Host "`nℹ️  Deleted Key Vault '$VaultName' is already gone. Same-name redeploy is available immediately." -ForegroundColor Green
+        Write-Host "`nℹ️  Deleted Key Vault '$VaultName' is absent from Azure's deleted-vault cache after verification. Same-name redeploy is available." -ForegroundColor Green
         return $true
     }
 
@@ -688,7 +689,12 @@ function Resolve-DeletedKeyVaultConflict {
 
     Write-Host "`n🧹 Found soft-deleted Key Vault blocking redeploy: $VaultName" -ForegroundColor Yellow
     if ($deletedState.PurgeProtectionEnabled) {
-        Write-Host "  🛡️  Purge protection is enabled. Azure is retaining the deleted vault name and same-name redeploy is not available until the retention window expires." -ForegroundColor Yellow
+        if ($null -ne $deletedState.RetainedUntil) {
+            Write-Host "  🛡️  Purge protection is enabled until $($deletedState.RetainedUntil.ToString('yyyy-MM-ddTHH:mm:ssK')). Azure is retaining the deleted vault name and same-name redeploy is not available until the retention window expires." -ForegroundColor Yellow
+        }
+        else {
+            Write-Host "  🛡️  Purge protection is enabled. Azure is retaining the deleted vault name and same-name redeploy is not available until the retention window is authoritatively confirmed." -ForegroundColor Yellow
+        }
         Write-Host "  🔐 No purge call was attempted because Azure would reject it. Use a different workload name or wait until the retention window ends." -ForegroundColor Gray
         return $false
     }
