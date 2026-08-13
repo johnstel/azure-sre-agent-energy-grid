@@ -33,8 +33,8 @@ jobs:
           set -euo pipefail
 
           echo "Local equivalent commands:"
-          echo "  az bicep build --file infra/bicep/main.bicep --stdout >/dev/null"
-          echo "  for file in infra/bicep/modules/*.bicep; do az bicep build --file \"$file\" --stdout >/dev/null || exit 1; done"
+          echo '  az bicep build --file infra/bicep/main.bicep --stdout >/dev/null'
+          echo '  for file in infra/bicep/modules/*.bicep; do az bicep build --file "$file" --stdout >/dev/null || exit 1; done'
 
           az bicep build --file infra/bicep/main.bicep --stdout >/dev/null
 
