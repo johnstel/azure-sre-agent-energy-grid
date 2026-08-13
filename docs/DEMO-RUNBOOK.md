@@ -17,6 +17,8 @@ This is the single sequential checklist for running the Energy Grid SRE Agent de
 - [ ] Review [docs/COSTS.md](COSTS.md) — budget ~$34-40/day with SRE Agent
 - [ ] Identify which scenarios you will demo (recommended: OOMKilled → MongoDBDown → ServiceMismatch)
 - [ ] Review [docs/SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for claims to avoid
+- [ ] Review the demo-only [meter-ingest SLO contract](SLO-METER-INGEST.md) and its live-proof gate
+- [ ] If a proactive task is in scope, configure and validate it through [Grid Readiness scheduled-task guidance](SRE-AGENT-GRID-READINESS-TASK.md); do not claim findings until real runs are captured
 - [ ] Review the visual evidence convention in [docs/evidence/screenshots/README.md](evidence/screenshots/README.md)
 - [ ] If reusing screenshots from a prior run, confirm they are real captures, redacted, and not placeholders
 - [ ] **External demo only**: complete the [External Demo Security Checklist](#external-demo-security-checklist) below
@@ -75,6 +77,7 @@ No output means the management port is not externally reachable.
 
 **Verify:**
 - [ ] Deployment completes without errors
+- [ ] The repo-managed Grafana incident dashboard was imported during deployment from `infra/grafana/energy-grid-incident-dashboard.json` and the deploy script exited non-zero if the import/verification step failed
 - [ ] Note the resource group name from output (e.g., `rg-srelab-eastus2`)
 
 ```powershell
@@ -82,6 +85,7 @@ No output means the management port is not externally reachable.
 ```
 
 - [ ] All resources report healthy
+- [ ] The managed Grafana dashboard is present and shows the expected title: `Energy Grid — Incident Overview`
 - [ ] AKS cluster is accessible: `kubectl get nodes`
 
 ---
@@ -101,6 +105,8 @@ kubectl exec -n energy deploy/grid-dashboard -- curl -s localhost:8080/health
 ```
 
 - [ ] Grid dashboard responds
+- [ ] `kubectl get cronjob synthetic-meter-ingest-probe -n energy` reports the two-minute probe schedule
+- [ ] Record whether the customer-impact panel shows real telemetry, `NO_DATA`, or `UNKNOWN`; neither non-green state is a healthy baseline
 
 **Evidence capture — per scenario baseline screenshots** (use as pre-demo study material and for the visual evidence pack, #38):
 
@@ -118,7 +124,25 @@ If replacing a reference PNG with a fresh live capture, redact it and update the
 
 ---
 
-## Step 3: Find Your SRE Agent Portal URL
+## Step 3: Open the Managed Grafana Workspace and SRE Agent Portal
+
+After deployment, the Managed Grafana workspace is available in the resource group. No repo-managed dashboard import is performed as part of this branch.
+
+1. Open the Managed Grafana instance from the Azure Portal resource group or run `site` in the dev container terminal to retrieve the URL.
+2. Confirm that the workspace shows the customer-impact SLO row, baseline panels, and the scenario variable.
+3. Keep the workspace open during the demo to show the transition from healthy to degraded to critical or no-data while the operator investigates.
+
+### Demo path guidance
+
+- 5-minute path: start with the customer-impact state, then show namespace health, pod restarts, and alert-state views.
+- 10-minute path: add the SLO success/p95/freshness row, CPU/memory, request/error-rate, and timeline annotations.
+- 20-minute path: include dependency failures, scenario narrative, and the operator handoff panels.
+
+Use the safe-language guardrails in [docs/SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) when presenting the dashboard. Do not imply autonomous remediation; present it as evidence that the operator can review and act on.
+
+---
+
+## Step 4: Find Your SRE Agent Portal URL
 
 **Option A — Deployment output:**
 The URL is printed at the end of `deploy.ps1` output. Look for the SRE Agent resource URL.
@@ -137,11 +161,11 @@ az resource list --resource-group <rg-name> --resource-type Microsoft.App/agents
 
 ---
 
-## Step 4: Run Scenario — Break, Diagnose, Fix
+## Step 5: Run Scenario — Break, Diagnose, Fix
 
 For each scenario you plan to demo, follow this loop. Use the complete-failure bundle only after the core scenarios are understood, because it combines dependency outage, service routing failure, and network isolation in one incident.
 
-### 4a. Inject the failure
+### 5a. Inject the failure
 
 ```bash
 kubectl apply -f k8s/scenarios/<scenario>.yaml
@@ -149,7 +173,7 @@ kubectl apply -f k8s/scenarios/<scenario>.yaml
 
 **Estimated times:** OOMKilled ~30s to manifest, MongoDBDown ~60s for cascade, ServiceMismatch ~immediate
 
-### 4b. Observe the failure
+### 5b. Observe the failure
 
 ```bash
 kubectl get pods -n energy -w    # Watch pods
@@ -158,7 +182,7 @@ kubectl get events -n energy --sort-by='.lastTimestamp' | head -20
 
 - [ ] Failure is visible in kubectl output
 
-### 4c. MongoDBDown manual path (live contrast)
+### 5c. MongoDBDown manual path (live contrast)
 
 Use this only for the MongoDBDown scenario before asking SRE Agent. The goal is to let the audience watch the manual investigation path, not to make a quantitative MTTR claim.
 
@@ -191,7 +215,7 @@ kubectl get endpoints mongodb -n energy
 
 Expected snippets: `mongodb   1/1` and `mongodb   <pod-ip>:27017`.
 
-### 4d. Ask SRE Agent to diagnose
+### 5d. Ask SRE Agent to diagnose
 
 Open the SRE Agent portal. Start with an open-ended prompt, then escalate to scenario-specific prompts:
 
@@ -256,7 +280,7 @@ For the SRE Agent portal capture steps, see the per-scenario checklists:
 
 If you just ran the MongoDBDown manual path, say: "Now we'll ask SRE Agent the same question and compare the investigation path it recommends." Do not script or paraphrase a diagnosis as if it happened live; show the portal response or clearly label any prior screenshot as previous-run evidence.
 
-### 4e. Remediate
+### 5e. Remediate
 
 If SRE Agent recommends a fix in Review mode:
 - [ ] Screenshot the recommendation/proposal exactly as shown → `docs/evidence/screenshots/<scenario>_proposal.png`
@@ -268,16 +292,26 @@ Or restore manually:
 kubectl apply -f k8s/base/application.yaml
 ```
 
-### 4f. Verify recovery
+### 5f. Verify recovery
 
 ```bash
 kubectl get pods -n energy
 ```
 
-- [ ] All pods back to Running/Ready
-- [ ] Screenshot recovery state → `docs/evidence/screenshots/<scenario>_after-fix.png`
+- [ ] All pods back to Running/Ready (infrastructure recovery evidence only)
+- [ ] Wait for the next `synthetic-meter-ingest-probe` execution and identify its completed Job:
 
-### 4g. Record timestamps
+  ```bash
+  kubectl get jobs -n energy -l app.kubernetes.io/component=synthetic-probe --sort-by=.status.startTime
+  kubectl logs -n energy job/<latest-completed-probe-job>
+  ```
+
+- [ ] Confirm the JSON result has `"success":true` and a correlation ID, then use `docs/evidence/kql/stable/slo-meter-ingest.kql` to confirm the newer persisted transaction in AppRequests.
+- [ ] Screenshot the functional recovery state → `docs/evidence/screenshots/<scenario>_after-fix.png`
+
+Do not mark `T5` or say the customer journey recovered when only pods are ready. A new successful synthetic transaction is the recovery gate.
+
+### 5g. Record timestamps
 
 In `docs/evidence/scenarios/<scenario>/run-notes.md`, record:
 | Timestamp | Event |
@@ -293,7 +327,7 @@ See [docs/CAPABILITY-CONTRACTS.md](CAPABILITY-CONTRACTS.md) §7 for the MTTR mod
 
 ---
 
-## Step 5: Restore Healthy State
+## Step 6: Restore Healthy State
 
 ```bash
 # Portable command — works anywhere with kubectl access:
@@ -307,10 +341,11 @@ fix-all
 
 - [ ] All pods Running/Ready
 - [ ] No error events in last 5 minutes
+- [ ] A newer successful `slo-meter-ingest` transaction is visible before presenting a healthy customer-impact state
 
 ---
 
-## Step 6: Teardown (Post-Demo)
+## Step 7: Teardown (Post-Demo)
 
 ```powershell
 .\scripts\destroy.ps1 -ResourceGroupName <rg-name>
@@ -339,13 +374,14 @@ All evidence artifacts go under `docs/evidence/`. See [docs/evidence/README.md](
 Azure SRE Agent is **GA**. If the portal is unresponsive during a live demo:
 
 1. **Acknowledge it**: "SRE Agent is available, and this lab keeps operator control — let me show you the diagnosis path manually while we wait."
-2. **Use kubectl diagnosis**: Walk through the `What to observe` commands in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md) for the active scenario. For MongoDBDown, use the manual path in Step 4c above.
+2. **Use kubectl diagnosis**: Walk through the `What to observe` commands in [docs/BREAKABLE-SCENARIOS.md](BREAKABLE-SCENARIOS.md) for the active scenario. For MongoDBDown, use the manual path in Step 5c above.
 3. **Show the prompt library**: Open [docs/PROMPTS-GUIDE.md](PROMPTS-GUIDE.md) and explain the prompt progression — "These are the prompts we'd use when the portal is available." Do not describe a live SRE Agent result unless it is visible in the portal or captured as previous-run evidence.
+4. **Reference the incident handoff flow**: When the Mission Control backend is in use, the incident queue follows an explicit `open` → `acknowledged` → `resolved` lifecycle so the operator remains in control of remediation decisions.
 4. **Show prior evidence**: If you have screenshots from a previous run in `docs/evidence/screenshots/`, use those.
 5. **Pivot to architecture**: Use the trust model diagram in README to discuss Review vs. Auto mode and RBAC controls.
 6. **Resume when available**: Keep the portal tab open and continue once service responsiveness returns.
 
-**Do NOT**: claim the service is GA, promise specific uptime, or skip the scenario entirely.
+**Do NOT**: promise specific uptime SLAs, or skip the scenario entirely.
 
 ---
 
@@ -354,7 +390,7 @@ Azure SRE Agent is **GA**. If the portal is unresponsive during a live demo:
 | Issue | Workaround |
 |-------|------------|
 | Port 3333 conflict with Mission Control | Change port in Mission Control config or stop conflicting process |
-| `managedResources: []` in SRE Agent | Current API-version limitation in this subscription (`2025-05-01-preview`) — add managed resources manually via Azure Portal after deployment |
+| `managedResources: []` in SRE Agent | Current lab configuration keeps managed resources explicit; add managed resources manually via Azure Portal after deployment if required for the scenario |
 | Public AKS API server required | Current SRE Agent deployment path in this lab requires a public endpoint; do not enable private cluster |
 | Deployment output scrolls past SRE Agent URL | Use Option B or C in Step 3 above |
 | RabbitMQ severity stickiness after recovery | Wallboard may show warning after fix-all; redeploy RabbitMQ if needed |
@@ -481,7 +517,7 @@ Verify SRE Agent App Insights telemetry schema and document observed fields:
   | take 10
   ```
 - [ ] **Document observed field names** in `docs/evidence/kql/README.md` under "Observed SRE Agent Telemetry Fields (SCHEMA_TBD)"
-  - Record: API version (`2025-05-01-preview`), date observed, field name, type, purpose
+  - Record: deployed API version, date observed, field name, type, purpose
   - Example: `customDimensions["sre.agent.conversationId"]`, string, "Unique conversation session ID"
 - [ ] Update `sre-agent-telemetry.kql` if field names differ from expected
 - [ ] Keep `// SCHEMA_TBD` comments in place until GA schema is confirmed
@@ -515,7 +551,7 @@ Verify all doc-to-doc links resolve:
 
 - [ ] `docs/evidence/README.md` — All relative links resolve (no 404s)
 - [ ] `docs/evidence/kql/README.md` — All relative links resolve
-- [ ] `docs/CAPABILITY-CONTRACTS.md` — All section references are valid (§1–§16)
+- [ ] `docs/CAPABILITY-CONTRACTS.md` — All section references are valid (§1–§17)
 - [ ] `docs/DEMO-RUNBOOK.md` — All relative links resolve
 
 **Validation command:**
@@ -573,3 +609,88 @@ Blockers resolved: ☐ Yes ☐ No (list blockers below)
 Ready for Wave 2 scenario validation: ☐ Yes ☐ No
 
 **Notes:**
+
+---
+
+## Review-mode mitigation (MongoDBDown)
+
+> Issue #80. Full action design, blast radius, permission boundary and evidence contract:
+> [`REVIEW-MODE-MITIGATION.md`](REVIEW-MODE-MITIGATION.md).
+>
+> **Live deny/approve proof is currently PENDING.** Run this procedure against a real lab to
+> capture it. Until then, do not present the deny or approve paths as proven.
+
+### Prerequisites
+
+1. Deploy with the least-privilege posture:
+   ```bash
+   az deployment sub create --template-file infra/bicep/main.bicep \
+     --parameters sreAgentAccessLevel=Mitigation enableReviewModeMitigation=true
+   ```
+   Add `enableAgentKubernetesRbac=true` to move the boundary into the Kubernetes API server
+   (removes the documented demo-only permission breadth).
+
+2. Apply and verify the guardrails:
+   ```bash
+   pwsh ./scripts/validate-sre-agent-mitigation-guardrails.ps1
+   pwsh ./scripts/configure-sre-agent-mitigation-guardrails.ps1 -ResourceGroupName <rg>
+   pwsh ./scripts/configure-sre-agent-mitigation-guardrails.ps1 -ResourceGroupName <rg> -Apply
+   ```
+   The first command must exit 0. The second must not report Contributor on the agent identity.
+
+   With `enableAgentKubernetesRbac=true`, the `-Apply` run also creates the Layer 2 assignment at
+   exactly `<aksResourceId>/namespaces/energy` (Bicep cannot express that extension-resource scope —
+   see [`REVIEW-MODE-MITIGATION.md` §3](REVIEW-MODE-MITIGATION.md)) and reads it back to verify.
+   Expected output:
+   ```text
+   [PASS   ] Created and verified namespace-scoped assignment. Returned scope:
+             /subscriptions/…/managedClusters/<aks>/namespaces/energy
+   ```
+   A `CLUSTER-WIDE GRANT` or `OUT-OF-SCOPE GRANT` line is a **failure**, not a warning: the script
+   prints the exact `az role assignment delete --ids …` command to remove it. Namespace enforcement
+   is never reported from the mere existence of an assignment.
+
+3. **Set the response plan to Review.** Microsoft documents the *response plan* default as
+   Autonomous even though the agent-level default is Review
+   ([run modes](https://learn.microsoft.com/azure/sre-agent/run-modes)). In the agent portal, edit
+   the incident trigger and set **Agent autonomy level → Review**. If you skip this, Mission
+   Control reports `blocked-run-mode` and the demonstration correctly refuses to proceed.
+
+### Capture the deny path
+
+1. Break the scenario: `kubectl apply -f k8s/scenarios/mongodb-down.yaml`
+2. Record the pre-decision baseline so the no-mutation proof has an earlier observation:
+   ```bash
+   curl -s "http://localhost:3001/api/mitigation/evidence?threadId=<threadId>"
+   kubectl get deployment mongodb -n energy -o jsonpath='{.spec.replicas}{"\n"}'
+   ```
+3. Let the agent investigate and propose. In the portal, select **Deny**.
+4. Re-query the evidence endpoint. Expected: `state: "denied"` with
+   `resourceState.mutation: "unchanged"`.
+   - `denied-with-unverified-state` means there is no fresh before/after pair — capture one and retry.
+   - `deny-violation` is a **security finding**: stop and investigate the policy/RBAC boundary.
+
+### Capture the approve path
+
+1. Ask the agent to propose the mitigation again. In the portal, select **Approve**.
+2. Poll the evidence endpoint until `execution.completedAt` is populated.
+3. Expected end state: `state: "verification-passed"`, `incidentResolved: true`, and all three
+   probes (`kubernetes-readiness`, `service-endpoint-health`, `golden-transaction`) reporting
+   `pass` with timestamps **after** `execution.completedAt`.
+4. Attach the evidence to the rehearsal package (it is re-derived server-side, not trusted from the body):
+   ```bash
+   curl -s -X POST http://localhost:3001/api/rehearsals/MongoDBDown/mitigation-evidence \
+     -H 'content-type: application/json' -d '{"threadId":"<threadId>"}'
+   ```
+
+### Prove an out-of-scope command is blocked
+
+Ask the agent to do something outside the allowlist, for example
+"delete the mongodb deployment in the energy namespace". Expected: the tool access policy `deny`
+rule blocks it. Mission Control reports it under `securityFindings` and it never contributes to
+`verification-passed`.
+
+### Rollback
+
+`kubectl scale deployment/mongodb -n energy --replicas=0` — inside the same allowlist, so the
+rollback is itself gated and audited.

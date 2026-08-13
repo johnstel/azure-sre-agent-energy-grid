@@ -1,0 +1,281 @@
+# =============================================================================
+# SRE Agent Deep Context — Knowledge Manifest
+# =============================================================================
+# Authority: johnstel/azure-sre-agent-energy-grid
+# Purpose:   Curated allowlist of documents approved for SRE Agent knowledge base.
+# Policy:    Only sources listed here may be uploaded or connected. Each entry
+#            carries provenance metadata so stale/contradictory content can be
+#            detected and purged programmatically.
+#
+# Governance: Review quarterly (see docs/deep-context/GOVERNANCE.md).
+# Schema:    See tests/deep-context/test_manifest_schema.py
+# =============================================================================
+
+manifest_version: "1.0.0"
+last_reviewed: "2026-08-12"
+next_review_due: "2026-11-12"
+repository: "johnstel/azure-sre-agent-energy-grid"
+environment: "Energy Grid Demo Lab (non-production)"
+
+# -----------------------------------------------------------------------------
+# AUTHORIZED KNOWLEDGE SOURCES
+# -----------------------------------------------------------------------------
+sources:
+
+  # --- Architecture & Topology ---
+  - id: arch-overview
+    path: "docs/DEMO-NARRATIVE.md"
+    title: "Energy Grid Architecture & Demo Narrative"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "Primary architecture reference; describes all services, topology, and demo flow."
+
+  - id: k8s-base-manifest
+    path: "k8s/base/application.yaml"
+    title: "Healthy Kubernetes Application Manifest"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: code_access
+    rationale: "Canonical healthy-state manifest with selectors, labels, resource limits, and dependencies."
+
+  - id: bicep-main
+    path: "infra/bicep/main.bicep"
+    title: "Main Bicep Deployment Orchestration"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: code_access
+    rationale: "Infrastructure-as-code entry point; defines resource dependencies and parameters."
+
+  # --- Scenario Runbooks ---
+  - id: rb-001-oom
+    path: "docs/evidence/runbooks/RB-001-oom-killed.md"
+    title: "Runbook: OOMKilled — Meter Service Memory Spike"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "Validated runbook for OOMKilled scenario with diagnosis steps and remediation."
+
+  - id: rb-009-mongodb
+    path: "docs/evidence/runbooks/RB-009-mongodb-down.md"
+    title: "Runbook: MongoDBDown — Cascading Database Failure"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "Validated runbook for MongoDB outage with dependency chain and root-cause isolation."
+
+  - id: rb-010-svc-mismatch
+    path: "docs/evidence/runbooks/RB-010-service-mismatch.md"
+    title: "Runbook: ServiceMismatch — Selector/Label Routing Failure"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "Validated runbook for silent service mismatch with selector analysis."
+
+  # --- KQL Queries ---
+  - id: kql-oom
+    path: "docs/evidence/kql/stable/scenario-oom-killed.kql"
+    title: "KQL: OOMKilled Pod Events"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "Validated KQL for OOMKilled telemetry correlation."
+
+  - id: kql-mongodb
+    path: "docs/evidence/kql/stable/scenario-mongodb-down.kql"
+    title: "KQL: MongoDB Down Dependency Events"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "Validated KQL for MongoDB dependency failure signals."
+
+  - id: kql-svc-mismatch
+    path: "docs/evidence/kql/stable/scenario-service-mismatch.kql"
+    title: "KQL: Service Mismatch Endpoint Gaps"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "Validated KQL for service selector mismatch detection."
+
+  - id: kql-pod-lifecycle
+    path: "docs/evidence/kql/stable/pod-lifecycle.kql"
+    title: "KQL: Pod Lifecycle Events"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "General pod lifecycle query useful across scenarios."
+
+  # --- Breakable Scenario Manifests ---
+  - id: scenario-oom
+    path: "k8s/scenarios/oom-killed.yaml"
+    title: "Scenario Manifest: OOMKilled"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: code_access
+    rationale: "Exact Kubernetes patch that triggers the OOMKilled scenario."
+
+  - id: scenario-mongodb
+    path: "k8s/scenarios/mongodb-down.yaml"
+    title: "Scenario Manifest: MongoDB Down"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: code_access
+    rationale: "Exact Kubernetes patch that triggers the MongoDB outage scenario."
+
+  - id: scenario-svc-mismatch
+    path: "k8s/scenarios/service-mismatch.yaml"
+    title: "Scenario Manifest: Service Mismatch"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: code_access
+    rationale: "Exact Kubernetes patch that triggers the service mismatch scenario."
+
+  # --- Troubleshooting & Safe Language ---
+  - id: k8s-troubleshooting
+    path: "docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md"
+    title: "Kubernetes Service Troubleshooting Guide"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "General K8s troubleshooting methodology applicable across scenarios."
+
+  - id: safe-language
+    path: "docs/ANALYST-SAFE-LANGUAGE.md"
+    title: "Analyst Safe Language Guidance"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "Safety guardrails for agent-generated recommendations."
+
+  # --- Dependency/Costs Context ---
+  - id: costs
+    path: "docs/COSTS.md"
+    title: "Cost Breakdown and Assumptions"
+    authority: authoritative
+    owner: johnstel
+    version: "main:HEAD"
+    last_validated: "2026-08-12"
+    environment: "energy-grid-demo"
+    sensitivity: public
+    review_due: "2026-11-12"
+    upload_target: knowledge_base
+    rationale: "Operational cost context for resource sizing decisions."
+
+# -----------------------------------------------------------------------------
+# EXCLUDED SOURCES (with rationale)
+# -----------------------------------------------------------------------------
+exclusions:
+
+  - path: "docs/evidence/wave1-live/**"
+    rationale: "Raw live evidence contains unredacted resource identifiers and transient kubectl output. Not authoritative for future investigations."
+
+  - path: "docs/evidence/wave2-live/**"
+    rationale: "Same as wave1: raw evidence with potential PII/resource IDs."
+
+  - path: "docs/evidence/screenshots/**"
+    rationale: "Binary screenshots may contain tenant IDs, subscription details, or stale UI. Use redacted references only."
+
+  - path: "docs/evidence/complete-failure-bundle/**"
+    rationale: "Transient demo bundle with unvalidated run notes. May contain contradictory state."
+
+  - path: "docs/SRE-AGENT-API-RESEARCH.md"
+    rationale: "Internal research spike; may contain speculative or outdated API information."
+
+  - path: "docs/SRE-AGENT-API-ROLLOUT.md"
+    rationale: "Operational rollout tracking; not reference documentation."
+
+  - path: "docs/spikes/**"
+    rationale: "Exploration spikes are not validated and may contradict final designs."
+
+  - path: "docs/GRAFANA-INCIDENT-DASHBOARD-REVIEW-NOTE.md"
+    rationale: "Internal review note; not operational reference."
+
+  - path: "docs/scenario-narration.json"
+    rationale: "UI narration data; not authoritative system documentation."
+
+  - path: "**/*.png"
+    rationale: "Binary images excluded from text knowledge base (use Alt text or description docs instead)."
+
+  - path: "docs/evidence/kql/schema-tbd/**"
+    rationale: "TBD queries are unvalidated and should not be cited as authoritative."
+
+  - path: ".devcontainer/**"
+    rationale: "Dev container config is tooling, not system knowledge."
+
+  - path: "docs/CUSTOMER-LEAVE-BEHIND.md"
+    rationale: "Customer-facing sales artifact; not operational reference for SRE investigations."

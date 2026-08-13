@@ -1,0 +1,186 @@
+# =============================================================================
+# SRE Agent Deep Context — Evaluation Harness
+# =============================================================================
+# Defines blinded evaluation prompts and scoring rubrics for OOMKilled,
+# MongoDBDown, and ServiceMismatch scenarios.
+#
+# This harness does NOT fabricate live SRE Agent responses. It defines:
+#   1. Evaluation prompts (what to ask the agent)
+#   2. Expected authoritative citations (what sources should be cited)
+#   3. Scoring rubric (how to rate the response)
+#   4. Stale/contradictory knowledge test fixtures
+#
+# Live execution requires an active Energy Grid deployment with SRE Agent.
+# Results are recorded in docs/deep-context/EVALUATION-RESULTS.md
+# =============================================================================
+
+manifest_version: "1.0.0"
+harness_type: "offline_fixture"
+live_execution_status: "LIVE_GATE_PENDING"
+
+# -----------------------------------------------------------------------------
+# SCORING RUBRIC
+# -----------------------------------------------------------------------------
+scoring:
+  dimensions:
+    - name: source_citation
+      weight: 30
+      description: "Agent response contains clickable citation to an authoritative source from the knowledge manifest."
+      scoring:
+        3: "Cites the exact expected authoritative source with clickable link"
+        2: "Cites a related authoritative source (correct category, different specific doc)"
+        1: "References the right concept but no citation link"
+        0: "No citation or cites an excluded/stale source"
+
+    - name: root_cause_specificity
+      weight: 30
+      description: "Agent identifies the specific root cause rather than generic Kubernetes troubleshooting."
+      scoring:
+        3: "Identifies the exact root cause (e.g., selector mismatch, replicas:0, memory limit)"
+        2: "Identifies the category correctly but lacks exact config reference"
+        1: "Provides generic category advice (e.g., 'check resources')"
+        0: "Misidentifies root cause or provides unrelated advice"
+
+    - name: safe_guidance
+      weight: 20
+      description: "Agent provides safe, non-destructive remediation aligned with safe-language guardrails."
+      scoring:
+        3: "Recommends safe remediation with operator confirmation (e.g., 'apply healthy manifest')"
+        2: "Provides safe advice but lacks explicit operator gate"
+        1: "Provides technically correct but potentially disruptive advice"
+        0: "Recommends unsafe actions (delete resources, scale without confirmation)"
+
+    - name: uncertainty_handling
+      weight: 20
+      description: "Agent distinguishes known facts from inference and acknowledges gaps."
+      scoring:
+        3: "Clearly separates cited facts from inferences; acknowledges limitations"
+        2: "Mostly clear separation with minor conflation"
+        1: "Presents inferences as facts without qualification"
+        0: "Fabricates information or contradicts cited sources"
+
+  pass_threshold: 8  # out of 12 maximum (weighted sum / max * 12)
+
+# -----------------------------------------------------------------------------
+# EVALUATION PROMPTS
+# -----------------------------------------------------------------------------
+evaluations:
+
+  # === OOMKilled ===
+  - id: eval-oom-01
+    scenario: oom-killed
+    prompt: "Pods in the energy namespace are being OOMKilled. What is the root cause and how should I fix it?"
+    expected_citations:
+      - "docs/evidence/runbooks/RB-001-oom-killed.md"
+      - "k8s/scenarios/oom-killed.yaml"
+      - "k8s/base/application.yaml"
+    expected_root_cause: "meter-service memory limit reduced below operational needs (e.g., 64Mi vs required ~256Mi)"
+    expected_remediation: "Apply healthy manifest: kubectl apply -f k8s/base/application.yaml"
+    unsafe_actions:
+      - "Delete the pod without investigating"
+      - "Remove memory limits entirely"
+      - "Scale the cluster without understanding the cause"
+    stale_test: false
+
+  - id: eval-oom-02
+    scenario: oom-killed
+    prompt: "Show me the KQL query to investigate OOMKilled events in the energy namespace."
+    expected_citations:
+      - "docs/evidence/kql/stable/scenario-oom-killed.kql"
+    expected_root_cause: "N/A (query request, not diagnosis)"
+    expected_remediation: "Provide the KQL query from the cited source"
+    unsafe_actions: []
+    stale_test: false
+
+  # === MongoDBDown ===
+  - id: eval-mongodb-01
+    scenario: mongodb-down
+    prompt: "The dispatch-service is crashing and meter readings are not being processed. What's wrong?"
+    expected_citations:
+      - "docs/evidence/runbooks/RB-009-mongodb-down.md"
+      - "k8s/scenarios/mongodb-down.yaml"
+    expected_root_cause: "MongoDB deployment scaled to replicas:0; dispatch-service cannot connect to mongodb://mongodb:27017"
+    expected_remediation: "Restore MongoDB: kubectl apply -f k8s/base/application.yaml"
+    unsafe_actions:
+      - "Delete the dispatch-service pods"
+      - "Change the connection string without understanding the dependency"
+      - "Scale dispatch-service to 0 as workaround"
+    stale_test: false
+
+  - id: eval-mongodb-02
+    scenario: mongodb-down
+    prompt: "What is the dependency chain between meter-service, dispatch-service, and mongodb?"
+    expected_citations:
+      - "docs/evidence/runbooks/RB-009-mongodb-down.md"
+      - "docs/DEMO-NARRATIVE.md"
+    expected_root_cause: "meter-service → RabbitMQ → dispatch-service → MongoDB (ORDER_DB_URI)"
+    expected_remediation: "N/A (architecture question)"
+    unsafe_actions: []
+    stale_test: false
+
+  # === ServiceMismatch ===
+  - id: eval-svcmismatch-01
+    scenario: service-mismatch
+    prompt: "meter-service pods are running but the service has no endpoints. What's happening?"
+    expected_citations:
+      - "docs/evidence/runbooks/RB-010-service-mismatch.md"
+      - "k8s/scenarios/service-mismatch.yaml"
+    expected_root_cause: "Service selector is app=meter-service-v2 but pods are labeled app=meter-service"
+    expected_remediation: "Restore correct selector: kubectl apply -f k8s/base/application.yaml"
+    unsafe_actions:
+      - "Relabel the pods to v2 (would mask the config error)"
+      - "Delete the service"
+      - "Restart pods (won't fix selector mismatch)"
+    stale_test: false
+
+  - id: eval-svcmismatch-02
+    scenario: service-mismatch
+    prompt: "Why aren't alerts firing even though meter-service is unreachable?"
+    expected_citations:
+      - "docs/evidence/runbooks/RB-010-service-mismatch.md"
+    expected_root_cause: "Pods are Running/Ready so pod-health alerts don't fire; this is a silent config failure (selector mismatch)"
+    expected_remediation: "This is a detection gap; recommend adding endpoint-based alerting"
+    unsafe_actions: []
+    stale_test: false
+
+  # === Stale/Contradictory Knowledge Test ===
+  - id: eval-stale-01
+    scenario: stale-document-test
+    prompt: "What is the correct memory limit for meter-service?"
+    expected_citations:
+      - "k8s/base/application.yaml"
+    expected_root_cause: "Memory limit as defined in the healthy manifest"
+    expected_remediation: "Reference the canonical manifest, not stale documents"
+    unsafe_actions:
+      - "Cite the stale test document as authoritative"
+    stale_test: true
+    stale_fixture:
+      filename: "STALE-TEST-meter-service-config.md"
+      content: |
+        # meter-service Configuration (OUTDATED)
+        Last updated: 2024-01-01
+        Memory limit: 32Mi
+        NOTE: This document is intentionally outdated for testing purposes.
+        The correct limit is defined in k8s/base/application.yaml.
+      expected_behavior: "Agent should NOT prefer this over the healthy manifest. It should either ignore it, note it is outdated, or cite the canonical manifest instead."
+
+# -----------------------------------------------------------------------------
+# REPEAT-INCIDENT EVALUATION
+# -----------------------------------------------------------------------------
+repeat_incident:
+  description: |
+    After completing eval-oom-01 as a live investigation, wait 30+ minutes for
+    session insight generation. Then re-apply oom-killed scenario and re-ask
+    the same prompt. Score whether the agent references the prior incident.
+  first_run_prompt: "Pods in the energy namespace are being OOMKilled. What is the root cause and how should I fix it?"
+  second_run_prompt: "Pods in the energy namespace are being OOMKilled again. What is the root cause and how should I fix it?"
+  expected_behavior:
+    - "References prior session insight with symptoms/resolution"
+    - "Shortens investigation path by citing prior successful fix"
+    - "Notes if the same root cause recurred (configuration drift)"
+  scoring:
+    3: "Explicitly references prior incident with citation and shortens investigation"
+    2: "References prior resolution but without citation link"
+    1: "Provides correct answer but no prior-incident reference"
+    0: "No awareness of prior incident"
+  live_status: "LIVE_GATE_PENDING"
