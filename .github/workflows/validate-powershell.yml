@@ -1,0 +1,78 @@
+name: Validate PowerShell
+
+on:
+  push:
+    paths:
+      - 'scripts/**/*.ps1'
+      - '.github/workflows/validate-powershell.yml'
+  pull_request:
+    paths:
+      - 'scripts/**/*.ps1'
+      - '.github/workflows/validate-powershell.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-powershell:
+    name: Parse and analyze PowerShell scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell syntax
+        shell: pwsh
+        run: |
+          $scriptFiles = Get-ChildItem scripts -Filter *.ps1 -Recurse
+          if (-not $scriptFiles) {
+            throw "No PowerShell scripts were found under scripts/."
+          }
+
+          $errorCount = 0
+          foreach ($file in $scriptFiles) {
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $file.FullName,
+              [ref]$null,
+              [ref]$parseErrors
+            )
+
+            if ($parseErrors) {
+              foreach ($error in $parseErrors) {
+                $line = $error.Extent.StartLineNumber
+                $column = $error.Extent.StartColumnNumber
+                Write-Host "::error file=$($file.FullName),line=$line,col=$column::$($error.Message)"
+                $errorCount++
+              }
+            }
+          }
+
+          if ($errorCount -gt 0) {
+            throw "PowerShell syntax parsed with $errorCount error(s)."
+          }
+
+          Write-Host "PowerShell AST parser passed for $($scriptFiles.Count) file(s)."
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck -RequiredVersion '1.23.0'
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error
+
+          if ($results) {
+            foreach ($result in $results) {
+              Write-Host "::error file=$($result.ScriptPath),line=$($result.Line),col=$($result.Column),title=$($result.RuleName)::$($result.Message)"
+            }
+
+            throw "PSScriptAnalyzer found $($results.Count) Error-severity issue(s)."
+          }
+
+          Write-Host "PSScriptAnalyzer returned no Error-severity issues."
