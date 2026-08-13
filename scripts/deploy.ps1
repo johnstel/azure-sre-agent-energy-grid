@@ -1467,10 +1467,6 @@ if ($storeUrl) {
 else {
     Write-Host "  ⚠️  Grid Dashboard external IP is still pending. Check again with: kubectl get svc grid-dashboard -n energy" -ForegroundColor Yellow
 }
-}
-else {
-    Write-Host "  ⚠️  Application manifest not found at: $k8sPath" -ForegroundColor Yellow
-}
 
 # Provision the repo-managed Grafana dashboard
 Write-Host "`n📊 Provisioning repo-managed Grafana dashboard..." -ForegroundColor Yellow
