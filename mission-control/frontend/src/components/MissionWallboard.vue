@@ -172,7 +172,9 @@
       <Terminal :lines="jobLines" :title="jobStreamTitle" :tone="jobStreamKind === 'destroy' ? 'danger' : 'default'" />
     </div>
 
+    <SreAgentPanel v-if="controlPanelOpen" />
     <PortalValidation v-if="controlPanelOpen" />
+    <RehearsalWorkflow v-if="controlPanelOpen" />
 
     <div class="wallboard__main">
       <section class="inventory-panel" aria-labelledby="inventory-heading">
@@ -230,7 +232,62 @@
       </section>
 
       <aside class="ops-panel" aria-label="Active incidents and pod board">
-        <section class="wallboard-card">
+        <CustomerImpactPanel :impact="customerImpact" :error="customerImpactError" />
+        <ReviewModeMitigationPanel
+          :evidence="mitigationEvidence"
+          :guardrails="mitigationGuardrails"
+          :error="mitigationError"
+        />
+        <section class="wallboard-card incident-handoff-card">
+        <div class="wallboard-panel__heading">
+          <div>
+            <p class="wallboard-kicker">Operator handoff</p>
+            <h2>Incident Queue</h2>
+          </div>
+          <span class="badge" :class="openIncidentHandoffCount > 0 ? 'badge-warning' : 'badge-online'">{{ openIncidentHandoffCount }} pending</span>
+        </div>
+        <p class="wallboard-card__copy">
+          Action-group alerts and dashboard evidence are captured here as operator-reviewed handoffs. Safe remediation remains operator-controlled.
+        </p>
+        <div v-if="incidentHandoffError" class="wallboard-alert wallboard-alert--warning" role="status">{{ incidentHandoffError }}</div>
+        <div v-if="incidentHandoffs.length === 0" class="wallboard-empty">No incident handoffs captured yet.</div>
+        <div v-for="incident in incidentHandoffs" :key="incident.id" class="incident-handoff" :class="`incident-handoff--${incident.severity}`">
+          <div class="incident-handoff__header">
+            <div>
+              <strong>{{ incident.title }}</strong>
+              <p>{{ incident.summary }}</p>
+            </div>
+            <span class="badge" :class="incidentBadgeClass(incident.status)">{{ incident.status }}</span>
+          </div>
+          <div class="incident-handoff__meta">
+            <span>{{ incident.scenarioName ? `Scenario · ${incident.scenarioName}` : 'Manual handoff' }}</span>
+            <span>{{ incident.source }}</span>
+          </div>
+          <div class="incident-handoff__meta">
+            <span class="badge" :class="nativeEvidenceBadgeClass(incident.nativeEvidence)">{{ nativeEvidenceLabel(incident.nativeEvidence) }}</span>
+            <span v-if="incident.nativeEvidence?.stale">stale evidence</span>
+          </div>
+          <p v-if="incident.nativeEvidence?.threadId" class="incident-handoff__native-detail">
+            Thread {{ incident.nativeEvidence.threadId }}<span v-if="incident.nativeEvidence.responsePlanId"> · Plan {{ incident.nativeEvidence.responsePlanId }}</span>
+          </p>
+          <ul v-if="incident.evidence.length > 0" class="compact-list">
+            <li v-for="piece in incident.evidence" :key="piece">{{ piece }}</li>
+          </ul>
+          <div class="incident-handoff__actions">
+            <button class="command-button command-button--neutral" type="button" :disabled="incidentActionBusyId === incident.id || incident.status === 'acknowledged' || incident.status === 'resolved'" @click="updateIncidentHandoff(incident.id, 'acknowledge')">
+              {{ incidentActionBusyId === incident.id ? 'Updating…' : 'Acknowledge' }}
+            </button>
+            <button class="command-button command-button--primary" type="button" :disabled="incidentActionBusyId === incident.id || incident.status === 'resolved'" @click="updateIncidentHandoff(incident.id, 'resolve')">
+              {{ incidentActionBusyId === incident.id ? 'Updating…' : 'Resolve' }}
+            </button>
+            <button class="command-button command-button--neutral" type="button" :disabled="incidentActionBusyId === incident.id" @click="reconcileNativeEvidenceForIncident(incident.id)">
+              {{ incidentActionBusyId === incident.id ? 'Updating…' : 'Check native evidence' }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="wallboard-card">
           <div class="wallboard-panel__heading">
             <div>
               <p class="wallboard-kicker">Top severity</p>
@@ -480,14 +537,23 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useApi } from '@/composables/useApi';
 import { useWebSocket } from '@/composables/useWebSocket';
+import { buildMitigationEvidenceRequest } from '@/utils/reviewModeMitigation';
 import PortalValidation from './PortalValidation.vue';
+import RehearsalWorkflow from './RehearsalWorkflow.vue';
+import SreAgentPanel from './SreAgentPanel.vue';
 import ScenarioNarrationPanel from './ScenarioNarrationPanel.vue';
 import Terminal from './Terminal.vue';
+import CustomerImpactPanel from './CustomerImpactPanel.vue';
+import ReviewModeMitigationPanel from './ReviewModeMitigationPanel.vue';
 import type {
   Deployment,
   AssistantAskResponse,
   AssistantClientContext,
   AssistantConversationMessage,
+  CustomerImpactResponse,
+  ReviewModeMitigationEvidence,
+  ReviewModeMitigationGuardrails,
+  IncidentHandoff,
   InventoryItem,
   InventorySeverity,
   Job,
@@ -530,7 +596,10 @@ const {
   enableScenario,
   fixAll,
   getDeployments,
+  getCustomerImpact,
+  getMitigationEvidence,
   getEvents,
+  getIncidentHandoffs,
   getInventory,
   getPodLogs,
   getPods,
@@ -538,6 +607,9 @@ const {
   getScenarios,
   getServiceEndpoints,
   getServices,
+  acknowledgeIncident,
+  resolveIncident,
+  reconcileNativeEvidence,
 } = useApi();
 
 const inventory = ref<InventoryItem[]>([]);
@@ -547,6 +619,12 @@ const services = ref<Service[]>([]);
 const events = ref<KubeEvent[]>([]);
 const scenarios = ref<Scenario[]>([]);
 const preflightChecks = ref<PreflightCheck[]>([]);
+const incidentHandoffs = ref<IncidentHandoff[]>([]);
+const customerImpact = ref<CustomerImpactResponse>();
+const customerImpactError = ref('');
+const mitigationEvidence = ref<ReviewModeMitigationEvidence>();
+const mitigationGuardrails = ref<ReviewModeMitigationGuardrails>();
+const mitigationError = ref('');
 
 const inventoryLoading = ref(false);
 const inventoryError = ref('');
@@ -557,6 +635,8 @@ const selectedLogs = ref<string[]>([]);
 const selectedEndpoints = ref<ServiceEndpoint[]>([]);
 const diagnosticsError = ref('');
 const diagnosticsLoading = ref(false);
+const incidentHandoffError = ref('');
+const incidentActionBusyId = ref<string | null>(null);
 const drawerCollapsed = ref(false);
 const controlPanelOpen = ref(false);
 
@@ -644,6 +724,7 @@ const incidents = computed(() => inventory.value
   .filter(item => item.severity === 'critical' || item.severity === 'warning')
   .sort((a, b) => severityRank(b.severity) - severityRank(a.severity))
   .slice(0, 5));
+const openIncidentHandoffCount = computed(() => incidentHandoffs.value.filter(incident => incident.status !== 'resolved').length);
 const overallSeverity = computed<InventorySeverity>(() => {
   if (inventory.value.some(item => item.severity === 'critical')) return 'critical';
   if (inventory.value.some(item => item.severity === 'warning') || activeScenarios.value > 0) return 'warning';
@@ -694,7 +775,7 @@ const preflightBadgeClass = computed(() => {
   if (preflightChecks.value.length === 0) return 'badge-neutral';
   return preflightChecks.value.every(check => check.status === 'pass') ? 'badge-online' : 'badge-offline';
 });
-const statusLiveSummary = computed(() => `Mission status ${heartbeatLabel.value}. Inventory ${inventory.value.length} resources with ${mismatchCount.value} mismatches. Pods ${readyPodCount.value} of ${pods.value.length} ready. Scenarios ${activeScenarios.value} active.`);
+const statusLiveSummary = computed(() => `Mission status ${heartbeatLabel.value}. Inventory ${inventory.value.length} resources with ${mismatchCount.value} mismatches. Pods ${readyPodCount.value} of ${pods.value.length} ready. Scenarios ${activeScenarios.value} active. ${openIncidentHandoffCount.value} incident handoffs pending.`);
 const analystTranscriptStatus = computed(() => {
   if (analystTranscript.value.length === 0) return 'Local only';
   const answerCount = analystTranscript.value.filter(message => message.role === 'assistant').length;
@@ -703,7 +784,8 @@ const analystTranscriptStatus = computed(() => {
 
 async function refreshAll() {
   inventoryLoading.value = true;
-  await Promise.all([loadInventory(), loadRuntime(), loadScenarios()]);
+  await Promise.all([loadInventory(), loadRuntime(), loadScenarios(), loadIncidentHandoffs(), loadCustomerImpact()]);
+  await loadMitigationEvidence();
   inventoryLoading.value = false;
 }
 
@@ -744,6 +826,75 @@ async function loadRuntime() {
   else podError.value = `Pods unavailable: ${runtime[0].reason instanceof Error ? runtime[0].reason.message : String(runtime[0].reason)}`;
   if (runtime[1].status === 'fulfilled') services.value = runtime[1].value.services;
   if (runtime[2].status === 'fulfilled') events.value = runtime[2].value.events;
+}
+
+async function loadIncidentHandoffs() {
+  incidentHandoffError.value = '';
+  try {
+    const response = await getIncidentHandoffs();
+    incidentHandoffs.value = response.incidents ?? [];
+  } catch (error) {
+    incidentHandoffError.value = `Incident handoffs unavailable: ${error instanceof Error ? error.message : String(error)}`;
+    incidentHandoffs.value = [];
+  }
+}
+
+async function loadCustomerImpact() {
+  customerImpactError.value = '';
+  try {
+    customerImpact.value = await getCustomerImpact();
+  } catch (error) {
+    customerImpact.value = undefined;
+    customerImpactError.value = `Customer-impact API unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+async function loadMitigationEvidence() {
+  mitigationError.value = '';
+  // Correlate with the newest observed native thread/incident, if Mission Control has one.
+  // Never invent an identifier: with none, the backend reports `ambiguous` rather than guessing.
+  const correlated = incidentHandoffs.value.find(incident => incident.nativeEvidence?.threadId || incident.nativeEvidence?.incidentId);
+  const request = buildMitigationEvidenceRequest(correlated?.nativeEvidence ?? {});
+
+  // Keep the guardrail disclosure visible even when no native correlation exists. The backend
+  // intentionally answers an empty query with an `ambiguous` state plus `buildGuardrails()` rather
+  // than guessing, and it does not hit Azure/Kubernetes in that path.
+  try {
+    const response = await getMitigationEvidence(request);
+    mitigationEvidence.value = response.evidence;
+    mitigationGuardrails.value = response.guardrails;
+  } catch (error) {
+    mitigationEvidence.value = undefined;
+    mitigationError.value = `Mitigation evidence API unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+async function updateIncidentHandoff(id: string, action: 'acknowledge' | 'resolve') {
+  incidentActionBusyId.value = id;
+  try {
+    const response = action === 'acknowledge'
+      ? await acknowledgeIncident(id)
+      : await resolveIncident(id);
+    const updatedIncident = response.incident;
+    incidentHandoffs.value = incidentHandoffs.value.map(incident => incident.id === updatedIncident.id ? updatedIncident : incident);
+  } catch (error) {
+    incidentHandoffError.value = `Unable to update incident handoff: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    incidentActionBusyId.value = null;
+  }
+}
+
+async function reconcileNativeEvidenceForIncident(id: string) {
+  incidentActionBusyId.value = id;
+  try {
+    const response = await reconcileNativeEvidence(id);
+    const updatedIncident = response.incident;
+    incidentHandoffs.value = incidentHandoffs.value.map(incident => incident.id === updatedIncident.id ? updatedIncident : incident);
+  } catch (error) {
+    incidentHandoffError.value = `Unable to reconcile native evidence: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    incidentActionBusyId.value = null;
+  }
 }
 
 async function loadScenarios() {
@@ -1504,6 +1655,36 @@ function badgeForJob(status: string): string {
   return 'badge-neutral';
 }
 
+function incidentBadgeClass(status: IncidentHandoff['status']): string {
+  if (status === 'resolved') return 'badge-online';
+  if (status === 'acknowledged') return 'badge-warning';
+  return 'badge-offline';
+}
+
+function nativeEvidenceLabel(nativeEvidence?: IncidentHandoff['nativeEvidence']): string {
+  switch (nativeEvidence?.state) {
+    case 'native-mitigated': return 'Native: mitigated';
+    case 'native-approval-required': return 'Native: approval required';
+    case 'native-observed': return 'Native: investigation observed';
+    case 'local-fallback-only': return 'Local alert handoff only';
+    case 'evidence-unavailable':
+    default:
+      return 'Native evidence unavailable';
+  }
+}
+
+function nativeEvidenceBadgeClass(nativeEvidence?: IncidentHandoff['nativeEvidence']): string {
+  switch (nativeEvidence?.state) {
+    case 'native-mitigated': return 'badge-online';
+    case 'native-approval-required': return 'badge-warning';
+    case 'native-observed': return 'badge-warning';
+    case 'local-fallback-only': return 'badge-neutral';
+    case 'evidence-unavailable':
+    default:
+      return 'badge-neutral';
+  }
+}
+
 function preflightStatusSymbol(status: PreflightCheck['status']): string {
   if (status === 'pass') return '✓';
   if (status === 'warn') return '⚠';
@@ -1979,6 +2160,68 @@ defineExpose({
 .incident-row--warning,
 .pod-row--warning { border-color: rgb(245 158 11 / 0.44); }
 .pod-row--healthy { border-color: rgb(16 185 129 / 0.24); }
+
+.wallboard-card__copy {
+  margin: 0 0 0.7rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.incident-handoff {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  border: 1px solid rgb(148 163 184 / 0.16);
+  border-radius: var(--radius-sm);
+  background: rgb(2 6 23 / 0.34);
+  padding: 0.7rem;
+}
+
+.incident-handoff--critical { border-color: rgb(239 68 68 / 0.56); }
+.incident-handoff--warning { border-color: rgb(245 158 11 / 0.44); }
+.incident-handoff--unknown { border-color: rgb(107 114 128 / 0.38); }
+
+.incident-handoff__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.incident-handoff__header strong {
+  display: block;
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.incident-handoff__header p,
+.incident-handoff__meta {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.incident-handoff__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.incident-handoff__native-detail {
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.incident-handoff__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
 
 .analyst-input {
   width: 100%;

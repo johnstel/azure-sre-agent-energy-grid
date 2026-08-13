@@ -13,7 +13,68 @@ This document closes the placement and data-contract gate for the Interactive Gr
 
 The selected host is the `ops-console` nginx-served ConfigMap and Service in `k8s/base/application.yaml`.
 
-## V1 data contract
+## V1.2 / governed read-only status contract
+
+Issue #68 adds a governed read-only in-cluster status API (`/api/grid-status/v1`) and transient scenario nodes. The browser uses that contract for allowlisted resource snapshots, explicit unknown states, source timestamps, staleness, and non-color accessibility cues.
+
+### `/api/grid-status/v1` response shape
+
+```jsonc
+{
+  "schemaVersion": "1.2",
+  "dataContractVersion": "cloud-demo-v2",
+  "namespace": "energy",
+  "generatedAt": "2026-08-11T15:00:00Z",
+  "sourceTimestamp": "2026-08-11T15:00:00Z",
+  "stalenessSeconds": 0,
+  "allowlistedResources": ["asset-service", "dispatch-service", "grid-dashboard", "grid-worker", "load-simulator", "meter-service", "mongodb", "ops-console", "rabbitmq"],
+  "allowlistedNamespaces": ["energy"],
+  "nodes": [
+    {
+      "id": "meter-service",
+      "status": "healthy",
+      "readiness": "ready",
+      "podReadiness": "ready",
+      "deploymentReadiness": "ready",
+      "restartCount": 0,
+      "warningEvents": 0,
+      "resourcePressure": "none",
+      "serviceEndpointState": "ready",
+      "sourceTimestamp": "2026-08-11T15:00:00Z",
+      "stalenessSeconds": 0,
+      "summary": "Governed status for meter-service",
+      "reason": "governed-status",
+      "resourcePressureNote": "all pods are ready",
+      "mongodbReachable": null,
+      "rabbitmqReachable": null
+    }
+  ],
+  "events": [
+    {
+      "nodeId": "meter-service",
+      "severity": "warning",
+      "timestamp": "2026-08-11T15:00:00Z",
+      "reason": "Warning",
+      "message": "Warning event surfaced from the governed in-cluster snapshot",
+      "objectName": "meter-service"
+    }
+  ],
+  "activeScenario": "oom-killed",
+  "bannerMessage": "Governed read-only in-cluster status snapshot loaded.",
+  "scenarioNodeIds": ["meter-service", "asset-service", "dispatch-service"]
+}
+```
+
+**Governance rules**:
+- The endpoint is **read-only** — no mutations, no write verbs, no request body.
+- The response is an **allowlist**: only nodes declared in `grid-map-topology.json` appear; no arbitrary cluster resources are exposed.
+- The payload is bounded: the server caps node count, event count, output bytes, and time window so the browser can safely render a predictable snapshot.
+- The endpoint must return explicit `unknown`/stale states instead of silently omitting a node, and it must surface `activeScenario`, `bannerMessage`, and `scenarioNodeIds` for scenario-aware rendering.
+- Error responses (`5xx`, network timeout) cause the client to retain the last-known state and overlay a "data unavailable" banner rather than clearing the map.
+
+### Security and redaction
+
+The governed API is intentionally defensive-in-depth. It only reads from the `energy` namespace and a fixed allowlist of resources, never exposes arbitrary objects, pod logs, or credentials, and redacts secret-like values before they reach the browser. Responses replace credential-like content with `[redacted]` and avoid surfacing tokens, connection strings, or other secrets in event messages or node summaries.
 
 V1 uses existing in-cluster HTTP health proxies exposed by `ops-console`:
 
@@ -56,6 +117,18 @@ It is reconciled with `k8s/base/application.yaml`:
 
 If `application.yaml` adds, removes, or renames a service, update `grid-map-topology.json` in the same pull request.
 
+## Transient scenario topology
+
+The topology includes four transient scenario-only nodes for `high-cpu`, `pending-pods`, `probe-failure`, and `missing-config`. Rendering rules:
+
+| Behaviour | Rule |
+|---|---|
+| Presence | Always present in `grid-map-topology.json`; always rendered on the map. |
+| Default state | `unknown` / `source: "absent"` when the scenario is not active. |
+| Active state | If a future governed endpoint can probe the transient deployment, severity reflects the probe. Until then, the node remains `unknown`. |
+| Visual treatment | Dashed border, gray fill, "(scenario)" suffix in label. |
+| Security | Same allowlist contract — no secrets, arbitrary objects, logs, or write capabilities exposed. |
+
 ## Explicit exclusions
 
 V1 must not use:
@@ -65,6 +138,27 @@ V1 must not use:
 - pod logs, Kubernetes events, or endpoint details unless a future governed read-only in-cluster status endpoint is added;
 - write, exec, shell, secret, scale, patch, restart, or remediation actions;
 - any direct Azure SRE Agent chat/action API.
+
+## Accessibility contract (WCAG 2.1 AA)
+
+The renderer must satisfy:
+
+1. **Non-color cues** — Every severity level is distinguishable without color: icon/badge shape + dash pattern on edges. A monochromatic-vision user can identify all states.
+2. **`aria-label` on nodes** — Format: `"{label}, {metaphor}, {severity}"`. When selected, append `, selected`.
+3. **`aria-live="polite"`** — Health banner and selection status regions announce severity changes to screen readers.
+4. **`prefers-reduced-motion`** — All pulse, ripple, cascade, and slide-in animations are suppressed; severity remains visible through static indicators.
+5. **Keyboard operability** — All nodes reachable via Tab; Enter opens drawer; Escape closes it; focus returns to prior node.
+
+## Live-test timing guidance
+
+| Metric | Expectation |
+|---|---|
+| Poll interval | Client polls `/api/grid-status/v1` every **10 s** (configurable via topology `pollIntervalMs`). |
+| Detection SLA for smoke tests | Node severity change visible within **≤ 30 s** of scenario apply. |
+| Recovery SLA for smoke tests | Node returns to healthy within **≤ 30 s** of `application.yaml` reapply. |
+| Staleness threshold | Client shows stale badge after **30 s** without a fresh `lastChecked`. |
+
+Testers should allow one full poll cycle (10 s) before asserting. If the assertion window is exceeded, check pod readiness and nginx proxy availability before declaring a map failure.
 
 ## Safe-language requirement
 

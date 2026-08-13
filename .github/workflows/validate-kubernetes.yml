@@ -1,0 +1,55 @@
+name: Validate Kubernetes Manifests
+
+on:
+  push:
+    paths:
+      - '.github/workflows/validate-kubernetes.yml'
+      - 'k8s/**'
+  pull_request:
+    paths:
+      - '.github/workflows/validate-kubernetes.yml'
+      - 'k8s/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-kubernetes:
+    name: kubeconform
+    runs-on: ubuntu-latest
+
+    env:
+      KUBECONFORM_VERSION: v0.6.7
+      KUBERNETES_VERSION: '1.30.0'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: List YAML manifests to validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Kubernetes YAML manifests under k8s/base and k8s/scenarios:"
+          find k8s/base k8s/scenarios -type f -name '*.yaml' -print | sort
+
+      - name: Validate Kubernetes schemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFESTS=$(find k8s/base k8s/scenarios -type f -name '*.yaml' -print | sort | tr '\n' ' ')
+
+          if [ -z "$MANIFESTS" ]; then
+            echo "No Kubernetes YAML manifests found under k8s/base or k8s/scenarios." >&2
+            exit 1
+          fi
+
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            "ghcr.io/yannh/kubeconform:${KUBECONFORM_VERSION}" \
+            -strict \
+            -summary \
+            -kubernetes-version "${KUBERNETES_VERSION}" \
+            $MANIFESTS

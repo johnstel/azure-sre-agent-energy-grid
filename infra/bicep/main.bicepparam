@@ -17,7 +17,10 @@ param deployAlerts = true
 // Deploy Azure SRE Agent (programmatic deployment now supported)
 param deploySreAgent = true
 
-// Secure-by-default Key Vault purge protection. Override to false only for disposable demo labs that intentionally accept name retention/reuse trade-offs.
+// Secure-by-default: keep purge protection enabled. Set false only before deployment for a disposable demo lab
+// where rapid delete/recreate and same-name reuse are deliberately accepted. When false, the generated Key Vault
+// resource omits enablePurgeProtection entirely because Azure rejects an explicit false value. Once enabled for a
+// vault, Azure does not allow turning purge protection off and deleted vault names remain retained for the retention period.
 param keyVaultPurgeProtection = true
 
 // Default action group for incident routing (add webhook at deploy time)
@@ -52,6 +55,24 @@ param acrAdminUserEnabled = false
 // H-3: 'High' is intentional for the internal demo to allow SRE Agent remediation actions.
 // For external/customer-facing demos, omit this parameter or set to 'Low'.
 param sreAgentAccessLevel = 'High'
+
+// Connect Azure Monitor as the SRE Agent incident platform (issue #76).
+// This wires the documented Microsoft.App/agents incidentManagementConfiguration ARM property and
+// grants the agent's managed identity Monitoring Contributor on this resource group, so Azure Monitor
+// alerts on Energy Grid resources become visible to the agent. The response plan itself (severity/title
+// filter, Review-mode autonomy, reinvestigation cooldown) is NOT exposed by this ARM resource -- run
+// scripts/configure-sre-agent-incident-response.ps1 after deployment, which automates what it can via
+// the Azure MCP Server and prints exact portal steps for anything that remains portal-only.
+// The existing Action Group -> Mission Control webhook fallback keeps working regardless of this value.
+//
+// ⚠️ UPGRADING AN EXISTING DEPLOYMENT: redeploying with this parameter set (the default) connects
+// Azure Monitor on an agent that previously had no incident platform configured. Microsoft Learn
+// documents that connecting a platform auto-creates a "Quickstart" response plan, and that new
+// response plans default to Autonomous mode, not Review. Run
+// scripts/configure-sre-agent-incident-response.ps1 (or check the portal) IMMEDIATELY after
+// redeploying to confirm or delete the Quickstart plan, before any alert can fire. Set this to
+// 'None' first if you want to stage the Bicep change without connecting the platform yet.
+param sreAgentIncidentPlatform = 'AzureMonitor'
 
 // Tags
 param tags = {

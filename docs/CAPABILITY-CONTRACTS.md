@@ -1,7 +1,7 @@
 # Capability Contracts
 
 > **Version**: 0.2 · **Wave**: 0 — Contracts only, no runtime changes
-> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
+> **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
 > **Repo**: [`johnstel/azure-sre-agent-energy-grid`](https://github.com/johnstel/azure-sre-agent-energy-grid)
 
 This document defines the shared contracts that every capability in the demo lab consumes. No implementation work should start for a wave until the contracts it depends on are locked here.
@@ -166,6 +166,8 @@ Defined in `infra/bicep/modules/alerts.bicep`:
 | Sev 2 | Warning | Degraded but functional; scheduling/pull issues |
 | Sev 3 | Informational | Proactive signals, drift detection |
 
+> **Alert query semantics:** The Wave 1 HTTP 5xx and dependency-failure alerts evaluate a total count over the alert window (not a 5-minute bucket count), so their thresholds are based on the real number of 5xx responses or failed dependencies in the window.
+
 ### Custom properties
 
 Every alert must include these custom properties for query correlation:
@@ -324,7 +326,7 @@ Every end-to-end incident lifecycle must record these timestamps. Until measurem
 | `T2` | SRE Agent conversation started | Operator opens SRE Agent portal and submits first prompt |
 | `T3` | Recommendation made | SRE Agent returns diagnosis and recommended action |
 | `T4` | Operator action taken | Human approves/executes remediation |
-| `T5` | Service healthy | All affected pods Running/Ready, endpoints serving |
+| `T5` | Functional recovery verified | A newer successful `slo-meter-ingest` transaction is persisted and confirmed; pods/endpoints alone are insufficient. |
 
 - **MTTR** = `T5 − T1` (time from detection to recovery).
 - **Agent diagnosis time** = `T3 − T2`.
@@ -332,14 +334,18 @@ Every end-to-end incident lifecycle must record these timestamps. Until measurem
 
 ### SLO framework
 
-SLO definitions will be added in Wave 5. Reserve the following structure:
+`slo-meter-ingest` is a demo-only customer-journey SLO backed by a repository-owned
+synthetic transaction. Its success condition is MongoDB persistence confirmed through
+`dispatch-service`, not HTTP acceptance or Kubernetes readiness.
 
-| SLO Name | Indicator | Target | Burn-Rate Window | Alert Severity |
-|----------|-----------|--------|------------------|----------------|
-| `slo-pod-availability` | Pod Running ratio in `energy` namespace | 99.5% | 5m / 1h / 6h | Sev 1 / Sev 2 / Sev 3 |
-| `slo-meter-ingest` | Meter readings processed per minute | > 0 for 5m | 5m | Sev 0 |
+| SLO Name | Indicator | Target | Evaluation / burn-rate window | No-data behavior |
+|----------|-----------|--------|-------------------------------|------------------|
+| `slo-meter-ingest` | Unique synthetic correlation IDs with successful persistence confirmation | >= 95% success; p95 <= 30 seconds; last success <= 5 minutes | Rolling 10 minutes; burn rate = failure ratio / 5% error budget | `NO_DATA` / unknown, never healthy |
+| `slo-pod-availability` | Pod Running ratio in `energy` namespace | Reserved; not a customer-impact objective | Not implemented | N/A |
 
-These are placeholders. Do not implement burn-rate alerts until real data sources exist.
+The `slo-meter-ingest` windows are accelerated demonstration semantics, not a production
+SLO or SLA. The implementation, scenario mapping, and live-proof gate are defined in
+[`SLO-METER-INGEST.md`](SLO-METER-INGEST.md).
 
 ---
 
@@ -353,13 +359,13 @@ Azure SRE Agent is GA. App Insights telemetry emitted by the agent (custom dimen
 
 1. Any KQL query or dashboard that references SRE Agent-specific App Insights fields must be tagged with a `// SCHEMA_TBD` comment.
 2. Do not build production-grade dashboards or alerts against `SCHEMA_TBD` fields.
-3. When this subscription exposes `Microsoft.App/agents@2026-01-01` and `what-if` validates it, audit all `SCHEMA_TBD` references and update or remove the tag.
-4. Document observed field names in `docs/evidence/kql/README.md` with the preview API version where they were seen.
+3. Keep `SCHEMA_TBD` tags until live evidence captures the exact telemetry fields emitted by the deployed `Microsoft.App/agents@2026-01-01` resource.
+4. Document observed field names in `docs/evidence/kql/README.md` with the deployed API version where they were seen.
 
 ### Example
 
 ```kql
-// SCHEMA_TBD — observed in 2025-05-01-preview, may change
+// SCHEMA_TBD — observed field names may change across SRE Agent service/API versions
 traces
 | where customDimensions["sre.agent.conversationId"] != ""
 | project timestamp, message, customDimensions
@@ -371,7 +377,22 @@ traces
 
 This demo proves **Review mode only**. Auto mode exists but is out of scope for this wave.
 
-No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'` and `accessLevel: 'High'`, which means the agent may recommend remediation but a human operator remains responsible for executing write actions. If the Azure SRE Agent portal exposes a specific approval/denial UX in this environment, capture it as evidence before mentioning it; otherwise use “agent recommends, operator executes.”
+No document, slide, runbook, prompt, or live demo shall claim that auto-remediation is demonstrated by this lab. The current deployment uses `mode: 'Review'`, which means the agent may propose remediation but a human decision is required before any write executes.
+
+**Scoped exception (issue #80, `MongoDBDown` only).** One reversible scenario has a documented,
+guardrailed Review-mode mitigation path — see [`REVIEW-MODE-MITIGATION.md`](REVIEW-MODE-MITIGATION.md).
+For every other scenario, keep the conservative “agent recommends, operator executes” wording.
+Even for `MongoDBDown`, Mission Control derives the lifecycle from observed `IncidentActivitySnapshot`,
+`ApprovalDecision`, `AgentToolExecution` and `AgentAzCliExecution` telemetry and reports
+`verification-passed` **only** when approval, execution, and three post-execution probes were all
+observed and correlated by exact identifier. Live deny/approve proof is recorded as **pending**
+until captured against a real environment (`REVIEW-MODE-MITIGATION.md` §10) — do not present it as
+proven before then.
+
+A Kubernetes write does **not** trigger the native Review-mode Approve/Deny button on its own
+([run modes](https://learn.microsoft.com/azure/sre-agent/run-modes) scopes that gate to Azure
+infrastructure operations). The approval gate for this path is a global Tool Access Policy `ask`
+rule combined with response-plan run mode Review.
 
 Any future Auto mode demo requires a separate security review with evidence of:
 
@@ -396,7 +417,8 @@ The current demo profile intentionally grants broad roles through `scripts/confi
 | Key Vault Secrets Officer | Key Vault | ⚠️ DEMO ONLY | ❌ Remove or Key Vault Secrets User | Agent doesn't manage secrets |
 | AcrPull | ACR | ✅ | ✅ Keep if image metadata/pull access is needed | No scenario requires image push |
 | Reader | Subscription | ⚠️ DEMO ONLY | Reader (Resource Group scope) | Limit enumeration surface |
-| Contributor | Resource Group | ⚠️ DEMO ONLY (`accessLevel: 'High'`) | ❌ Remove (`accessLevel: 'Low'`) | Use Low for read-only diagnosis |
+| Contributor | Resource Group | ⚠️ DEMO ONLY (`accessLevel: 'High'`) | ❌ Remove (`accessLevel: 'Low'` or `'Mitigation'`) | Use Low for read-only diagnosis; use `Mitigation` for the issue #80 remediation path, which grants **no** Contributor |
+| SRE Agent Energy Grid Mitigation Operator (custom) | AKS resource | ✅ `accessLevel: 'Mitigation'` | ✅ Keep | Only `managedClusters/read` + `listClusterUserCredential/action`; no admin credential, no `runCommand`, no wildcard |
 
 `accessLevel: 'Low'` gives Reader + Log Analytics Reader. `accessLevel: 'High'` adds Contributor. The Bicep source of truth allows only `High` and `Low` for `accessLevel`; do not use other values.
 
@@ -448,7 +470,7 @@ Known TBD scope includes all fields emitted by the SRE Agent App Insights teleme
 | ⚠️ DEMO ONLY — MongoDB without authentication | `k8s/base/application.yaml` | Any pod can read/write all data | Enable `--auth`, create service accounts |
 | ⚠️ DEMO ONLY — No pod `securityContext` | All deployments in `application.yaml` | Containers run as root with full capabilities | Set `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, drop all capabilities |
 | ⚠️ DEMO ONLY — No default-deny NetworkPolicy | `energy` namespace | Any pod can reach any pod | Add default-deny policy, allow only required paths |
-| ✅ Secure default — Key Vault purge protection enabled; explicit disposable override requires `keyVaultPurgeProtection = false` and documented retention risk | `infra/bicep/modules/key-vault.bicep` | Security baseline | Keep secure default, document any intentional disposable opt-out |
+| ✅ Secure default — Key Vault purge protection is enabled by default; any disposable override is explicit and must be documented before deployment because names remain retained while purge protection is active | `infra/bicep/modules/key-vault.bicep` | Security baseline | Keep the secure default; document any intentional disposable opt-out and the retention window trade-off |
 | ⚠️ DEMO ONLY — Public AKS API server | `infra/bicep/modules/aks.bicep` | Expanded attack surface | Required for SRE Agent Preview; use private cluster when GA supports it |
 | ⚠️ DEMO ONLY — App Insights connection string as Bicep output | `infra/bicep/modules/app-insights.bicep` | Key material in deployment outputs | Route through Key Vault references |
 
@@ -530,10 +552,122 @@ These rules prevent wasted effort from building on unstable foundations.
 
 ---
 
-## 16 · Document History
+## 16 · Native Incident Platform Evidence Contract (issue #76)
+
+This section defines the shared contract for reconciling native Azure SRE Agent incident-platform
+evidence with the local Action Group → Mission Control webhook fallback (§4, §9). It governs
+`mission-control/backend/src/services/SreAgentEvidenceService.ts` and
+`NativeIncidentReconciliationService.ts`.
+
+### Documented event names
+
+Source: [Audit Agent Actions](https://learn.microsoft.com/azure/sre-agent/audit-agent-actions). All
+four live in the `customEvents` table of the SRE Agent's linked Application Insights resource
+(the same workspace-based App Insights resource this repo already deploys for application
+telemetry — see `infra/bicep/modules/app-insights.bicep` and `sre-agent.bicep`'s
+`logConfiguration`).
+
+| Event name | Field enumeration status |
+|---|---|
+| `IncidentActivitySnapshot` | Documented: `IncidentId`, `IncidentTitle`, `IncidentSeverity`, `IncidentStatus`, `IncidentPlatform`, `IncidentMitigatedByAgent`, `IncidentAssistedByAgent`, `AgentAutonomyLevel`, `ResponsePlanId`, `ResponsePlanCustom`, `IncidentImpactedService`, `IncidentCreatedOn`, `IncidentHandledOn`, `IncidentMitigatedOn` |
+| `AgentExecution` | `SCHEMA_TBD` — Microsoft Learn documents only "session start/end lifecycle" without an itemized field table |
+| `AgentToolExecution` | Documented: `EventType`, `ToolName`, `ToolInput`, `ToolOutput`, `SubAgentName`, `CallId` |
+| `ApprovalDecision` | `SCHEMA_TBD` — Microsoft Learn shows only a raw `customDimensions` projection, no itemized field table. `mitigationLifecycle.ts` scans a bounded candidate-key list for the outcome and resolves to `unknown` when none matches; it never defaults to `approved`. |
+| `AgentAzCliExecution` | Name documented ("Azure CLI commands run by the agent"); fields `SCHEMA_TBD`. Correlated when present, but never required for the kubectl mitigation path. |
+
+Shared correlation fields on every event (all four): `gen_ai.agent.id`, `gen_ai.agent.name`,
+`TraceId`, `SpanId`, `ParentSpanId`, `ThreadId`, `LogTimestamp`, `CorrelationId`.
+
+Per the §8 `SCHEMA_TBD` rule, any query or dashboard referencing `AgentExecution` or
+`ApprovalDecision` fields beyond the shared correlation fields must be tagged `// SCHEMA_TBD` and
+must not be treated as a stable production contract.
+
+### Incident platform literal (`incidentManagementConfiguration.type`)
+
+Source: [API reference for Azure SRE Agent](https://learn.microsoft.com/azure/sre-agent/api-reference#agent-properties),
+which enumerates this field as: `PagerDuty`, `AzMonitor`, `ServiceNow`, or `None`. **Azure Monitor's
+literal is `AzMonitor`**, not `AzureMonitor` — `sre-agent.bicep`'s `incidentManagementConfigurationType`
+parameter and `scripts/configure-sre-agent-incident-response.ps1`'s `-ExpectedIncidentPlatformType`
+both default to `AzMonitor` and are `@allowed`/`ValidateSet`-constrained to the four documented
+literals. This repo's own Bicep/script *selector* param (`incidentPlatform`/`sreAgentIncidentPlatform`,
+allowed `AzureMonitor`/`None`) is a separate, internal name and intentionally does not need to match
+the ARM literal — only the value actually written to `incidentManagementConfiguration.type` does.
+Because ARM does not enforce an allowed-values constraint on this property (it is typed as a bare
+`string` in the generic ARM template schema), a wrong literal deploys successfully while the SRE
+Agent backend silently ignores the unrecognized platform type — do not rely on deployment success
+alone to confirm the platform connected; read back `incidentManagementConfiguration.type` and
+compare it to the documented enum, exactly as the setup script does.
+
+### Reinvestigation cooldown
+
+Documented default (Azure Monitor response plans only): **3 hours**, configurable 1–24h in the
+portal (Builder → Incident response plans → autonomy step). Repeated firings of the same alert
+rule within the cooldown window merge into the existing investigation thread; resolved threads
+within the window are reopened rather than duplicated. This is **not** exposed by the
+`Microsoft.App/agents` ARM schema or by the current Azure MCP Server response-plan tool — it must
+be confirmed/set in the portal. `NativeIncidentReconciliationService.ts` computes a client-side
+`withinCooldown` estimate (default 3h) for display only; it does not control or guarantee the
+agent's actual merge decision.
+
+### Evidence states
+
+Mission Control incident cards expose exactly one of these states (never blended, never inferred
+from absence):
+
+| State | Meaning |
+|---|---|
+| `local-fallback-only` | No native evidence observed; the Action Group webhook fallback (§4, §9) created the card. |
+| `native-observed` | A matching `IncidentActivitySnapshot` row was observed; not yet mitigated, and not blocked on approval. |
+| `native-approval-required` | `AgentAutonomyLevel = review` and no `ApprovalDecision` has been observed yet. |
+| `native-mitigated` | `IncidentMitigatedByAgent = true` on the freshest observed row. |
+| `evidence-unavailable` | No native evidence and no local fallback either, or the evidence query failed schema validation. |
+
+### Correlation approach
+
+Local incidents are correlated to native evidence by, in order of preference: a previously observed
+`ThreadId`/`IncidentId` (sticky across repeated reconciliation calls), an explicit operator-supplied
+override, or a best-effort `scenarioName → IncidentImpactedService` keyword heuristic (see
+`SCENARIO_IMPACTED_SERVICE_HINTS` in `mission-control/backend/src/routes/incidents.ts`). The
+heuristic is **not** a documented Azure SRE Agent contract — `IncidentImpactedService` is
+populated by the agent's own investigation, so a keyword match is a hint, not proof.
+
+An explicit `IncidentId` or a `ThreadId` that actually matches a returned row (`selectRowsForCorrelation`
+in `NativeIncidentReconciliationService.ts`) counts as a **strong** correlation. When neither is
+available and the impactedService heuristic returns more than one distinct `IncidentId` after
+de-duplication, the match is **ambiguous** — `reconcileNativeIncidentEvidence` refuses to silently
+pick the newest one and reports `local-fallback-only`/`evidence-unavailable` instead. A known
+`ThreadId` that matches nothing never falls back to the unfiltered row set, to avoid attributing a
+different incident's thread/plan/mitigation status to the wrong local card.
+
+### Rules
+
+- KQL must only be built through the allowlisted templates in `SreAgentEvidenceService.ts`
+  (`incident-activity-snapshot`, `agent-execution-lifecycle`, `agent-tool-execution`,
+  `approval-decisions`, `incident-thread-timeline`). Do not add freeform KQL entry points.
+- A query that fails because the deployed telemetry schema no longer matches the documented event
+  or field names must surface `schemaMismatch: true` and report `evidence-unavailable` — never
+  silently return zero rows as if the agent were idle.
+- Duplicate `IncidentActivitySnapshot` rows for the same `IncidentId` are lifecycle updates, not
+  separate incidents; reconciliation keeps only the freshest row by `timestamp`. A row with an
+  unparsable `timestamp` is dropped, not defaulted to "now".
+- More than one distinct candidate `IncidentId` without a strong correlation is ambiguous, not an
+  invitation to guess the newest one (see Correlation approach above).
+- Do not remove the Action Group → Mission Control webhook fallback (§4, §9) until native handling
+  has passed repeatable live validation (OOMKilled ×2 for cooldown, MongoDBDown ×1).
+- Do not enable Autonomous mode for this contract. `scripts/configure-sre-agent-incident-response.ps1`
+  blocks `-AgentMode autonomous` without an explicit `-AllowAutonomous` acknowledgment. Note that
+  Microsoft Learn documents new response plans (including the auto-created Quickstart plan) as
+  defaulting to Autonomous — confirming/deleting the Quickstart plan in the portal immediately
+  after connecting Azure Monitor is a required manual step, not optional cleanup.
+
+---
+
+## 17 · Document History
 
 | Date | Version | Change | Author |
 |------|---------|--------|--------|
+| 2026-08-12 | 0.4 | Corrected `incidentManagementConfiguration.type` literal to documented `AzMonitor` (was incorrectly `AzureMonitor`); added literal enum subsection (issue #76 review fix) | Copilot draft for review |
+| 2026-08-12 | 0.3 | Added §16 Native Incident Platform Evidence Contract (issue #76) | Copilot draft for review |
 | 2026-04-26 | 0.2 | Wave 0 fix pass — S0-1..S0-5 security blockers, accessLevel terminology fix | Lambert (QA/Docs) |
 | 2026-04-26 | 0.2 | Alert deployment status, RBAC source-of-truth, retention prerequisites (Wave 0 infra precision) | Ripley (Infra Dev) |
 | 2026-04-26 | 0.1 | Wave 0 — Initial contract definitions | Lambert (QA/Docs) |

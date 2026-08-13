@@ -17,7 +17,7 @@ param tags object
 @description('Enable RBAC authorization (recommended)')
 param enableRbacAuthorization bool = true
 
-@description('Enable Azure Key Vault purge protection. Defaults to true. Set to false only before deployment for a disposable demo lab where immediate delete/recreate and name reuse are intentionally accepted. Azure rejects an explicit false value; once a vault is created with purge protection enabled, Azure does not permit turning it off and deleted vault names remain retained for the retention window.')
+@description('Enable Azure Key Vault purge protection. Defaults to true. Set to false only before deployment for a disposable demo lab where rapid delete/recreate and same-name reuse are intentionally accepted. Azure rejects an explicit false value; once a vault is created with purge protection enabled, Azure does not permit turning it off and deleted vault names remain retained for the retention window.')
 param enablePurgeProtection bool = true
 
 @description('SKU for Key Vault')

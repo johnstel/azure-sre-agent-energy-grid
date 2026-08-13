@@ -47,30 +47,46 @@ function Configure-AzScenario {
         if ($command -eq 'keyvault') {
             if ($operation -eq 'show-deleted') {
                 $script:showDeletedCalls++
-                $afterPurgeExists = $script:scenario.afterPurgeExists
-                if ($script:scenario.mode -eq 'protected') {
+                $mode = $script:scenario.mode
+
+                if ($mode -eq 'protected') {
                     $global:LASTEXITCODE = 0
                     return ($script:scenario.deletedRecord | ConvertTo-Json -Depth 20)
                 }
 
-                if ($script:scenario.mode -eq 'disposable') {
-                    if ($script:purgeCalls -gt 0 -and $afterPurgeExists -eq $false) {
+                if ($mode -eq 'disposable') {
+                    if ($script:purgeCalls -gt 0 -and $script:scenario.afterPurgeExists -eq $false) {
                         $global:LASTEXITCODE = 1
-                        return "ERROR: DeletedVaultNotFound"
+                        return 'ERROR: DeletedVaultNotFound'
                     }
 
                     $global:LASTEXITCODE = 0
                     return ($script:scenario.deletedRecord | ConvertTo-Json -Depth 20)
                 }
 
-                if ($script:scenario.mode -eq 'timeout') {
+                if ($mode -eq 'timeout') {
                     $global:LASTEXITCODE = 0
                     return ($script:scenario.deletedRecord | ConvertTo-Json -Depth 20)
                 }
 
-                if ($script:scenario.mode -eq 'not-found') {
+                if ($mode -eq 'not-found') {
                     $global:LASTEXITCODE = 1
-                    return "ERROR: DeletedVaultNotFound"
+                    return 'ERROR: DeletedVaultNotFound'
+                }
+
+                if ($mode -eq 'auth-error') {
+                    $global:LASTEXITCODE = 1
+                    return 'ERROR: Please run az login to setup account.'
+                }
+
+                if ($mode -eq 'network-error') {
+                    $global:LASTEXITCODE = 1
+                    return 'ERROR: Connection timed out while contacting the management service.'
+                }
+
+                if ($mode -eq 'malformed-json') {
+                    $global:LASTEXITCODE = 0
+                    return '{not valid json'
                 }
             }
 
@@ -79,6 +95,22 @@ function Configure-AzScenario {
                 if ($script:scenario.mode -eq 'disposable') {
                     $script:scenario.afterPurgeExists = $false
                 }
+
+                if ($script:scenario.mode -eq 'timeout') {
+                    $global:LASTEXITCODE = 0
+                    return ''
+                }
+
+                if ($script:scenario.mode -eq 'auth-error') {
+                    $global:LASTEXITCODE = 1
+                    return 'ERROR: AuthorizationFailed'
+                }
+
+                if ($script:scenario.mode -eq 'network-error') {
+                    $global:LASTEXITCODE = 1
+                    return 'ERROR: The request failed due to a network timeout.'
+                }
+
                 $global:LASTEXITCODE = 0
                 return ''
             }
@@ -111,9 +143,10 @@ Configure-AzScenario -Scenario @{
     afterPurgeExists = $true
 }
 $protectedState = Get-KeyVaultDeletedVaultState -VaultName 'test-vault' -Location 'eastus2'
-Assert-True -Condition ($protectedState.Found -and $protectedState.PurgeProtectionEnabled -and -not $protectedState.RedeployImmediatelyAvailable) -Message 'Protected vault should report purge protection and no immediate redeploy.'
+Assert-True -Condition ($protectedState.Status -eq 'Found' -and $protectedState.PurgeProtectionEnabled -and -not $protectedState.RedeployImmediatelyAvailable) -Message 'Protected vault should report purge protection and no immediate redeploy.'
 $protectedResolution = Resolve-KeyVaultPurgeForReuse -VaultName 'test-vault' -Location 'eastus2' -WaitSeconds 1 -PollingIntervalSeconds 0
 Assert-True -Condition (-not $protectedResolution.Resolved -and $protectedResolution.PurgeProtectionEnabled -and -not $protectedResolution.RedeployImmediatelyAvailable) -Message 'Protected vault should not purge and should reject immediate redeploy.'
+Assert-True -Condition ($script:purgeCalls -eq 0) -Message 'Protected vault should skip the purge call entirely.'
 $results.Add([pscustomobject]@{ Name = 'protected'; Passed = $true })
 
 Configure-AzScenario -Scenario @{
@@ -122,7 +155,7 @@ Configure-AzScenario -Scenario @{
     afterPurgeExists = $true
 }
 $disposableResolution = Resolve-KeyVaultPurgeForReuse -VaultName 'test-vault' -Location 'eastus2' -WaitSeconds 1 -PollingIntervalSeconds 0
-Assert-True -Condition ($disposableResolution.Resolved -and $disposableResolution.RedeployImmediatelyAvailable) -Message 'Disposable vault should purge and report immediate redeploy availability.'
+Assert-True -Condition ($disposableResolution.Resolved -and $disposableResolution.RedeployImmediatelyAvailable -and $script:purgeCalls -ge 1) -Message 'Disposable vault should purge and report immediate redeploy availability.'
 $results.Add([pscustomobject]@{ Name = 'disposable'; Passed = $true })
 
 Configure-AzScenario -Scenario @{
@@ -131,7 +164,7 @@ Configure-AzScenario -Scenario @{
     afterPurgeExists = $true
 }
 $timeoutResolution = Resolve-KeyVaultPurgeForReuse -VaultName 'test-vault' -Location 'eastus2' -WaitSeconds 1 -PollingIntervalSeconds 0
-Assert-True -Condition (-not $timeoutResolution.Resolved -and -not $timeoutResolution.RedeployImmediatelyAvailable) -Message 'Observable timeout should fail closed and keep redeploy unavailable.'
+Assert-True -Condition (-not $timeoutResolution.Resolved -and -not $timeoutResolution.RedeployImmediatelyAvailable) -Message 'Timeout should fail closed and keep redeploy unavailable.'
 $results.Add([pscustomobject]@{ Name = 'timeout'; Passed = $true })
 
 Configure-AzScenario -Scenario @{
@@ -140,8 +173,37 @@ Configure-AzScenario -Scenario @{
     afterPurgeExists = $false
 }
 $notFoundState = Get-KeyVaultDeletedVaultState -VaultName 'test-vault' -Location 'eastus2'
-Assert-True -Condition (-not $notFoundState.Found -and $notFoundState.RedeployImmediatelyAvailable) -Message 'Not-found deleted vault should report immediate redeploy availability.'
+Assert-True -Condition ($notFoundState.Status -eq 'NotFound' -and $notFoundState.RedeployImmediatelyAvailable) -Message 'Not-found deleted vault should report immediate redeploy availability.'
 $results.Add([pscustomobject]@{ Name = 'not-found'; Passed = $true })
+
+Configure-AzScenario -Scenario @{
+    mode = 'auth-error'
+    deletedRecord = (New-KeyVaultDeletedRecord -PurgeProtectionEnabled $false)
+    afterPurgeExists = $true
+}
+$authErrorState = Get-KeyVaultDeletedVaultState -VaultName 'test-vault' -Location 'eastus2'
+Assert-True -Condition ($authErrorState.Status -eq 'Unknown' -and -not $authErrorState.RedeployImmediatelyAvailable) -Message 'Auth failures should classify as unknown and fail closed.'
+$authErrorResolution = Resolve-KeyVaultPurgeForReuse -VaultName 'test-vault' -Location 'eastus2' -WaitSeconds 1 -PollingIntervalSeconds 0
+Assert-True -Condition (-not $authErrorResolution.Resolved -and -not $authErrorResolution.RedeployImmediatelyAvailable) -Message 'Auth failures should not claim immediate redeploy.'
+$results.Add([pscustomobject]@{ Name = 'auth-error'; Passed = $true })
+
+Configure-AzScenario -Scenario @{
+    mode = 'network-error'
+    deletedRecord = (New-KeyVaultDeletedRecord -PurgeProtectionEnabled $false)
+    afterPurgeExists = $true
+}
+$networkErrorState = Get-KeyVaultDeletedVaultState -VaultName 'test-vault' -Location 'eastus2'
+Assert-True -Condition ($networkErrorState.Status -eq 'Unknown' -and -not $networkErrorState.RedeployImmediatelyAvailable) -Message 'Network errors should classify as unknown and fail closed.'
+$results.Add([pscustomobject]@{ Name = 'network-error'; Passed = $true })
+
+Configure-AzScenario -Scenario @{
+    mode = 'malformed-json'
+    deletedRecord = $null
+    afterPurgeExists = $false
+}
+$malformedJsonState = Get-KeyVaultDeletedVaultState -VaultName 'test-vault' -Location 'eastus2'
+Assert-True -Condition ($malformedJsonState.Status -eq 'Unknown' -and -not $malformedJsonState.RedeployImmediatelyAvailable) -Message 'Malformed Azure payloads should fail closed instead of claiming immediate reuse.'
+$results.Add([pscustomobject]@{ Name = 'malformed-json'; Passed = $true })
 
 Write-Host "Key Vault lifecycle validation passed for $($results.Count) scenarios." -ForegroundColor Green
 foreach ($result in $results) {

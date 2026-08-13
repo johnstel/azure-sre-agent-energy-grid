@@ -1,6 +1,6 @@
 # Azure SRE Agent Service Demo — Customer Readiness Delta Analysis
 
-> **Version**: 1.0 &middot; **Date**: 2026-04-25 &middot; **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2025-05-01-preview` in this subscription)
+> **Version**: 1.0 &middot; **Date**: 2026-04-25 &middot; **Status**: Azure SRE Agent is **GA** (lab API pin: `Microsoft.App/agents@2026-01-01`, Stable channel)
 > **Applicable regions**: East US 2, Sweden Central, Australia East
 > **Repo**: [`johnstel/azure-sre-agent-energy-grid`](https://github.com/johnstel/azure-sre-agent-energy-grid)
 
@@ -27,7 +27,7 @@ The Azure SRE Agent Energy Grid demo lab deploys a fully automated Azure environ
 | **P0** | `mode: 'Review'` vs `mode: 'Auto'` trade-off is not documented for customers | Cannot answer the #1 customer question: "Can it auto-remediate?" |
 | **P0** | Alert rules default to off (`deployAlerts = false`); no alert-to-agent trigger is wired | Cannot demonstrate autonomous detection or alert querying |
 | **P0** | No SRE Agent audit trail evidence (screenshots, KQL queries, or dashboards) | Cannot answer "Show me what the agent did" |
-| **P1** | No MTTR instrumentation, no SLO/error-budget framework | Value story is qualitative only |
+| **P1** | Demo-only `slo-meter-ingest` source, SLI queries, burn-rate rules, and Mission Control state are implemented; live evidence remains pending | Value story cannot be presented as a measured production SLO until the live-proof gate is complete |
 | **P1** | Demo apps do not emit Application Insights telemetry | Application-level observability prompts return thin results |
 
 ---
@@ -75,7 +75,7 @@ The demo deploys a three-tier, fully-IaC architecture via a single `main.bicep` 
 | **Compute** | AKS (Standard tier, public API, Azure CNI + Calico, OIDC + Workload Identity, Container Insights, Azure Policy addon, Key Vault Secrets Provider) | `infra/bicep/modules/aks.bicep` |
 | **Application** | 8 microservices in `energy` namespace: grid-dashboard (Vue.js), ops-console (Vue.js), meter-service (Node.js), asset-service (Rust), dispatch-service (Go), load-simulator (Python), RabbitMQ, MongoDB | `k8s/base/application.yaml` |
 | **Observability** | Log Analytics (30-day retention), App Insights (90-day retention), Managed Grafana, Azure Monitor Prometheus, 4 scheduled-query alert rules (opt-in) | `infra/bicep/main.bicep:134-268` |
-| **SRE Agent** | `Microsoft.App/agents@2025-05-01-preview` with user-assigned managed identity, `accessLevel: 'High'`, `mode: 'Review'` | `infra/bicep/modules/sre-agent.bicep:77-107` |
+| **SRE Agent** | `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`, user-assigned managed identity, `accessLevel: 'High'`, `mode: 'Review'` | `infra/bicep/modules/sre-agent.bicep:76-108` |
 | **Mission Control** | Local-only Fastify 5 + Vue 3 SPA. Includes "Ask Copilot" assistant (read-only, GitHub Copilot SDK). Binds to `127.0.0.1:3333`. | `mission-control/README.md` |
 
 **Key distinction**: Azure SRE Agent is the cloud-side AI diagnostic and remediation service (the product being demonstrated). Mission Control is a local demo cockpit for launching scenarios and viewing wallboard state. They share the same AKS cluster and observability stack but have no direct integration with each other.
@@ -261,7 +261,7 @@ With `accessLevel: 'High'`, the managed identity holds: Log Analytics Reader + R
 
 **Toil reduction**: For the Azure SRE Agent Service demo, toil reduction must be framed around the intended agent-assisted diagnosis workflow once portal evidence exists. Mission Control can reduce local scenario-injection toil, but it is out of scope as proof of Azure SRE Agent capability.
 
-**SLO / error budget**: ❌ Not implemented. No SLO definitions, no error budget tracking, no burn-rate alerting exist in the repo.
+**SLO / error budget**: ⚠️ A demo-only `slo-meter-ingest` contract now defines success rate, raw-run p95, freshness, no-data behavior, and burn-rate rules. It is not production guidance and has no captured live evidence yet. See [`SLO-METER-INGEST.md`](SLO-METER-INGEST.md).
 
 | Status | Item |
 |--------|------|
@@ -271,7 +271,7 @@ With `accessLevel: 'High'`, the managed identity holds: Log Analytics Reader + R
 | ⚠️ | Wallboard severity is sticky for services with historical restarts: RabbitMQ readiness warnings can persist after current readiness recovers because `deriveSeverity()` marks `warning` whenever `restarts > 0`, with no decay window (`MissionWallboard.vue:1256-1260`) |
 | ❌ | No automated alert → SRE Agent trigger (all detection is human-initiated) |
 | ❌ | No MTTR instrumentation |
-| ❌ | No SLO/error-budget framework |
+| ⚠️ | Demo-only `slo-meter-ingest` framework exists; live evidence and scheduled-task proof remain pending |
 
 ### 4.2 Root-Cause Hypothesis Generation
 
@@ -346,7 +346,7 @@ The demo is **qualitative only** for all three metrics. This is the most signifi
 |--------|----------------|----------------|
 | **MTTR** | Demonstrates diagnosis speed (single prompt vs. multi-step manual) | No timestamps captured; no before/after comparison data |
 | **Toil reduction** | Wallboard auto-refresh, one-click scenarios, prompt library | No measurement of time saved or manual steps eliminated |
-| **SLO / error budget** | Not present | No SLO definitions, no burn-rate alerting, no availability tracking |
+| **SLO / error budget** | Demo-only synthetic meter-ingest success, p95, freshness, and no-data contract | No production target or live evidence claim until the proof gate is complete |
 
 > **Recommendation**: Frame each scenario in terms of *which SRE metric it improves* without fabricating numbers. Use language like "reduces the manual investigation from ~5 `kubectl` commands to a single prompt" rather than "reduces MTTR by X%."
 
@@ -394,7 +394,7 @@ graph TD
 |-------|------------|-----------|----------|
 | **Log Analytics** | Container Insights: pod lifecycle, resource metrics, K8s events | 30 days (configurable 30-730) | `log-analytics.bicep:43` |
 | **Application Insights** | Application telemetry + SRE Agent operational telemetry. Exact SRE Agent schema is TBD: `logConfiguration` is configured in Bicep, but emitted fields depend on the deployed API version. | 90 days | `app-insights.bicep:43`, `sre-agent.bicep:97-101` |
-| **Key Vault** | Soft delete enabled, purge protection **enabled by default** with an explicit `keyVaultPurgeProtection = false` disposable override | 7-day soft delete | `key-vault.bicep:28-48` |
+| **Key Vault** | Soft delete enabled, purge protection **enabled by default**; any disposable override is explicit and must be documented before deployment because retained deleted names remain unavailable until purge/retention completes | 7-day soft delete + retention while purge protection remains enabled | `key-vault.bicep:28-48` |
 | **Mission Control** | No persistent data store — K8s state is read-only, jobs are in-memory | Session-only | `server.ts:19` |
 | **Ask Copilot** | System message prohibits requesting secrets, tokens, and kubeconfig. `redactSensitiveText()` strips Bearer tokens, password/secret/key values, `AccountKey` credentials, and URI-embedded credentials. | Session-only | `AssistantService.ts:23-27`, `KubeClient.ts:631-636` |
 | **Azure SRE Agent** | Conversations are managed by the Azure-hosted service; SRE Agent operational telemetry is configured to use App Insights. Exact conversation/audit schema is opaque to this repo. | Opaque to this repo | `sre-agent.bicep:97-101` |
@@ -405,7 +405,7 @@ graph TD
 | ✅ | kubectl output redaction is solid for Bearer tokens, password/secret/key values, `AccountKey` credentials, and URI-embedded credentials |
 | ✅ | No customer PII exists in the demo by design (simulated energy grid data) |
 | ✅ | Application Insights IP masking remains enabled (`DisableIpMasking: false`) |
-| ✅ | Key Vault purge protection is enabled by default; any disposable override must be explicit and documented before deployment |
+| ✅ | Key Vault purge protection is enabled by default; any disposable override must be explicit and documented in deployment parameters before deployment |
 | ⚠️ | App Insights connection string is exposed as a Bicep deployment output — acceptable for demo, route through Key Vault for production |
 | ⚠️ | No data classification statement in the repo |
 | ❌ | Azure SRE Agent conversation data retention policy is not documented or linked |
@@ -557,7 +557,7 @@ graph TB
 | P0-2 | Permission-boundary diagram absent from core demo materials before this document | Architecture | Promote the trust-tier diagram in §3.4 into the README, demo deck, or customer handout |
 | P0-3 | `mode: 'Review'` vs `mode: 'Auto'` not documented | Action Model | Document the trade-off, explain why Review was chosen, note Auto exists |
 | P0-4 | Alert rules default to off (`deployAlerts = false`) | Detection | Recommend `deployAlerts = true` for customer demos; document the opt-in |
-| P0-5 | No alert-to-agent trigger wired | Detection | Document Subagent builder / Incident triggers as next step; wire if possible |
+| P0-5 | Alert-to-agent trigger wired via Bicep `incidentManagementConfiguration` + `scripts/configure-sre-agent-incident-response.ps1` (issue #76); live end-to-end proof pending | Detection | See `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md` for capability findings and outstanding live-validation checklist |
 | P0-6 | No SRE Agent audit trail evidence | Auditability | Capture Portal screenshots showing conversation audit, action proposals, execution log |
 | P0-7 | No pre-built KQL audit queries | Auditability | Create queries for: pod lifecycle events, SRE Agent actions from App Insights, RBAC changes from Activity Log |
 | P0-8 | No "demo vs. production" permissions guidance | Security | Document `accessLevel: 'Low'` as diagnosis-only option; provide minimum role set for production |
@@ -567,7 +567,7 @@ graph TB
 | ID | Delta | Category | Action Required |
 |----|-------|----------|-----------------|
 | P1-1 | No MTTR instrumentation | Measurement | Instrument incident-open → diagnosis → remediation → close timestamps |
-| P1-2 | Demo apps don't emit App Insights telemetry | Observability | Add Application Insights SDK to at least meter-service and dispatch-service |
+| P1-2 | Repo-owned meter-service and dispatch-service now emit OpenTelemetry; live AppRequests validation remains pending | Observability | Execute the `slo-meter-ingest` live-proof gate before making a telemetry coverage claim |
 | P1-3 | No CI/CD pipeline for change correlation | Correlation | Add GitHub Actions workflow so SRE Agent can show commit-to-incident linking via MCP |
 | P1-4 | No runbook library | Governance | Create structured runbooks for top scenarios (OOMKilled, CrashLoop, MongoDBDown) |
 | P1-5 | No compound/multi-symptom failure demo | Diagnosis | Create at least one scenario with >1 contributing factor |
@@ -575,7 +575,7 @@ graph TB
 | P1-7 | `managedResources: []` — IaC doesn't complete AKS ↔ SRE Agent connection | Setup | Document as current API-version limitation in this subscription; cite RBAC script and portal step as workaround |
 | P1-8 | No SRE Agent reasoning chain visibility | Explainability | Investigate App Insights tracing in `logConfiguration`; document what's visible |
 | P1-9 | No data classification statement | Compliance | Add explicit statement: demo contains zero PII/PHI (simulated energy grid data) |
-| P1-10 | Key Vault purge protection override does not specify a secure default | Security | Keep `keyVaultPurgeProtection = true` as the default and document any disposable override before deployment |
+| P1-10 | Key Vault purge protection default is secure; any disposable override requires explicit documentation before deployment | Security | Keep `keyVaultPurgeProtection = true` as the default and document any disposable override before deployment |
 | P1-11 | Azure SRE Agent conversation retention undocumented | Compliance | Link to Microsoft's data handling policy for the service/API version in use |
 | P1-12 | No documented escalation/reject flow | HITL | Document what happens when operator rejects a proposed action |
 | P1-13 | Public AKS API server | Security | Document as current deployment-path requirement; note private cluster + private endpoint as production path |
@@ -615,7 +615,7 @@ graph TB
 | `infra/bicep/modules/alerts.bicep` | 4 scheduled-query alert rules: pod restarts, HTTP 5xx, pod failures, CrashLoop/OOM |
 | `infra/bicep/modules/log-analytics.bicep` | Log Analytics: 30-day retention, per-GB pricing |
 | `infra/bicep/modules/app-insights.bicep` | App Insights: 90-day retention, wired to Log Analytics workspace |
-| `infra/bicep/modules/key-vault.bicep` | Key Vault: soft delete enabled, purge protection secure-by-default with explicit disposable opt-out, RBAC authorization |
+| `infra/bicep/modules/key-vault.bicep` | Key Vault: soft delete enabled, purge protection enabled by default with explicit disposable override documentation, RBAC authorization |
 
 ### Documentation
 
