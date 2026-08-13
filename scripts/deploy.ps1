@@ -76,6 +76,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+. "$PSScriptRoot/key-vault-lifecycle.ps1"
+
 if ($AksApiServerAuthorizedIpRanges.Count -gt 0) {
     $cidrPattern = '^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\/([0-9]|[12][0-9]|3[0-2])$'
     $invalidCidrs = @($AksApiServerAuthorizedIpRanges | Where-Object { $_ -notmatch $cidrPattern })
@@ -539,7 +541,10 @@ function Get-DeletedKeyVaultConflict {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
-        [string]$ResourceGroupName
+        [string]$ResourceGroupName,
+
+        [Parameter(Mandatory)]
+        [string]$Location
     )
 
     $deployment = Invoke-AzCliJsonArgs -Arguments @(
@@ -591,8 +596,13 @@ function Get-DeletedKeyVaultConflict {
         return $null
     }
 
+    $deletedState = Get-KeyVaultDeletedVaultState -VaultName $vaultName -Location $Location
+
     return [pscustomobject]@{
-        VaultName = $vaultName
+        VaultName                    = $vaultName
+        PurgeProtectionEnabled      = $deletedState.PurgeProtectionEnabled
+        RedeployImmediatelyAvailable = $deletedState.RedeployImmediatelyAvailable
+        Message                     = $deletedState.Message
     }
 }
 
@@ -606,36 +616,27 @@ function Resolve-DeletedKeyVaultConflict {
         [string]$Location
     )
 
+    $deletedState = Get-KeyVaultDeletedVaultState -VaultName $VaultName -Location $Location
+    if (-not $deletedState.Found) {
+        Write-Host "`nℹ️  Deleted Key Vault '$VaultName' is already gone. Same-name redeploy is available immediately." -ForegroundColor Green
+        return $true
+    }
+
     Write-Host "`n🧹 Found soft-deleted Key Vault blocking redeploy: $VaultName" -ForegroundColor Yellow
-    Write-Host "  Purging deleted Key Vault entry so the deployment can continue..." -ForegroundColor Gray
-
-    $purgeOutput = az keyvault purge --name $VaultName --location $Location 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) {
-        $deletedVaultCount = az keyvault list-deleted --query "[?name=='$VaultName'] | length(@)" --output tsv 2>$null
-        if ($purgeOutput -match 'DeletedVaultNotFound' -and $LASTEXITCODE -eq 0 -and $deletedVaultCount -eq '0') {
-            Write-Host "  ℹ️  Deleted Key Vault entry is already gone. Waiting for Azure to release the name..." -ForegroundColor Yellow
-            Start-Sleep -Seconds 20
-            return $true
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($purgeOutput)) {
-            Write-Host $purgeOutput.Trim() -ForegroundColor Red
-        }
+    if ($deletedState.PurgeProtectionEnabled) {
+        Write-Host "  🛡️  Purge protection is enabled. Azure is retaining the deleted vault name and same-name redeploy is not available until retention expires." -ForegroundColor Yellow
+        Write-Host "  🔐 No purge call was attempted because Azure would reject it. Use a different workload name or wait until the retention window ends." -ForegroundColor Gray
         return $false
     }
 
-    $deadline = (Get-Date).AddMinutes(2)
-    do {
-        Start-Sleep -Seconds 5
-        $deletedVaultCount = az keyvault list-deleted --query "[?name=='$VaultName'] | length(@)" --output tsv 2>$null
-        if ($LASTEXITCODE -eq 0 -and $deletedVaultCount -eq '0') {
-            Write-Host "  ✅ Deleted Key Vault entry purged" -ForegroundColor Green
-            Start-Sleep -Seconds 20
-            return $true
-        }
-    } while ((Get-Date) -lt $deadline)
+    Write-Host "  Purging deleted Key Vault entry so the deployment can continue..." -ForegroundColor Gray
+    $purgeResult = Resolve-KeyVaultPurgeForReuse -VaultName $VaultName -Location $Location -WaitSeconds 120 -PollingIntervalSeconds 5
+    if ($purgeResult.Resolved) {
+        Write-Host "  ✅ Deleted Key Vault entry purged. Same-name redeploy is available immediately." -ForegroundColor Green
+        return $true
+    }
 
-    Write-Host "  ⚠️  Purge request completed, but Azure has not removed the deleted vault entry yet." -ForegroundColor Yellow
+    Write-Host "  ⚠️  $($purgeResult.Message)" -ForegroundColor Yellow
     return $false
 }
 
@@ -1022,13 +1023,15 @@ try {
         Write-SubscriptionDeploymentFailureSummary -DeploymentName $deploymentName -ResourceGroupName $resourceGroupName
 
         if ($attempt -eq 1) {
-            $deletedKeyVaultConflict = Get-DeletedKeyVaultConflict -ResourceGroupName $resourceGroupName
+            $deletedKeyVaultConflict = Get-DeletedKeyVaultConflict -ResourceGroupName $resourceGroupName -Location $Location
             if ($deletedKeyVaultConflict) {
                 $resolved = Resolve-DeletedKeyVaultConflict -VaultName $deletedKeyVaultConflict.VaultName -Location $Location
                 if ($resolved) {
                     Write-Host "`n🔁 Retrying deployment after Key Vault purge..." -ForegroundColor Yellow
                     continue
                 }
+
+                throw "Deployment failed because the retained Key Vault name cannot be reused immediately. Use a different workload name or wait for the purge-protection retention window to expire."
             }
         }
 

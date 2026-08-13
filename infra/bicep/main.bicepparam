@@ -17,6 +17,9 @@ param deployAlerts = true
 // Deploy Azure SRE Agent (programmatic deployment now supported)
 param deploySreAgent = true
 
+// Secure-by-default Key Vault purge protection. Override to false only for disposable demo labs that intentionally accept name retention/reuse trade-offs.
+param keyVaultPurgeProtection = true
+
 // Default action group for incident routing (add webhook at deploy time)
 param deployActionGroup = false
 

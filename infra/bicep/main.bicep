@@ -34,6 +34,9 @@ param deployAlerts bool = true
 @description('Deploy Azure SRE Agent for AI-powered diagnostics and remediation')
 param deploySreAgent bool = true
 
+@description('Enable Azure Key Vault purge protection. Defaults to true for secure-by-default lab deployments. Set to false only for an explicitly disposable demo environment where immediate delete/recreate and same-name reuse are intentionally accepted. Azure rejects an explicit false value; once enabled, it cannot be turned off and deleted vault names remain retained for the retention period.')
+param keyVaultPurgeProtection bool = true
+
 @description('Deploy default Action Group for alert notifications and incident routing')
 param deployActionGroup bool = false
 
@@ -249,6 +252,7 @@ module keyVault 'modules/key-vault.bicep' = {
     location: location
     tags: tags
     enableRbacAuthorization: true
+    enablePurgeProtection: keyVaultPurgeProtection
   }
 }
 

@@ -17,6 +17,9 @@ param tags object
 @description('Enable RBAC authorization (recommended)')
 param enableRbacAuthorization bool = true
 
+@description('Enable Azure Key Vault purge protection. Defaults to true. Set to false only before deployment for a disposable demo lab where immediate delete/recreate and name reuse are intentionally accepted. Azure rejects an explicit false value; once a vault is created with purge protection enabled, Azure does not permit turning it off and deleted vault names remain retained for the retention window.')
+param enablePurgeProtection bool = true
+
 @description('SKU for Key Vault')
 @allowed([
   'standard'
@@ -28,27 +31,31 @@ param skuName string = 'standard'
 // RESOURCES
 // =============================================================================
 
+var keyVaultProperties = {
+  sku: {
+    family: 'A'
+    name: skuName
+  }
+  tenantId: subscription().tenantId
+  enableRbacAuthorization: enableRbacAuthorization
+  enableSoftDelete: true
+  softDeleteRetentionInDays: 7
+  publicNetworkAccess: 'Enabled'
+  networkAcls: {
+    bypass: 'AzureServices'
+    defaultAction: 'Allow'
+  }
+}
+
+var purgeProtectionProperties = enablePurgeProtection ? {
+  enablePurgeProtection: true
+} : {}
+
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: name
   location: location
   tags: tags
-  properties: {
-    sku: {
-      family: 'A'
-      name: skuName
-    }
-    tenantId: subscription().tenantId
-    enableRbacAuthorization: enableRbacAuthorization
-    enableSoftDelete: true
-    softDeleteRetentionInDays: 7
-    // Note: enablePurgeProtection is omitted to default to false for dev/demo
-    // Once enabled, purge protection cannot be disabled
-    publicNetworkAccess: 'Enabled'
-    networkAcls: {
-      bypass: 'AzureServices'
-      defaultAction: 'Allow'
-    }
-  }
+  properties: union(keyVaultProperties, purgeProtectionProperties)
 }
 
 // =============================================================================
@@ -58,3 +65,5 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
 output keyVaultId string = keyVault.id
 output keyVaultName string = keyVault.name
 output vaultUri string = keyVault.properties.vaultUri
+output keyVaultPurgeProtectionEnabled bool = keyVault.properties.enablePurgeProtection ?? false
+output keyVaultPurgeProtectionStatus string = (keyVault.properties.enablePurgeProtection ?? false) ? 'enabled' : 'disabled-demo-only'

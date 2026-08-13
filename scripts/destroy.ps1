@@ -30,6 +30,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+. "$PSScriptRoot/key-vault-lifecycle.ps1"
+
 Write-Host @"
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
@@ -111,41 +113,41 @@ if ($keyVaultNames.Count -gt 0) {
 
     if ($groupDeleted) {
         Write-Host "  ✅ Resource group deleted" -ForegroundColor Green
-        Write-Host "`n🧹 Purging deleted Key Vault records to avoid name conflicts on redeploy..." -ForegroundColor Yellow
+        Write-Host "`n🧹 Evaluating deleted Key Vault records for purge-protection and same-name reuse status..." -ForegroundColor Yellow
 
+        $sameNameRedeployAvailable = $true
         foreach ($keyVaultName in $keyVaultNames) {
-            $deletedVaultFound = $false
-            $vaultDeadline = (Get-Date).AddMinutes(5)
-
-            do {
-                $deletedCount = az keyvault list-deleted --query "[?name=='$keyVaultName'] | length(@)" --output tsv 2>$null
-                if ($LASTEXITCODE -eq 0 -and $deletedCount -eq '1') {
-                    $deletedVaultFound = $true
-                    break
-                }
-
-                Start-Sleep -Seconds 5
-            } while ((Get-Date) -lt $vaultDeadline)
-
-            if (-not $deletedVaultFound) {
-                Write-Host "   ⚠️  Deleted Key Vault entry not found for $keyVaultName; Azure may still be finalizing deletion." -ForegroundColor Yellow
+            $deletedState = Get-KeyVaultDeletedVaultState -VaultName $keyVaultName -Location $($rg.location)
+            if (-not $deletedState.Found) {
+                Write-Host "   ✅ $keyVaultName is already cleared from the deleted-vault cache. Same-name redeploy is available." -ForegroundColor Green
                 continue
             }
 
-            $purgeOutput = az keyvault purge --name $keyVaultName --location $($rg.location) 2>&1 | Out-String
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "   ✅ Purged $keyVaultName" -ForegroundColor Green
+            if ($deletedState.PurgeProtectionEnabled) {
+                $sameNameRedeployAvailable = $false
+                Write-Host "   🛡️  $keyVaultName is retained by purge protection. Same-name redeploy is unavailable until retention expires; no purge call was attempted." -ForegroundColor Yellow
+                continue
+            }
+
+            $purgeResult = Resolve-KeyVaultPurgeForReuse -VaultName $keyVaultName -Location $($rg.location) -WaitSeconds 120 -PollingIntervalSeconds 5
+            if ($purgeResult.Resolved) {
+                Write-Host "   ✅ Purged $keyVaultName. Same-name redeploy is available immediately." -ForegroundColor Green
             }
             else {
-                Write-Host "   ⚠️  Failed to purge $keyVaultName" -ForegroundColor Yellow
-                if (-not [string]::IsNullOrWhiteSpace($purgeOutput)) {
-                    Write-Host "      $($purgeOutput.Trim())" -ForegroundColor Gray
-                }
+                $sameNameRedeployAvailable = $false
+                Write-Host "   ⚠️  $($purgeResult.Message)" -ForegroundColor Yellow
             }
+        }
+
+        if ($sameNameRedeployAvailable) {
+            Write-Host "`n🔐 Key Vault name reuse status: same-name redeploy is available immediately." -ForegroundColor Green
+        }
+        else {
+            Write-Host "`n🔐 Key Vault name reuse status: same-name redeploy remains unavailable because at least one deleted vault is retained by purge protection or has not completed purge." -ForegroundColor Yellow
         }
     }
     else {
-        Write-Host "  ⚠️  Resource group deletion is still in progress. Key Vault purge was not attempted yet." -ForegroundColor Yellow
+        Write-Host "  ⚠️  Resource group deletion is still in progress. Key Vault purge safety checks were not attempted yet." -ForegroundColor Yellow
     }
 }
 
