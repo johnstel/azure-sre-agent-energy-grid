@@ -183,6 +183,7 @@ export interface InventoryResponse {
   namespace: 'energy';
   updatedAt: string;
   deployments: DeploymentInventoryItem[];
+  pods: Pod[];
   orphanPods: InventoryPodSummary[];
   services: Service[];
   events: KubeEvent[];

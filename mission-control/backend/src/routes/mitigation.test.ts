@@ -32,6 +32,7 @@ function inventoryFixture(desiredReplicas: number, readyPods: number): Inventory
   return {
     namespace: 'energy',
     updatedAt: T(-20),
+    pods: [],
     orphanPods: [],
     services: [],
     events: [],
