@@ -784,20 +784,27 @@ const analystTranscriptStatus = computed(() => {
 
 async function refreshAll() {
   inventoryLoading.value = true;
-  await Promise.all([loadInventory(), loadRuntime(), loadScenarios(), loadIncidentHandoffs(), loadCustomerImpact()]);
+  const [hasBundledRuntime] = await Promise.all([
+    loadInventory(),
+    loadScenarios(),
+    loadIncidentHandoffs(),
+    loadCustomerImpact(),
+  ]);
+  if (!hasBundledRuntime) await loadRuntime();
   await loadMitigationEvidence();
   inventoryLoading.value = false;
 }
 
-async function loadInventory() {
+async function loadInventory(): Promise<boolean> {
   inventoryError.value = '';
   try {
     const response = await getInventory();
     inventory.value = normalizeInventory(inventoryItemsFromResponse(response), response.namespace);
+    if (Array.isArray(response.pods)) pods.value = response.pods;
     if (Array.isArray(response.services)) services.value = response.services;
     if (Array.isArray(response.events)) events.value = response.events;
     inventorySource.value = 'inventory-api';
-    return;
+    return Array.isArray(response.pods);
   } catch (error) {
     inventoryError.value = `Inventory API unavailable: ${error instanceof Error ? error.message : String(error)}. Showing explicit fallback from older endpoints if available.`;
   }
@@ -817,6 +824,7 @@ async function loadInventory() {
     inventory.value = [];
     inventorySource.value = 'unavailable';
   }
+  return false;
 }
 
 async function loadRuntime() {
