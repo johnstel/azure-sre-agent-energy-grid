@@ -784,16 +784,19 @@ const analystTranscriptStatus = computed(() => {
 
 async function refreshAll() {
   inventoryLoading.value = true;
-  await Promise.all([loadInventory(), loadRuntime(), loadScenarios(), loadIncidentHandoffs(), loadCustomerImpact()]);
+  await Promise.all([loadInventory(), loadScenarios(), loadIncidentHandoffs(), loadCustomerImpact()]);
   await loadMitigationEvidence();
   inventoryLoading.value = false;
 }
 
 async function loadInventory() {
   inventoryError.value = '';
+  podError.value = '';
   try {
     const response = await getInventory();
-    inventory.value = normalizeInventory(inventoryItemsFromResponse(response), response.namespace);
+    const inventoryItems = inventoryItemsFromResponse(response);
+    inventory.value = normalizeInventory(inventoryItems, response.namespace);
+    pods.value = podsFromInventory(inventoryItems, response.namespace);
     if (Array.isArray(response.services)) services.value = response.services;
     if (Array.isArray(response.events)) events.value = response.events;
     inventorySource.value = 'inventory-api';
@@ -802,13 +805,18 @@ async function loadInventory() {
     inventoryError.value = `Inventory API unavailable: ${error instanceof Error ? error.message : String(error)}. Showing explicit fallback from older endpoints if available.`;
   }
 
-  const legacy = await Promise.allSettled([getDeployments(), getPods(), getServices()]);
+  const legacy = await Promise.allSettled([getDeployments(), getPods(), getServices(), getEvents()]);
   const deploymentResult = legacy[0];
   const podResult = legacy[1];
   const serviceResult = legacy[2];
+  const eventResult = legacy[3];
   deployments.value = deploymentResult.status === 'fulfilled' ? deploymentResult.value.deployments : [];
   pods.value = podResult.status === 'fulfilled' ? podResult.value.pods : pods.value;
+  if (podResult.status === 'rejected') {
+    podError.value = `Pods unavailable: ${podResult.reason instanceof Error ? podResult.reason.message : String(podResult.reason)}`;
+  }
   services.value = serviceResult.status === 'fulfilled' ? serviceResult.value.services : [];
+  if (eventResult.status === 'fulfilled') events.value = eventResult.value.events;
 
   if (deployments.value.length > 0 || services.value.length > 0) {
     inventory.value = deriveInventory(deployments.value, pods.value, services.value);
@@ -817,15 +825,6 @@ async function loadInventory() {
     inventory.value = [];
     inventorySource.value = 'unavailable';
   }
-}
-
-async function loadRuntime() {
-  podError.value = '';
-  const runtime = await Promise.allSettled([getPods(), getServices(), getEvents()]);
-  if (runtime[0].status === 'fulfilled') pods.value = runtime[0].value.pods;
-  else podError.value = `Pods unavailable: ${runtime[0].reason instanceof Error ? runtime[0].reason.message : String(runtime[0].reason)}`;
-  if (runtime[1].status === 'fulfilled') services.value = runtime[1].value.services;
-  if (runtime[2].status === 'fulfilled') events.value = runtime[2].value.events;
 }
 
 async function loadIncidentHandoffs() {
@@ -1467,6 +1466,18 @@ function normalizeInventory(items: InventoryItem[], fallbackNamespace = 'energy'
     actualState: item.actualState || `${Number(item.readyReplicas ?? item.readyPods ?? 0)}/${Number(item.desiredReplicas ?? item.replicas ?? 0)} ready`,
     severity: normalizeSeverity(item.severity ?? item.status),
   }));
+}
+
+function podsFromInventory(items: InventoryItem[], fallbackNamespace: string): Pod[] {
+  const podsByName = new Map<string, Pod>();
+  for (const pod of items.flatMap(item => item.pods ?? [])) {
+    podsByName.set(pod.name, {
+      ...pod,
+      namespace: pod.namespace ?? fallbackNamespace,
+      age: pod.age ?? 'unknown',
+    });
+  }
+  return [...podsByName.values()];
 }
 
 function deriveInventory(deploymentsInput: Deployment[], podsInput: Pod[], servicesInput: Service[]): InventoryItem[] {
