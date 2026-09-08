@@ -1,10 +1,11 @@
-import { ref, onUnmounted } from 'vue';
+import { onScopeDispose, ref } from 'vue';
 
 export function usePolling<T>(fetcher: () => Promise<T>, intervalMs = 5000) {
   const data = ref<T | null>(null) as { value: T | null };
   const error = ref<Error | null>(null);
   const loading = ref(false);
-  let timer: ReturnType<typeof setInterval> | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let active = false;
 
   async function poll() {
     loading.value = true;
@@ -18,19 +19,28 @@ export function usePolling<T>(fetcher: () => Promise<T>, intervalMs = 5000) {
     }
   }
 
+  async function runScheduledPoll() {
+    await poll();
+    if (active) {
+      timer = setTimeout(runScheduledPoll, intervalMs);
+    }
+  }
+
   function start() {
-    poll();
-    timer = setInterval(poll, intervalMs);
+    if (active) return;
+    active = true;
+    void runScheduledPoll();
   }
 
   function stop() {
+    active = false;
     if (timer) {
-      clearInterval(timer);
+      clearTimeout(timer);
       timer = null;
     }
   }
 
-  onUnmounted(stop);
+  onScopeDispose(stop);
 
   return { data, error, loading, start, stop, poll };
 }

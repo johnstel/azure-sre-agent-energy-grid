@@ -98,6 +98,7 @@ export class KubeClient {
       namespace: ENERGY_NAMESPACE,
       updatedAt: new Date().toISOString(),
       deployments: deploymentItems,
+      pods,
       orphanPods: pods.filter((pod) => !claimedPods.has(pod.name)).map(toInventoryPodSummary),
       services,
       events: events.slice(0, 50),
