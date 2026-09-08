@@ -470,7 +470,7 @@ Known TBD scope includes all fields emitted by the SRE Agent App Insights teleme
 | ⚠️ DEMO ONLY — MongoDB without authentication | `k8s/base/application.yaml` | Any pod can read/write all data | Enable `--auth`, create service accounts |
 | ⚠️ DEMO ONLY — No pod `securityContext` | All deployments in `application.yaml` | Containers run as root with full capabilities | Set `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, drop all capabilities |
 | ⚠️ DEMO ONLY — No default-deny NetworkPolicy | `energy` namespace | Any pod can reach any pod | Add default-deny policy, allow only required paths |
-| ✅ Secure-by-default — Key Vault purge protection enabled by default | `infra/bicep/modules/key-vault.bicep` | Follow secure baseline | Keep default enabled; only an explicit disposable-demo override before deployment may omit the property instead of setting false; once enabled, purge protection cannot be turned off |
+| ✅ Secure default — Key Vault purge protection is enabled by default; any disposable override is explicit and must be documented before deployment because names remain retained while purge protection is active | `infra/bicep/modules/key-vault.bicep` | Security baseline | Keep the secure default; document any intentional disposable opt-out and the retention window trade-off |
 | ⚠️ DEMO ONLY — Public AKS API server | `infra/bicep/modules/aks.bicep` | Expanded attack surface | Required for SRE Agent Preview; use private cluster when GA supports it |
 | ⚠️ DEMO ONLY — App Insights connection string as Bicep output | `infra/bicep/modules/app-insights.bicep` | Key material in deployment outputs | Route through Key Vault references |
 
