@@ -85,44 +85,25 @@ The `High` level (adds Contributor + AKS admin roles) must be explicitly request
 
 ### Finding
 
-Bishop flagged that `guest/guest` RabbitMQ credentials were hardcoded as plaintext in Kubernetes manifest environment variables.
+Bishop flagged that default RabbitMQ admin credentials were hardcoded as plaintext in previous Kubernetes manifest environment variables.
 
-### Current state (resolved for K8s scope)
+### Current state (Key Vault bootstrap)
 
-The credentials are stored in a Kubernetes `Secret` object named `rabbitmq-credentials` (namespace: `energy`). All service deployments reference credentials via `secretKeyRef` — no plaintext values appear in any `env.value` field.
+RabbitMQ credentials are now bootstrapped to Azure Key Vault during deployment instead of being treated as repository-managed secrets. The deployment creates and preserves these named secrets:
 
-Additionally, the original `guest/guest` default credentials have been rotated to demo-specific values.
+- `rabbitmq-username`
+- `rabbitmq-password`
+- `rabbitmq-amqp-uri`
 
-**Secret definition** (`k8s/base/application.yaml`):
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: rabbitmq-credentials
-  namespace: energy
-type: Opaque
-stringData:              # Demo-static values — see note below
-  rabbitmq-username: "energy-grid-mq"
-  rabbitmq-password: "energy-grid-mq-demo"
-  rabbitmq-amqp-uri: "amqp://energy-grid-mq:energy-grid-mq-demo@rabbitmq:5672/"
-```
+The values are generated at deploy time with cryptographically secure randomness and are never checked into the repository. The default path preserves existing secret versions; the explicit `-RotateRabbitMqSecrets` switch creates new versions without printing secret values.
 
-**All service references use `secretKeyRef`** (verified: `meter-service`, `dispatch-service`, `rabbitmq` deployment env blocks).
-
-### Demo-static values note
-
-Per issue #52, demo-static values are accepted for the dev lab. Key Vault rotation is **not** required for this issue. The original `guest/guest` defaults have been replaced with demo-specific credentials (`energy-grid-mq`/`energy-grid-mq-demo`).
-
-The values are visible in the Git repository. This is a known, accepted trade-off for a demo lab. For production or truly sensitive demos:
-
-1. Rotate credentials before the demo (change `stringData` values and re-apply).
-2. Consider managing the Secret out-of-band (manually apply a Secret that is not in Git).
-3. Key Vault-backed Secrets via CSI driver can be added in a future enhancement.
+This issue is intentionally limited to the secure source-of-truth bootstrap. Kubernetes CSI consumption and workload identity remain separate follow-up work.
 
 ### Operator pre-demo checklist (H-4)
 
-- [ ] Acknowledge that demo-static RabbitMQ credentials (`energy-grid-mq`/`energy-grid-mq-demo`) are in the Git repository (accepted per issue #52 for demo-lab use).
-- [ ] For higher-sensitivity external demos: rotate credentials manually — update the `stringData` values in a local copy, apply with `kubectl apply`, and do NOT commit the changed values.
+- [ ] Confirm the deployment created the RabbitMQ Key Vault secrets in the target vault.
+- [ ] For any required rotation, rerun `deploy.ps1 -RotateRabbitMqSecrets` instead of editing checked-in files or manifests.
+- [ ] Verify no secret values appear in deployment logs, output files, or tracked Git content.
 - [ ] Confirm RabbitMQ management UI is not publicly exposed (it is ClusterIP only — no LoadBalancer Service for port 15672).
 
 ---
@@ -148,8 +129,8 @@ Copy this checklist into your demo pre-flight notes before any customer-facing r
       az role assignment list --assignee <sre-agent-principal-id> --output table
 
 ### H-4: RabbitMQ Credentials
-- [ ] Accepted: guest/guest demo-static values are acknowledged
-- [ ] If rotating: Secret updated locally, NOT committed
+- [ ] RabbitMQ Key Vault secrets were bootstrapped for the active vault
+- [ ] Rotation is done via `deploy.ps1 -RotateRabbitMqSecrets`, not by editing tracked files
 - [ ] RabbitMQ management UI (port 15672) is NOT publicly exposed
 
 ### General

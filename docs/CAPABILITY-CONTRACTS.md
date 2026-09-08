@@ -466,11 +466,11 @@ Known TBD scope includes all fields emitted by the SRE Agent App Insights teleme
 
 | Shortcut | Location | Risk | Production Recommendation |
 |----------|----------|------|--------------------------|
-| ⚠️ DEMO ONLY — RabbitMQ static `guest/guest` credentials | `k8s/base/application.yaml` (`Secret/rabbitmq-credentials`) | Static credentials are stored in Git and not rotated | Use Key Vault + Workload Identity for credentials |
+| ⚠️ DEMO ONLY — RabbitMQ secret material is not committed to Git | `scripts/configure-key-vault-secrets.ps1` + Azure Key Vault | Secret values are generated at deploy time and stored as Key Vault-managed runtime metadata | Keep secrets in Key Vault and avoid handling them in Git-tracked manifests |
 | ⚠️ DEMO ONLY — MongoDB without authentication | `k8s/base/application.yaml` | Any pod can read/write all data | Enable `--auth`, create service accounts |
 | ⚠️ DEMO ONLY — No pod `securityContext` | All deployments in `application.yaml` | Containers run as root with full capabilities | Set `runAsNonRoot: true`, `readOnlyRootFilesystem: true`, drop all capabilities |
 | ⚠️ DEMO ONLY — No default-deny NetworkPolicy | `energy` namespace | Any pod can reach any pod | Add default-deny policy, allow only required paths |
-| ⚠️ DEMO ONLY — Key Vault purge protection disabled | `infra/bicep/modules/key-vault.bicep` | Compliance failure | Enable purge protection |
+| ✅ Secure-by-default — Key Vault purge protection enabled by default | `infra/bicep/modules/key-vault.bicep` | Follow secure baseline | Keep default enabled; only an explicit disposable-demo override before deployment may omit the property instead of setting false; once enabled, purge protection cannot be turned off |
 | ⚠️ DEMO ONLY — Public AKS API server | `infra/bicep/modules/aks.bicep` | Expanded attack surface | Required for SRE Agent Preview; use private cluster when GA supports it |
 | ⚠️ DEMO ONLY — App Insights connection string as Bicep output | `infra/bicep/modules/app-insights.bicep` | Key material in deployment outputs | Route through Key Vault references |
 

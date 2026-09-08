@@ -34,6 +34,9 @@ param deployAlerts bool = true
 @description('Deploy Azure SRE Agent for AI-powered diagnostics and remediation')
 param deploySreAgent bool = true
 
+@description('Enable Azure Key Vault purge protection for the lab vault. Defaults to true for secure-by-default deploys. Set to false only before deployment for a disposable demo lab where rapid delete/recreate and name reuse are intentionally accepted. When false, the generated Key Vault resource omits the property entirely because Azure rejects an explicit false value; once a vault is created with purge protection enabled, Azure does not allow turning it off and deleted vault names remain retained for the retention period.')
+param keyVaultPurgeProtection bool = true
+
 @description('Deploy default Action Group for alert notifications and incident routing')
 param deployActionGroup bool = true
 
@@ -107,6 +110,12 @@ param userMaxPods int = 50
 
 @description('Optional CIDR ranges allowed to reach the AKS API server public endpoint for external demos. Leave empty to preserve current public-access behavior.')
 param aksApiServerAuthorizedIpRanges array = []
+
+@description('Kubernetes namespace hosting the workload identity service account.')
+param workloadIdentityServiceAccountNamespace string = 'energy'
+
+@description('Service account name bound to the federation subject for Key Vault secret access. Default matches the RabbitMQ-consuming energy workload.')
+param workloadIdentityServiceAccountName string = 'meter-service'
 
 @description('Enable ACR admin user account (not required for default deploy path)')
 param acrAdminUserEnabled bool = false
@@ -259,6 +268,22 @@ module keyVault 'modules/key-vault.bicep' = {
     location: location
     tags: tags
     enableRbacAuthorization: true
+    enablePurgeProtection: keyVaultPurgeProtection
+  }
+}
+
+// Dedicated user-assigned identity for Key Vault read-only secret access in the energy namespace.
+module energyWorkloadIdentity 'modules/energy-workload-identity.bicep' = {
+  scope: resourceGroup
+  name: 'deploy-energy-workload-identity'
+  params: {
+    identityName: names.managedIdentity
+    location: location
+    tags: tags
+    aksOidcIssuerUrl: aks.outputs.oidcIssuerUrl
+    keyVaultResourceId: keyVault.outputs.keyVaultId
+    serviceAccountNamespace: workloadIdentityServiceAccountNamespace
+    serviceAccountName: workloadIdentityServiceAccountName
   }
 }
 
@@ -349,7 +374,22 @@ output acrLoginServer string = containerRegistry.outputs.loginServer
 output logAnalyticsWorkspaceId string = logAnalytics.outputs.workspaceId
 output appInsightsId string = appInsights.outputs.appInsightsId
 output appInsightsConnectionString string = appInsights.outputs.connectionString
+output keyVaultName string = keyVault.outputs.keyVaultName
 output keyVaultUri string = keyVault.outputs.vaultUri
+output rabbitMqKeyVaultSecretNames array = [
+  'rabbitmq-username'
+  'rabbitmq-password'
+  'rabbitmq-amqp-uri'
+]
+output keyVaultPurgeProtectionEnabled bool = keyVault.outputs.keyVaultPurgeProtectionEnabled
+output keyVaultPurgeProtectionStatus string = keyVault.outputs.keyVaultPurgeProtectionStatus
+output energyWorkloadIdentityName string = energyWorkloadIdentity.outputs.identityName
+output energyWorkloadIdentityResourceId string = energyWorkloadIdentity.outputs.resourceId
+output energyWorkloadIdentityClientId string = energyWorkloadIdentity.outputs.clientId
+output energyWorkloadIdentityPrincipalId string = energyWorkloadIdentity.outputs.principalId
+output energyWorkloadIdentityFederatedSubject string = energyWorkloadIdentity.outputs.federatedSubject
+output energyWorkloadIdentityServiceAccountNamespace string = energyWorkloadIdentity.outputs.serviceAccountNamespace
+output energyWorkloadIdentityServiceAccountName string = energyWorkloadIdentity.outputs.serviceAccountName
 output grafanaName string = deployObservability ? observability!.outputs.grafanaName : ''
 output grafanaDashboardUrl string = deployObservability ? observability!.outputs.grafanaEndpoint : ''
 output azureMonitorWorkspaceId string = deployObservability ? observability!.outputs.azureMonitorWorkspaceId : ''

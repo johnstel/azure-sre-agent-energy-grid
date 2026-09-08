@@ -1,0 +1,108 @@
+name: Validate PowerShell
+
+on:
+  push:
+    paths:
+      - 'scripts/**/*.ps1'
+      - '.github/workflows/validate-powershell.yml'
+  pull_request:
+    paths:
+      - 'scripts/**/*.ps1'
+      - '.github/workflows/validate-powershell.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-powershell:
+    name: Parse and analyze PowerShell scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Parse PowerShell syntax
+        shell: pwsh
+        run: |
+          $scriptFiles = Get-ChildItem scripts -Filter *.ps1 -Recurse
+          if (-not $scriptFiles) {
+            throw "No PowerShell scripts were found under scripts/."
+          }
+
+          $errorCount = 0
+          foreach ($file in $scriptFiles) {
+            $parseErrors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $file.FullName,
+              [ref]$null,
+              [ref]$parseErrors
+            )
+
+            if ($parseErrors) {
+              foreach ($error in $parseErrors) {
+                $line = $error.Extent.StartLineNumber
+                $column = $error.Extent.StartColumnNumber
+                Write-Host "::error file=$($file.FullName),line=$line,col=$column::$($error.Message)"
+                $errorCount++
+              }
+            }
+          }
+
+          if ($errorCount -gt 0) {
+            throw "PowerShell syntax parsed with $errorCount error(s)."
+          }
+
+          Write-Host "PowerShell AST parser passed for $($scriptFiles.Count) file(s)."
+
+      - name: Install, import, and run exact PSScriptAnalyzer version
+        shell: pwsh
+        run: |
+          $moduleVersion = '1.23.0'
+          $repositoryName = 'PSGallery'
+
+          $psGallery = Get-PSRepository -Name $repositoryName -ErrorAction Stop
+          if ($psGallery.InstallationPolicy -ne 'Trusted') {
+            Set-PSRepository -Name $repositoryName -InstallationPolicy Trusted -ErrorAction Stop
+          }
+
+          Install-Module `
+            -Name PSScriptAnalyzer `
+            -Repository $repositoryName `
+            -Scope CurrentUser `
+            -RequiredVersion $moduleVersion `
+            -Force `
+            -AcceptLicense `
+            -ErrorAction Stop
+
+          $installedModule = Get-Module -ListAvailable -Name PSScriptAnalyzer |
+            Where-Object { $_.Version -eq [version]$moduleVersion } |
+            Sort-Object Version -Descending |
+            Select-Object -First 1
+
+          if (-not $installedModule) {
+            throw "PSScriptAnalyzer $moduleVersion is not installed from $repositoryName."
+          }
+
+          Get-Module -Name PSScriptAnalyzer -All | Remove-Module -Force -ErrorAction SilentlyContinue
+          Import-Module $installedModule.Path -Force -RequiredVersion $moduleVersion -ErrorAction Stop
+
+          $loadedModule = Get-Module -Name PSScriptAnalyzer | Select-Object -First 1
+          if (-not $loadedModule -or $loadedModule.Version.ToString() -ne $moduleVersion) {
+            throw "Expected PSScriptAnalyzer version $moduleVersion to be loaded, but got $($loadedModule.Version.ToString())."
+          }
+
+          Write-Host "Loaded PSScriptAnalyzer $($loadedModule.Version) from $($loadedModule.Path)"
+
+          $results = Invoke-ScriptAnalyzer -Path scripts -Recurse -Severity Error
+
+          if ($results) {
+            foreach ($result in $results) {
+              Write-Host "::error file=$($result.ScriptPath),line=$($result.Line),col=$($result.Column),title=$($result.RuleName)::$($result.Message)"
+            }
+
+            throw "PSScriptAnalyzer found $($results.Count) Error-severity issue(s)."
+          }
+
+          Write-Host "PSScriptAnalyzer returned no Error-severity issues."
