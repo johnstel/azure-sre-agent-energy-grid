@@ -36,9 +36,13 @@ export function shouldUseTrace64Logging(env: NodeJS.ProcessEnv = process.env): b
   return TRUE_FLAG_VALUES.has(flag.trim().toLowerCase());
 }
 
+function escapeTrace64String(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 function formatTrace64Value(value: unknown): string {
   if (typeof value === 'string') {
-    return `"${value.replace(/"/g, '\\"')}"`;
+    return `"${escapeTrace64String(value)}"`;
   }
   if (value === null || value === undefined) {
     return 'NULL';
@@ -55,7 +59,7 @@ function formatTrace64Value(value: unknown): string {
 export function buildTrace64LogLine(entry: Trace64LogEntry): string {
   const timestamp = new Date(entry.timestamp ?? Date.now()).toISOString();
   const level = (entry.level ?? 'info').toUpperCase();
-  const message = entry.message.replace(/"/g, '\\"');
+  const message = escapeTrace64String(entry.message);
   const fieldEntries = Object.entries(entry.fields ?? {});
   const fieldsPart = fieldEntries.length > 0
     ? ` ${fieldEntries.map(([key, value]) => `${key}=${formatTrace64Value(value)}`).join(' ')}`
@@ -69,7 +73,7 @@ export function buildTrace64Script(logFile: string, entries: Trace64LogEntry[]):
   const lines = [
     `LOG.OPEN "${target}"`,
     ...entries.map((entry) => {
-      const rendered = buildTrace64LogLine(entry).replace(/"/g, '\\"');
+      const rendered = escapeTrace64String(buildTrace64LogLine(entry));
       return `PRINT "${rendered}"`;
     }),
     'LOG.CLOSE',

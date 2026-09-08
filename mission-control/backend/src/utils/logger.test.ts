@@ -66,6 +66,19 @@ test('buildTrace64LogLine escapes embedded double quotes in the message', () => 
   assert.equal(line, '1970-01-01T00:00:00.001Z INFO "said \\"hi\\" there"');
 });
 
+test('buildTrace64LogLine escapes backslashes before embedded quotes', () => {
+  const line = buildTrace64LogLine({
+    message: String.raw`path C:\Trace32 says "ready"`,
+    timestamp: 1,
+    fields: { script: String.raw`C:\Trace32\run.cmm` },
+  });
+
+  assert.equal(
+    line,
+    String.raw`1970-01-01T00:00:00.001Z INFO "path C:\\Trace32 says \"ready\"" script="C:\\Trace32\\run.cmm"`,
+  );
+});
+
 test('buildTrace64LogLine appends structured fields as key=value pairs', () => {
   const line = buildTrace64LogLine({
     message: 'mitigation applied',
@@ -99,6 +112,17 @@ test('buildTrace64Script emits a basic TRACE32 LOG.OPEN / PRINT / LOG.CLOSE scri
     script,
     /^LOG\.OPEN "\/tmp\/trace64\.log"\nPRINT "1970-01-01T00:00:00\.001Z INFO \\"boot\\""\nPRINT "1970-01-01T00:00:00\.002Z WARN \\"ready\\" pod=\\"api-2\\""\nLOG\.CLOSE\n$/,
   );
+});
+
+test('buildTrace64Script fully escapes backslashes and quotes in PRINT strings', () => {
+  const script = buildTrace64Script(String.raw`C:\Trace32\trace.log`, [
+    { message: String.raw`loaded C:\Trace32 "quoted"`, timestamp: 1 },
+  ]);
+
+  const printLine = script.split('\n')[1]!;
+  assert.ok(printLine.includes(String.raw`C:\\\\Trace32`));
+  assert.ok(printLine.includes(String.raw`\\\"quoted\\\"`));
+  assert.equal(printLine.includes(String.raw`C:\Trace32`), false);
 });
 
 test('writeTrace64Log is a no-op when Trace64 logging is disabled', () => {
