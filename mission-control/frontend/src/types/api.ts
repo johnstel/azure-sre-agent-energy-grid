@@ -172,6 +172,7 @@ export interface InventoryResponse {
   updatedAt?: string;
   inventory?: InventoryItem[];
   deployments: InventoryItem[];
+  pods?: Pod[];
   orphanPods: InventoryPodSummary[];
   services: Service[];
   events: KubeEvent[];

@@ -26,6 +26,7 @@ function inventory(overrides: Partial<InventoryResponse['deployments'][number]> 
   return {
     namespace: 'energy',
     updatedAt,
+    pods: [],
     orphanPods: [],
     services: [],
     events: [],

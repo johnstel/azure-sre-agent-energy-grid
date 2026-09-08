@@ -357,6 +357,7 @@ function inventoryWith(options: { mongoDown?: boolean; serviceMismatch?: boolean
         recentEvents: [],
       },
     ],
+    pods: [],
     orphanPods: [],
     services: [meterService],
     events: [],
