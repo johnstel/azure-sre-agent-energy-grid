@@ -18,7 +18,7 @@ This document prevents accidental overclaiming. Review it before every demo.
 
 | Topic | ❌ Do Not Claim | ✅ Say Instead | Why |
 |-------|----------------|---------------|-----|
-| **MTTR** | "Reduces MTTR by X%" | "Reduces the manual investigation from ~5 kubectl commands to a single conversational prompt" | No MTTR instrumentation exists yet. Quantitative claims require measurement infrastructure (Wave 5). |
+| **MTTR** | "Reduces MTTR by X%" | "Replaces several manual lookup steps with a conversational investigation path" | Quantitative claims require repeated, comparable measurements from live runs. |
 | **Autonomous Detection** | "SRE Agent autonomously detects incidents" | "SRE Agent diagnoses issues you point it to. Azure Monitor is wired as its incident platform (issue #76), so a matching alert can start a native investigation without a manually typed prompt — but this remains bounded by the configured response plan filters and Review-mode approval, not open-ended autonomous detection." | Alert-to-agent wiring exists in Bicep/scripts as of issue #76; live end-to-end proof that a live alert produced a native investigation has not been captured in this repo yet. Do not overstate scope beyond the configured response plan. |
 | **Alert-to-Agent Triggers** | "Alerts automatically trigger SRE Agent" or "This has been proven end-to-end in production" | "Azure Monitor is connected as the agent's incident platform via the documented `incidentManagementConfiguration` ARM property, and an Energy Grid response plan is created idempotently by `scripts/configure-sre-agent-incident-response.ps1`, in Review mode. Live proof that an injected alert produced a native investigation thread — and that repeated firings merge via the reinvestigation cooldown — is pending until run in a live Energy Grid environment. See `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md`." | Setup automation exists (Bicep + idempotent script + portal confirmation steps), but no live Energy Grid Azure environment was reachable in the session that implemented issue #76, so end-to-end live proof is explicitly marked pending, not claimed. |
 | **Native Incident Evidence in Mission Control** | "Mission Control shows Azure SRE Agent's real investigations" | "Mission Control reconciles native evidence only after `IncidentActivitySnapshot` telemetry is actually observed in Application Insights. Until then, incident cards show `local-fallback-only` or `evidence-unavailable` — never a fabricated native state, thread ID, or incident ID." | `NativeIncidentReconciliationService.ts` is designed to fail toward `evidence-unavailable`/`local-fallback-only` on missing, stale, duplicate, or schema-mismatched telemetry rather than guessing a healthy or mitigated state. |
@@ -65,10 +65,3 @@ If a customer asks a question not covered here:
 3. Do NOT improvise claims about production capabilities, pricing, or GA timelines.
 
 ---
-
-## Document History
-
-| Date | Version | Change | Author |
-|------|---------|--------|--------|
-| 2026-08-12 | 0.2 | Updated Alert-to-Agent Triggers/Autonomous Detection rows and added Native Incident Evidence + Reinvestigation Cooldown rows for issue #76 | Copilot draft for review |
-| 2026-04-26 | 0.1 | Wave 0 — Initial safe language guardrails | Lambert (QA/Docs) |

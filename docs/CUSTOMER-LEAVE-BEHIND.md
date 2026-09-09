@@ -1,6 +1,6 @@
 # Customer Leave-Behind: Azure SRE Agent Energy Grid Demo
 
-> **Azure SRE Agent is generally available (GA).** This lab pins `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`. If a subscription exposes only older preview provider metadata, deployment skips SRE Agent rather than falling back. This document is an evidence-safe summary of the demo lab and **requires Dallas approval before external customer use**.
+> **Azure SRE Agent is generally available (GA).** This lab pins `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`. If a subscription exposes only older preview provider metadata, deployment skips SRE Agent rather than falling back. This document is an evidence-safe summary of the demo lab and requires owner review before external customer use.
 
 **Version date:** 2026-04-29
 

@@ -81,7 +81,7 @@ Upload only documents listed in `docs/deep-context/KNOWLEDGE-MANIFEST.yaml` with
 | kql-mongodb | `docs/evidence/kql/stable/scenario-mongodb-down.kql` |
 | kql-svc-mismatch | `docs/evidence/kql/stable/scenario-service-mismatch.kql` |
 | kql-pod-lifecycle | `docs/evidence/kql/stable/pod-lifecycle.kql` |
-| k8s-troubleshooting | `docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md` |
+| k8s-troubleshooting | `docs/TROUBLESHOOTING.md` |
 | safe-language | `docs/ANALYST-SAFE-LANGUAGE.md` |
 | costs | `docs/COSTS.md` |
 

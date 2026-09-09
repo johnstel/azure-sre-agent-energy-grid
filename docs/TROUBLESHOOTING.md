@@ -538,14 +538,14 @@ curl -v "http://$PUBLIC_IP_OPS"
 **Symptom:** SRE Agent says it can't read namespaces or pods
 
 **Diagnosis:**
-1. Verify the cluster is **not** a fully private cluster (SRE Agent needs network access to the API server)
+1. Verify the cluster matches this lab's supported topology: a public AKS API endpoint, optionally restricted with authorized IP ranges
 2. Check the agent's managed identity has the correct roles:
    ```bash
    RESOURCE_GROUP="rg-srelab-eastus2"
    # List role assignments for the SRE Agent managed identity
    az role assignment list -g "$RESOURCE_GROUP" --query "[?principalType=='ServicePrincipal']" -o table
    ```
-3. Verify the cluster is in a supported region (East US 2, Sweden Central, Australia East)
+3. Verify the deployment uses one of this lab's allowed regions (East US 2, Sweden Central, Australia East). Azure SRE Agent supports additional regions, but they are not currently accepted by this repository's deployment scripts.
 
 **Fix:** Ensure the cluster is publicly accessible (or has authorized IP ranges that include SRE Agent). Re-run RBAC configuration if roles are missing:
 

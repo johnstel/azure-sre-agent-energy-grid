@@ -197,7 +197,7 @@ sources:
 
   # --- Troubleshooting & Safe Language ---
   - id: k8s-troubleshooting
-    path: "docs/KUBERNETES-SERVICE-TROUBLESHOOTING.md"
+    path: "docs/TROUBLESHOOTING.md"
     title: "Kubernetes Service Troubleshooting Guide"
     authority: authoritative
     owner: johnstel
@@ -241,38 +241,11 @@ sources:
 # -----------------------------------------------------------------------------
 exclusions:
 
-  - path: "docs/evidence/wave1-live/**"
-    rationale: "Raw live evidence contains unredacted resource identifiers and transient kubectl output. Not authoritative for future investigations."
-
-  - path: "docs/evidence/wave2-live/**"
-    rationale: "Same as wave1: raw evidence with potential PII/resource IDs."
-
-  - path: "docs/evidence/screenshots/**"
-    rationale: "Binary screenshots may contain tenant IDs, subscription details, or stale UI. Use redacted references only."
-
-  - path: "docs/evidence/complete-failure-bundle/**"
-    rationale: "Transient demo bundle with unvalidated run notes. May contain contradictory state."
-
-  - path: "docs/SRE-AGENT-API-RESEARCH.md"
-    rationale: "Internal research spike; may contain speculative or outdated API information."
-
-  - path: "docs/SRE-AGENT-API-ROLLOUT.md"
-    rationale: "Operational rollout tracking; not reference documentation."
-
-  - path: "docs/spikes/**"
-    rationale: "Exploration spikes are not validated and may contradict final designs."
-
-  - path: "docs/GRAFANA-INCIDENT-DASHBOARD-REVIEW-NOTE.md"
-    rationale: "Internal review note; not operational reference."
-
   - path: "docs/scenario-narration.json"
     rationale: "UI narration data; not authoritative system documentation."
 
   - path: "**/*.png"
     rationale: "Binary images excluded from text knowledge base (use Alt text or description docs instead)."
-
-  - path: "docs/evidence/kql/schema-tbd/**"
-    rationale: "TBD queries are unvalidated and should not be cited as authoritative."
 
   - path: ".devcontainer/**"
     rationale: "Dev container config is tooling, not system knowledge."

@@ -37,7 +37,7 @@ If a scheduled Grid Readiness task has not produced captured evidence, do **not*
 2. **Frame the value:** AI-assisted diagnosis, human-controlled remediation, and clear trust boundaries.
 3. **Show the trust model first:** Diagnosis Only → Recommend & Execute → Autonomous (not demonstrated).
 4. **Use the MongoDBDown wow moment:** show the dashboard or captured evidence if available; then ask the SRE Agent prompt or replay real captured evidence. Do not invent portal output.
-5. **Close with buyer next steps:** supported Preview regions, portal entry point, and cost pointer to [COSTS.md](COSTS.md).
+5. **Close with buyer next steps:** the lab's validated regions, portal entry point, and cost pointer to [COSTS.md](COSTS.md).
 
 **Emphasis:** decision confidence, operator control, and evidence-safe next steps.
 
@@ -219,7 +219,7 @@ For a 10-minute demo, use only scenarios 1 and 2. For a 5-minute demo, use scena
 | 7 | "Does it replace my SRE team?" | "No. It assists with repetitive early manual triage. Your SREs still make the decisions — they just get a clearer diagnosis path." |
 | 8 | "How does it know about my infrastructure?" | "It reads your Azure resource graph, Container Insights logs, and App Insights telemetry. It has the same view as an SRE with Reader access." |
 | 9 | "What about data privacy?" | "SRE Agent operates within your Azure tenant. Conversation data handling follows Azure's standard data processing terms. See Microsoft's Preview terms for specifics." |
-| 10 | "What does it cost?" | "The demo lab costs ~$34-40/day including SRE Agent. Production pricing follows Azure's standard consumption model — see our COSTS.md for the full breakdown." |
+| 10 | "What does it cost?" | "Core infrastructure is estimated separately from SRE Agent. SRE Agent adds 4 always-on AAUs per agent-hour plus active-flow AAUs; see COSTS.md and Azure Cost Management for the current total." |
 
 ---
 
@@ -234,14 +234,3 @@ See [SAFE-LANGUAGE-GUARDRAILS.md](SAFE-LANGUAGE-GUARDRAILS.md) for the complete 
 - ❌ "The scheduled task caught this before users noticed" → ✅ "The task configuration is ready; only a captured scheduled execution can demonstrate proactive analysis."
 
 ---
-
-## Document History
-
-| Date | Version | Change | Author |
-|------|---------|--------|--------|
-| 2026-08-12 | 0.6 | Added 60-second customer-impact opening, functional recovery gate, and scheduled-task evidence boundary | Copilot |
-| 2026-04-29 | 0.5 | Added persona routing for executive buyer, SRE manager, and security reviewer paths | Lambert (QA/Docs) |
-| 2025-07-22 | 0.4 | SCHEMA_TBD audit fix — replace all "conversations logged in App Insights" with evidence-safe telemetry language | Lambert (QA/Docs) |
-| 2025-07-22 | 0.3 | Security fix — soften 3 audit overclaims per SAFE-LANGUAGE-GUARDRAILS alignment | Lambert (QA/Docs) |
-| 2026-04-26 | 0.2 | Wave 0 polish — Core/Extended demo split, scenario table alignment | Lambert (QA/Docs) |
-| 2026-04-26 | 0.1 | Wave 0 — Initial demo narrative | Lambert (QA/Docs) |

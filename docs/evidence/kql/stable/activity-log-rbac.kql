@@ -12,7 +12,7 @@
 // Required projected columns: TimeBucket, ResourceId, CorrelationId (per Security MF-3)
 //
 // PREREQUISITE: Activity Log diagnostic export to Log Analytics must be deployed.
-// Wave 1 defines the diagnostic export in Bicep; live UAT must verify ingestion.
+// Bicep defines the diagnostic export; verify live ingestion before relying on it.
 // See: docs/CAPABILITY-CONTRACTS.md §11
 // =============================================================================
 
@@ -58,7 +58,7 @@ AzureActivity
 // ─────────────────────────────────────────────────────────────────────────────
 // This query will return no results until Activity Log diagnostic export is configured.
 //
-// Wave 1 UAT verification steps:
+// Verification steps:
 // 1. Verify Bicep module exists: infra/bicep/modules/activity-log-diagnostics.bicep
 // 2. Verify module is called from main.bicep
 // 3. Deploy infrastructure with Activity Log export enabled

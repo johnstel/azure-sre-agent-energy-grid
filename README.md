@@ -58,7 +58,8 @@ The platform simulates an electric energy producer with grid management and reta
 ### Prerequisites
 
 - Azure subscription with Owner/Contributor access
-- Azure region supporting SRE Agent: `East US 2`, `Sweden Central`, or `Australia East`
+- A lab-supported region: `East US 2`, `Sweden Central`, or `Australia East`
+  - Azure SRE Agent supports additional regions. This repository intentionally validates and permits only these three; see the [current service region list](https://learn.microsoft.com/azure/sre-agent/supported-regions).
 - [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli) installed
 - [VS Code](https://code.visualstudio.com/) with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (optional but recommended)
 
@@ -123,9 +124,9 @@ See [docs/SRE-AGENT-SETUP.md](docs/SRE-AGENT-SETUP.md) for detailed instructions
 | Configuration | Daily Cost | Monthly Cost |
 |--------------|------------|--------------|
 | Core lab / SRE Agent skipped | ~$24-30 | ~$660-870 |
-| Full demo lab / SRE Agent enabled | ~$34-40 | ~$970-1,170 |
+| SRE Agent | 4 AAUs per agent-hour + active-flow AAUs | Varies by usage and account pricing |
 
-The full demo lab is the default when SRE Agent deployment is available; use `.\scripts\deploy.ps1 -SkipSreAgent` for the lower core-lab estimate. Destroy the resource group after demos to stop most recurring charges. See [docs/COSTS.md](docs/COSTS.md) for the canonical breakdown, assumptions, and optimization tips.
+The full demo lab is the default when SRE Agent deployment is available; use `.\scripts\deploy.ps1 -SkipSreAgent` to omit its AAU charges. Destroy the resource group after demos to stop most recurring charges. See [docs/COSTS.md](docs/COSTS.md) for the canonical breakdown, assumptions, and optimization tips.
 
 ## 🔧 Available Scenarios
 
@@ -188,7 +189,7 @@ The full demo lab is the default when SRE Agent deployment is available; use `.\
 - [Prompts Guide](docs/PROMPTS-GUIDE.md)
 - [Breakable Scenarios Guide](docs/BREAKABLE-SCENARIOS.md)
 - [Cost Estimation](docs/COSTS.md)
-- [Interactive Grid Map Spec](docs/INTERACTIVE-GRID-MAP-SPEC.md) — approved cloud-demo topology map specification
+- [Interactive Grid Map Spec](docs/INTERACTIVE-GRID-MAP-SPEC.md) — implemented cloud-demo topology map specification
 - [Cloud Grid Map Data Contract](docs/CLOUD-GRID-MAP-DATA-CONTRACT.md) — selected cloud host, V1 health sources, and reusable topology config for the grid map
 - [Grid Map Smoke Tests](docs/GRID-MAP-SMOKE-TESTS.md) — scenario smoke test checklist and V1 visibility matrix for all 10 breakable scenarios
 
@@ -205,6 +206,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 **⚠️ Important Notes:**
 
 - SRE Agent docs use GA-language; this lab pins the ARM API to `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`.
-- SRE Agent is available for this lab in **East US 2**, **Sweden Central**, and **Australia East**
-- AKS cluster must **NOT** be a private cluster for SRE Agent to access
-- Firewall must allow `*.azuresre.ai`
+- This lab's deployment scripts currently allow **East US 2**, **Sweden Central**, and **Australia East**. Azure SRE Agent supports additional regions; check the [official region list](https://learn.microsoft.com/azure/sre-agent/supported-regions).
+- This lab uses a public AKS API endpoint with optional authorized IP ranges. Do not generalize that demo design into a service-wide private-cluster limitation.
+- Follow the complete [Azure SRE Agent network requirements](https://learn.microsoft.com/azure/sre-agent/network-requirements), not only the `*.azuresre.ai` domain.
