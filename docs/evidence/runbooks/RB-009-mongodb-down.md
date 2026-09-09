@@ -40,7 +40,7 @@
 4. Run stable KQL if workspace access is available:
    - `docs/evidence/kql/stable/scenario-mongodb-down.kql`
    - `docs/evidence/kql/stable/pod-lifecycle.kql`
-5. Check alert firing through `scripts/get-alert-firing-history.ps1`. Wave 2 documented `NO_ALERT_FIRED` for a rapid automated run; do not reinterpret that as Activity Log firing evidence.
+5. Check alert firing through `scripts/get-alert-firing-history.ps1`. An absent alert is an absent signal, not Activity Log proof that no failure occurred.
 
 ## Remediation
 
@@ -64,8 +64,6 @@
 
 - Scenario manifest: `docs/evidence/scenarios/scenario-manifest.yaml`
 - Scenario KQL: `docs/evidence/kql/stable/scenario-mongodb-down.kql`
-- Wave 2 evidence: `docs/evidence/wave2-live/mongodb-down/EVIDENCE-STATUS-FINAL.md`
-- Wave 4 dependency narrative: `docs/evidence/wave4-live/DEPENDENCY-REASONING.md`
 
 ## Execution Boundary
 

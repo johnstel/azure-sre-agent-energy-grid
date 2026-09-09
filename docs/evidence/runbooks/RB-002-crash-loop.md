@@ -60,7 +60,6 @@
 - Scenario manifest: `docs/evidence/scenarios/scenario-manifest.yaml`
 - Pod lifecycle KQL: `docs/evidence/kql/stable/pod-lifecycle.kql`
 - Alert mapping: `docs/evidence/ALERT-KQL-MAPPING.md`
-- Wave 4 status: `docs/evidence/wave4-live/STATUS.md`
 
 ## Execution Boundary
 

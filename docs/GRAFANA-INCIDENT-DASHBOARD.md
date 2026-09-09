@@ -72,7 +72,7 @@ The built-in Grafana annotation group is labeled **Annotations & Alerts**. It is
 ### Before a scenario
 
 - Confirm the baseline shows healthy pod lifecycle signals and that the request/dependency panels either return data or remain explicitly empty when telemetry is unavailable.
-- Optionally capture a screenshot → `docs/evidence/screenshots/{scenario}_grafana-before.png`.
+- Optionally capture a screenshot in the run's local evidence folder.
 
 ### After applying a breakable scenario
 
@@ -96,11 +96,11 @@ The built-in Grafana annotation group is labeled **Annotations & Alerts**. It is
 
 | Artifact | Path | Capture rule |
 |----------|------|--------------|
-| Healthy baseline | `docs/evidence/screenshots/{scenario}_grafana-before.png` | Real screenshot, redacted per [ANALYST-SAFE-LANGUAGE.md](ANALYST-SAFE-LANGUAGE.md) §Redaction |
-| Failure state | `docs/evidence/screenshots/{scenario}_grafana-failure.png` | Capture after scenario is applied and metrics propagate (~60 s) |
-| Post-fix | `docs/evidence/screenshots/{scenario}_grafana-after.png` | Capture after `kubectl apply -f k8s/base/application.yaml` and metrics settle |
+| Healthy baseline | `{scenario}_grafana-before.png` | Real screenshot, redacted per [ANALYST-SAFE-LANGUAGE.md](ANALYST-SAFE-LANGUAGE.md) §Redaction |
+| Failure state | `{scenario}_grafana-failure.png` | Capture after scenario is applied and metrics propagate (~60 s) |
+| Post-fix | `{scenario}_grafana-after.png` | Capture after `kubectl apply -f k8s/base/application.yaml` and metrics settle |
 
-Do not create placeholder images. If live Grafana is unavailable, document the gap in the scenario's `BLOCKER-NOTE.md`.
+Store captures outside the repository until reviewed. Do not create placeholder images; if live Grafana is unavailable, record that fact in the local run notes.
 
 ---
 

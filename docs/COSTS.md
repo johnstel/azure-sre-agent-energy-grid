@@ -31,17 +31,16 @@ The baseline estimate assumes the default `scripts/deploy.ps1 -Location eastus2`
 | **AKS Nodes (System)** | ~$4.85 | ~$147 | 2x Standard_D2s_v6 |
 | **AKS Nodes (User)** | ~$7.30 | ~$221 | 3x Standard_D2s_v6 |
 | **Container Registry** | ~$0.17 | ~$5 | Basic tier |
-| **Log Analytics** | ~$1.50-2.50 | ~$40-60 | 90-day retention (Wave 1) + Activity Log |
+| **Log Analytics** | ~$1.50-2.50 | ~$40-60 | 90-day retention + Activity Log |
 | **Application Insights** | ~$0.30-0.70 | ~$10-20 | Based on data volume |
 | **Managed Grafana** | ~$2.50 | ~$75 | Standard tier |
 | **Azure Monitor (Prometheus)** | ~$0.50 | ~$15 | Based on metrics volume |
 | **Key Vault** | ~$0.10 | ~$3 | Minimal operations |
 | **Disks, Load Balancer, Public IPs, Alerts** | ~$0.50-1.00 | ~$15-30 | AKS node OS disks, MongoDB PVC, Standard LB/IPs, scheduled query rules |
-| **SRE Agent** | ~$10-13 | ~$292-400 | Base + execution costs |
+| **SRE Agent** | 4 AAUs per agent-hour + active-flow AAUs | Variable | Confirm the current AAU price and model rates |
 | **Core lab / SRE Agent skipped** | **~$24-30** | **~$660-870** | Use `-SkipSreAgent` |
-| **Full demo lab / SRE Agent enabled** | **~$34-40** | **~$970-1,170** | Default deploy path when provider/API is available |
 
-> **Wave 1 Changes:** 90-day Log Analytics retention and Activity Log export add ~$10-15/month vs. Wave 0 minimal config. This supports ARM-level audit correlation for demo evidence once live UAT verifies Activity Log export and Log Analytics retention.
+Ninety-day Log Analytics retention and Activity Log export add an estimated ~$10-15/month over a minimal telemetry configuration. Verify actual ingestion and retention charges in Cost Management.
 
 ## Detailed Cost Breakdown
 
@@ -110,7 +109,7 @@ Cost is based on data ingestion:
 
 **Expected usage for demo:** 1-3 GB/day = $0-50/month
 
-**Wave 1 retention:** 90 days (aligned with App Insights for evidence consistency)
+**Configured retention:** 90 days (aligned with Application Insights)
 
 The workspace has no daily ingestion cap in the default deployment. Container Insights, AKS diagnostics, Activity Log export, alert queries, and scenario churn can increase ingestion above the expected demo range.
 
@@ -134,7 +133,7 @@ The workspace has no daily ingestion cap in the default deployment. Container In
 
 Application Insights is workspace-based in this lab. Its ingestion and retention contribute to the same evidence-retention posture as Log Analytics.
 
-### Activity Log Export (Wave 1)
+### Activity Log Export
 
 **What it does:** Exports subscription-level ARM operations to Log Analytics for SRE Agent-related ARM audit correlation.
 
@@ -190,16 +189,16 @@ Alert-rule charges are small compared with AKS nodes and SRE Agent, but they are
 
 ### Azure SRE Agent
 
-SRE Agent uses Azure AI Units (AAU) billing:
+SRE Agent uses Azure Agent Unit (AAU) billing:
 
-| Component | Calculation | Cost |
-|-----------|-------------|------|
-| Base compute | 4 AAU × 730 hours × $0.10 | $292/month |
-| Execution | Variable based on usage | $30-100/month |
+| Component | Meter |
+|-----------|-------|
+| Always-on flow | 4 AAUs per agent-hour while the agent exists |
+| Active flow | Token-based AAUs for chats, incidents, scheduled tasks, triggers, and remediation work |
 
-**Total SRE Agent cost:** ~$322-400/month
+At 730 hours, one agent consumes about **2,920 always-on AAUs per month**, before active work. The USD total depends on current AAU pricing, model selection, token mix, discounts, and region.
 
-Use `-SkipSreAgent` for the lower core-lab estimate. This repository pins the SRE Agent resource to `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`; pricing, regional availability, and execution costs may change. Treat the SRE Agent line as a planning estimate and confirm actual charges in Azure Cost Management.
+Use `-SkipSreAgent` to omit SRE Agent charges. Stopping an agent stops active flow but does not stop always-on billing; delete the agent or the lab resource group to stop both. See [Pricing and billing for Azure SRE Agent](https://learn.microsoft.com/azure/sre-agent/pricing-billing) and confirm actual charges in Azure Cost Management.
 
 ## Cost Optimization Strategies
 
@@ -245,18 +244,18 @@ Use `-SkipSreAgent` for the lower core-lab estimate. This repository pins the SR
 - Log Analytics (minimal retention)
 - Essential Grafana (free tier)
 
-### Standard Configuration (~$750/month)
-- AKS Standard + 4 nodes
+### Standard Configuration
+- AKS Standard + the configured node pools
 - Basic ACR
 - Log Analytics
 - App Insights
 - Standard Grafana
 
-### Full Demo Configuration (~$1,000/month)
+### Full Demo Configuration
 - Everything enabled
 - Standard Grafana + Prometheus
 - Best for comprehensive demos
-- Includes SRE Agent costs
+- Adds SRE Agent always-on and active-flow AAUs
 
 ## Monitoring Costs
 
@@ -308,9 +307,7 @@ Take advantage of Azure Free Tier:
 |----------|--------------|
 | Run demo for 1 hour | ~$2-3 |
 | Run core lab for 1 day | ~$24-30 |
-| Run full demo lab for 1 day | ~$34-40 |
 | Always-on core lab | ~$660-870 |
-| Always-on full demo lab | ~$970-1,170 |
-| With all optimizations | ~$400-500 |
+| SRE Agent-enabled lab | Core lab estimate + 4 AAUs per agent-hour + active-flow AAUs |
 
 **Recommended approach:** Deploy when needed, destroy after demos, use minimal config for testing.

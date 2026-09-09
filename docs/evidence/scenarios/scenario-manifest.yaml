@@ -1,15 +1,12 @@
 # =============================================================================
-# Energy Grid Demo Lab — Scenario Metadata Manifest (Wave 0)
+# Energy Grid Demo Lab — Scenario Metadata Manifest
 # =============================================================================
 #
 # PURPOSE: External metadata source of truth for all 10 breakable scenarios
 #
-# This manifest locks the stable metadata schema before Wave 1 implementation.
+# This manifest defines stable metadata for validation and documentation.
 # It provides structured metadata for alerts, runbooks, KQL queries, SLO tags,
 # and MTTR measurement without modifying runtime K8s manifests.
-#
-# WAVE 0 CONSTRAINT: Do NOT propagate this metadata into K8s manifests yet.
-# Later waves (1/2) may add annotations to k8s/scenarios/*.yaml after approval.
 #
 # DRIFT RISK: This is a docs-only file. Changes to K8s manifests must be
 # manually synchronized here. See README.md for drift mitigation strategy.
@@ -21,27 +18,21 @@
 version: "1.1.1"
 schema_version: "2026-04-25"
 
-# Explicitly excluded from the locked Wave 0 1-10 registry.
+# Explicitly excluded from the numbered 1-10 registry.
 # This bundle composes existing scenarios and is validated via script exclusion
 # policy + YAML checks until schema/versioning expands beyond 10 scenarios.
 excluded_from_wave0_registry:
-  rationale: "Wave 0 registry is locked to scenario IDs 1-10."
+  rationale: "The numbered registry is limited to scenario IDs 1-10."
   scenarios:
     - scenario_id: complete-failure-bundle
       k8s_manifest: k8s/scenarios/complete-failure-bundle/scenario.yaml
       reason: "Composite outage bundle (mongodb-down + network-block + service-mismatch) tracked outside base registry."
 
 # =============================================================================
-# ALL 10 SCENARIOS — Complete Wave 0 Metadata
+# ALL 10 SCENARIOS
 # =============================================================================
-# All 10 scenarios have complete Wave 0 metadata entries below.
-#
-# Three scenarios (oom-killed, mongodb-down, service-mismatch) are designated
-# as "reference scenarios" for Wave 2 SRE Agent validation because they
-# represent different complexity tiers (simple/complex/subtle).
-#
-# The remaining 7 scenarios have identical metadata completeness and are
-# ready for Wave 1+ implementation.
+# OOMKilled, MongoDBDown, and ServiceMismatch are useful reference scenarios
+# because they represent simple, cascading, and silent failure modes.
 
 scenarios:
   # ---------------------------------------------------------------------------
@@ -68,7 +59,7 @@ scenarios:
 
     runbook_id: RB-001-oom-killed
 
-    # SLO target reserved (Wave 5 implementation)
+    # Demo SLO linkage
     slo_impact: availability
     slo_target: "99.9%"
 
@@ -93,15 +84,15 @@ scenarios:
       - SRE Agent cannot trace pod restart pattern
 
     # Evidence folder for this scenario
-    evidence_folder: docs/evidence/scenarios/oom-killed
+    evidence_folder: external-run-evidence/oom-killed
 
-    # Wave 1 KQL evidence files
+    # Reusable KQL evidence files
     audit_evidence:
       - docs/evidence/kql/stable/scenario-oom-killed.kql
       - docs/evidence/kql/stable/pod-lifecycle.kql
       - docs/evidence/kql/stable/alert-history.kql
 
-    # Planned scenario-specific alert metadata; Wave 1 deploys baseline alerts only.
+    # Scenario-specific metadata; the deployment currently uses shared baseline alerts.
     alert_name: meter-service-oom
     alert_severity: Sev 1 (Error)
 
@@ -174,7 +165,7 @@ scenarios:
       - SRE Agent does not identify MongoDB as root cause
       - SRE Agent cannot correlate dependent service failures
 
-    evidence_folder: docs/evidence/scenarios/mongodb-down
+    evidence_folder: external-run-evidence/mongodb-down
 
     audit_evidence:
       - docs/evidence/kql/stable/scenario-mongodb-down.kql
@@ -248,7 +239,7 @@ scenarios:
       - SRE Agent does not check Service endpoint configuration
       - SRE Agent misses the label/selector mismatch
 
-    evidence_folder: docs/evidence/scenarios/service-mismatch
+    evidence_folder: external-run-evidence/service-mismatch
 
     audit_evidence:
       - docs/evidence/kql/stable/scenario-service-mismatch.kql
@@ -323,7 +314,7 @@ scenarios:
       - SRE Agent cannot access container logs
       - SRE Agent misses configuration issue
 
-    evidence_folder: docs/evidence/scenarios/crash-loop
+    evidence_folder: external-run-evidence/crash-loop
 
     audit_evidence:
       - docs/evidence/kql/stable/pod-lifecycle.kql
@@ -391,7 +382,7 @@ scenarios:
       - SRE Agent does not identify image pull failure
       - SRE Agent misses invalid image tag
 
-    evidence_folder: docs/evidence/scenarios/image-pull-backoff
+    evidence_folder: external-run-evidence/image-pull-backoff
 
     audit_evidence:
       - docs/evidence/kql/stable/pod-lifecycle.kql
@@ -457,7 +448,7 @@ scenarios:
       - SRE Agent does not detect CPU contention
       - SRE Agent misses performance impact
 
-    evidence_folder: docs/evidence/scenarios/high-cpu
+    evidence_folder: external-run-evidence/high-cpu
 
     audit_evidence:
       - docs/evidence/kql/stable/pod-lifecycle.kql
@@ -525,7 +516,7 @@ scenarios:
       - SRE Agent does not identify scheduling failure
       - SRE Agent misses resource constraint
 
-    evidence_folder: docs/evidence/scenarios/pending-pods
+    evidence_folder: external-run-evidence/pending-pods
 
     audit_evidence:
       - docs/evidence/kql/stable/pod-lifecycle.kql
@@ -593,7 +584,7 @@ scenarios:
       - SRE Agent does not identify probe configuration
       - SRE Agent misses health endpoint issue
 
-    evidence_folder: docs/evidence/scenarios/probe-failure
+    evidence_folder: external-run-evidence/probe-failure
 
     audit_evidence:
       - docs/evidence/kql/stable/pod-lifecycle.kql
@@ -661,7 +652,7 @@ scenarios:
       - SRE Agent does not identify NetworkPolicy
       - SRE Agent misses network isolation root cause
 
-    evidence_folder: docs/evidence/scenarios/network-block
+    evidence_folder: external-run-evidence/network-block
 
     audit_evidence:
       - docs/evidence/kql/stable/pod-lifecycle.kql
@@ -729,7 +720,7 @@ scenarios:
       - SRE Agent does not identify missing ConfigMap
       - SRE Agent misses configuration dependency
 
-    evidence_folder: docs/evidence/scenarios/missing-config
+    evidence_folder: external-run-evidence/missing-config
 
     audit_evidence:
       - docs/evidence/kql/stable/pod-lifecycle.kql
@@ -751,17 +742,3 @@ scenarios:
       - "Why won't grid-zone-config pods start?"
       - "Check for missing ConfigMaps in the energy namespace"
       - "Diagnose CreateContainerConfigError failures"
-
-# =============================================================================
-# METADATA SCHEMA VERSION HISTORY
-# =============================================================================
-#
-# 1.0.0 (2026-04-25) — Initial Wave 0 lock
-#   - Locked 10 scenario IDs (oom-killed → missing-config)
-#   - Locked root_cause_category taxonomy
-#   - Locked severity levels (critical, warning, info)
-#   - Reserved runbook IDs (RB-001 → RB-010)
-#   - Reserved SLO impact categories
-#   - Defined capability tags for wave planning
-#
-# =============================================================================

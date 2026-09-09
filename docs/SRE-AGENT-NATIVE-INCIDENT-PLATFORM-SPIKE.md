@@ -27,7 +27,7 @@ issue's own "medium confidence" framing anticipated:
 
 ## Research scope and source priority
 
-Reviewed in this order, consistent with `docs/SRE-AGENT-API-RESEARCH.md`'s established priority
+Reviewed in this order, prioritizing current first-party documentation and the checked-in implementation
 (Microsoft Learn and ARM template documentation over portal screenshots or undocumented behavior):
 
 1. [Azure Monitor alerts in Azure SRE Agent](https://learn.microsoft.com/azure/sre-agent/azure-monitor-alerts)
@@ -37,7 +37,7 @@ Reviewed in this order, consistent with `docs/SRE-AGENT-API-RESEARCH.md`'s estab
 5. [Microsoft.App/agents ARM template reference](https://learn.microsoft.com/azure/templates/microsoft.app/agents)
 6. [Azure MCP Server Tools for Azure SRE Agent](https://learn.microsoft.com/azure/developer/azure-mcp-server/tools/azure-sre-agent)
 7. [Azure built-in roles for Monitor](https://learn.microsoft.com/azure/role-based-access-control/built-in-roles/monitor) (Monitoring Contributor role ID)
-8. This repo's `docs/SRE-AGENT-API-RESEARCH.md`, `docs/CAPABILITY-CONTRACTS.md`, `docs/SAFE-LANGUAGE-GUARDRAILS.md`
+8. This repo's `docs/CAPABILITY-CONTRACTS.md` and `docs/SAFE-LANGUAGE-GUARDRAILS.md`
 
 ## Findings by requirement
 
@@ -57,7 +57,7 @@ properties.incidentManagementConfiguration: {
 }
 ```
 
-This property was already referenced (as unused/empty) in this repo's `docs/SRE-AGENT-API-RESEARCH.md`
+This property is now configured by the checked-in SRE Agent Bicep module
 line 47 ("`incidentManagementConfiguration`... Useful for provisioning/configuration research
 only"). This spike confirms it is a real, documented, stable ARM property and wires it:
 `infra/bicep/modules/sre-agent.bicep` now sets `incidentManagementConfiguration.type = 'AzMonitor'`

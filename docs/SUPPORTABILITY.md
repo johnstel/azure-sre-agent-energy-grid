@@ -14,11 +14,11 @@ This document is the starting point for anyone supporting the Azure SRE Agent En
 
 | Component | Supported Configuration |
 |-----------|------------------------|
-| **Kubernetes** | AKS cluster (`aks-srelab`), `energy` namespace, 8 application pods |
-| **Scenarios** | 10 breakable scenarios + 1 provisional bundle (see [Breakable Scenarios](BREAKABLE-SCENARIOS.md)) |
+| **Kubernetes** | AKS cluster (`aks-srelab`), `energy` namespace, application and dependency workloads defined in `k8s/base/application.yaml` |
+| **Scenarios** | 10 individual breakable scenarios + the complete-failure bundle (see [Breakable Scenarios](BREAKABLE-SCENARIOS.md)) |
 | **SRE Agent mode** | Review mode only (`mode: 'Review'`) |
 | **Access levels** | `Low` (Reader + Log Analytics Reader) for diagnosis; `High` (adds Contributor) for internal remediation demos |
-| **Regions** | East US 2, Sweden Central, Australia East |
+| **Regions** | Lab allowlist: East US 2, Sweden Central, Australia East. The service supports additional [officially documented regions](https://learn.microsoft.com/azure/sre-agent/supported-regions). |
 | **Observability** | Log Analytics, Application Insights, Container Insights, Managed Grafana |
 
 ### Supported SRE Agent Interactions
@@ -37,7 +37,7 @@ This document is the starting point for anyone supporting the Azure SRE Agent En
 | Multi-tenant isolation | Single resource group, single namespace |
 | Alert-to-agent triggers | Setup automation exists (Bicep `incidentManagementConfiguration` + `scripts/configure-sre-agent-incident-response.ps1`, issue #76), but live end-to-end proof (alert → native investigation thread, observed via `IncidentActivitySnapshot`) is pending -- see `docs/SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md` |
 | Application-level App Insights telemetry | Demo apps do not emit custom telemetry |
-| Private AKS clusters | SRE Agent requires network access to the API server |
+| Private AKS clusters in this lab | Not implemented or validated by this repository; the checked-in AKS module uses a public API endpoint with optional authorized IP ranges |
 
 ---
 
@@ -210,9 +210,9 @@ For the complete guardrail table, see [Safe Language Guardrails](SAFE-LANGUAGE-G
 | Subscription provider metadata may expose only preview API versions | SRE Agent deployment is skipped instead of falling back to a legacy preview API | Wait for `Microsoft.App/agents@2026-01-01` provider exposure, then rerun deployment | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
 | `maxPods=30` on existing node pools | Pod scheduling pressure at scale | Maintenance-window node pool replacement | [AKS maxPods Runbook](AKS-MAXPODS-MAINTENANCE-RUNBOOK.md) |
 | `SCHEMA_TBD` telemetry fields | SRE Agent App Insights dimensions may change | Do not build production dashboards against these fields | [Capability Contracts §8](CAPABILITY-CONTRACTS.md) |
-| Private clusters not supported | SRE Agent cannot access private API servers | Use public or authorized-IP clusters | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
-| Region constraints | SRE Agent only in East US 2, Sweden Central, Australia East | Deploy to supported region | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
-| Firewall requirements | Agent needs `*.azuresre.ai` access | Allowlist the domain in corporate firewall/proxy | [Troubleshooting → SRE Agent](TROUBLESHOOTING.md#sre-agent-issues) |
+| Private AKS path is not validated by this lab | The repository deploys a public API endpoint and its operational guidance assumes that topology | Use the checked-in public/authorized-IP design, or separately design and validate private connectivity | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
+| Lab region allowlist | Deployment scripts allow only East US 2, Sweden Central, and Australia East even though the service supports more regions | Use a lab-supported region or update and validate the IaC allowlist against the [official region list](https://learn.microsoft.com/azure/sre-agent/supported-regions) | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
+| Firewall requirements | SRE Agent needs several portal, identity, ARM, telemetry, and agent endpoints | Apply the complete [official network requirements](https://learn.microsoft.com/azure/sre-agent/network-requirements) | [Troubleshooting → SRE Agent](TROUBLESHOOTING.md#sre-agent-issues) |
 | Demo RBAC overprovisioning | Broad roles for convenience, not production-ready | See demo vs. production matrix | [Capability Contracts §10](CAPABILITY-CONTRACTS.md) |
 | Reinvestigation cooldown and custom-agent routing are portal-only | Not exposed by the ARM schema or current Azure MCP Server response-plan tool | Confirm/set in Builder → Incident response plans after running the setup script | [SRE Agent Setup → Step 3b](SRE-AGENT-SETUP.md), [Capability Contracts §16](CAPABILITY-CONTRACTS.md) |
 | Native incident-response live validation is pending | No live Energy Grid Azure environment was reachable to run OOMKilled ×2 / MongoDBDown ×1 end-to-end | Run `scripts/configure-sre-agent-incident-response.ps1` and the live validation steps once an environment is available | [Native Incident Platform Spike](SRE-AGENT-NATIVE-INCIDENT-PLATFORM-SPIKE.md) |
