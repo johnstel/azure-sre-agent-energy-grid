@@ -36,7 +36,7 @@
           :aria-busy="inventoryLoading"
           :disabled="inventoryLoading"
           :title="inventoryLoading ? 'Refreshing Mission Control data' : 'Refresh Mission Control data'"
-          @click="refreshAll"
+          @click="refreshPoller.poll"
         >
           Refresh
         </button>
@@ -536,6 +536,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useApi } from '@/composables/useApi';
+import { usePolling } from '@/composables/usePolling';
 import { useWebSocket } from '@/composables/useWebSocket';
 import { buildMitigationEvidenceRequest } from '@/utils/reviewModeMitigation';
 import PortalValidation from './PortalValidation.vue';
@@ -684,7 +685,6 @@ const MAX_CONTEXT_RESOURCES = 6;
 const MAX_CONTEXT_ENDPOINTS = 6;
 const MAX_CONTEXT_PUBLIC_LINKS = 4;
 
-let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let destroyCountdownTimer: ReturnType<typeof setInterval> | null = null;
 
 const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -794,6 +794,8 @@ async function refreshAll() {
   await loadMitigationEvidence();
   inventoryLoading.value = false;
 }
+
+const refreshPoller = usePolling(refreshAll, 5000);
 
 async function loadInventory(): Promise<boolean> {
   inventoryError.value = '';
@@ -1737,14 +1739,13 @@ function writeStoredBoolean(key: string, value: boolean) {
 }
 
 onMounted(() => {
-  refreshAll();
+  refreshPoller.start();
   runPreflight();
-  refreshTimer = setInterval(refreshAll, 5000);
   document.addEventListener('keydown', handleAnalystDocumentKeydown);
 });
 
 onUnmounted(() => {
-  if (refreshTimer) clearInterval(refreshTimer);
+  refreshPoller.stop();
   clearDestroyCountdown();
   document.removeEventListener('keydown', handleAnalystDocumentKeydown);
 });
