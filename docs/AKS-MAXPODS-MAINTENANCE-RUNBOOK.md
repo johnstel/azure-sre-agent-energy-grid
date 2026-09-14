@@ -4,7 +4,7 @@ Use this runbook to replace AKS node pools whose immutable `maxPods` value drift
 
 > **Production safety rule:** Do not run this procedure outside an approved maintenance window. Do not weaken Defender, Retina, monitoring, admission policies, security policies, resource requests/limits, affinity, or tolerations to make scheduling easier.
 >
-> **Dallas posture:** Defer live remediation to a maintenance window tracked by issue #4. If pod-density pressure returns before the window, use only approved temporary scale-out mitigation.
+> Defer live remediation to an approved maintenance window. If pod-density pressure returns before the window, use only an approved temporary scale-out mitigation.
 
 ## Purpose and scope
 
@@ -24,8 +24,8 @@ This runbook does not cover full cluster rebuilds, SKU resizing, permanent scale
 Use this runbook when all of the following are true:
 
 - GitHub issue [#4](https://github.com/johnstel/azure-sre-agent-energy-grid/issues/4) is the active production-tracking issue.
-- Dallas has approved the maintenance-window strategy and temporary cost overlap.
-- Lambert or the assigned validator is available for live validation.
+- The change owner has approved the maintenance-window strategy and temporary cost overlap.
+- An assigned validator is available for live validation.
 - The maintenance window is declared and stakeholders know that single-replica demo dependencies can restart.
 - Preflight checks confirm enough subnet IP capacity, node capacity, and healthy security/observability coverage.
 
@@ -44,22 +44,22 @@ Do not use this runbook when:
 
 Before you begin, confirm and record:
 
-- **Approval:** Dallas approved blue/green node-pool replacement and temporary overlap cost.
+- **Approval:** The change owner approved blue/green node-pool replacement and temporary overlap cost.
 - **Security review:** Security reviewer approved that the plan preserves Defender, Retina, monitoring, admission/security policies, requests/limits, affinity, and tolerations.
-- **Validation owner:** Lambert or another named owner is online for validation.
+- **Validation owner:** A named validator is online for validation.
 - **Maintenance window:** Window start/end time, expected interruption risk, and rollback decision time are declared.
 - **Access:** The operator has Azure RBAC for AKS node-pool add/delete operations and Kubernetes permissions to cordon/drain nodes.
 - **Context:** Azure CLI is authenticated to the intended subscription and `kubectl` points to the intended AKS cluster.
 
-Target environment for issue #4:
+Record the target environment before execution:
 
 | Item | Value |
 | --- | --- |
-| Subscription | `ME-MngEnvMCAP550731-jostelma-2` |
-| Resource group | `rg-srelab-eastus2` |
-| AKS cluster | `aks-srelab` |
-| Region | `eastus2` |
-| AKS subnet | `vnet-srelab/snet-aks`, currently planned as `10.0.0.0/22` |
+| Subscription | `<subscription-name-or-id>` |
+| Resource group | `<resource-group>` |
+| AKS cluster | `<cluster-name>` |
+| Region | `<region>` |
+| AKS subnet | `<vnet>/<subnet>` |
 | Canonical system pool | `system`, target `maxPods=50` |
 | Canonical workload pool | `workload`, target `maxPods=50` |
 | Temporary system pool | `sys50` |
@@ -76,11 +76,11 @@ Keep the security posture intact throughout the maintenance window:
 - Do **not** remove requests, limits, affinity, tolerations, or taints to force scheduling.
 - Do **not** delete pods blindly. Use node-scoped cordon and drain operations with evidence.
 - Treat Pending `kube-system` security/observability pods as degraded coverage and stop for review.
-- Use `kubectl drain` without `--force` by default. If `--force` appears necessary, pause and obtain explicit Dallas and Security approval before proceeding.
+- Use `kubectl drain` without `--force` by default. If `--force` appears necessary, pause and obtain explicit change-owner and security approval before proceeding.
 
 ## Cost impact and maintenance-window expectations
 
-Temporary overlap increases AKS VM cost while old and new pools exist together. The final target state should return to the current live node count and SKU unless Dallas approves a permanent sizing change.
+Temporary overlap increases AKS VM cost while old and new pools exist together. The final target state should return to the approved node count and SKU unless the change owner approves a permanent sizing change.
 
 Expected temporary overlap for the current plan:
 
@@ -482,7 +482,7 @@ Expected: no immutable-property drift remains for `maxPods`, and no node-pool re
 
 Attach or paste the following evidence to issue [#4](https://github.com/johnstel/azure-sre-agent-energy-grid/issues/4):
 
-- Approval record: Dallas approval, security review, validation owner, and maintenance-window timing.
+- Approval record: change-owner approval, security review, validation owner, and maintenance-window timing.
 - Azure context: sanitized `az account show` output showing the intended subscription.
 - Kubernetes context: `kubectl config current-context` and cluster identity evidence.
 - Before/after `az aks nodepool list` showing `maxPods=30` before and `maxPods=50` after for canonical pools.

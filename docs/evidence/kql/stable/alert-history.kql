@@ -7,7 +7,7 @@
 // LIMITATION: Activity Log "Alert" category captures rule create/update/delete,
 //             NOT alert firing events. For firing events, use:
 //             - Azure Resource Graph (AlertsManagementResources)
-//             - Alert diagnostic settings → AlertEvidence table (Wave 2)
+//             - Alert diagnostic settings that export firing events to a queryable table
 //
 // Parameters:
 //   - TimeRange: Time window for analysis (default: 24h)
@@ -17,7 +17,7 @@
 // Required projected columns: TimeBucket, ResourceId, CorrelationId (per Security MF-3)
 //
 // PREREQUISITE: Activity Log diagnostic export to Log Analytics (DEPLOYED ✅)
-// Wave 1 verified export is correctly configured; AzureActivity contains 86+ events.
+// Verify the deployed Activity Log export before relying on these results.
 // See: docs/CAPABILITY-CONTRACTS.md §11
 // =============================================================================
 
@@ -68,6 +68,6 @@ AzureActivity
 //
 // For alert firing events, use:
 // - Azure Resource Graph: az graph query -q "alertsmanagementresources | where type == 'microsoft.alertsmanagement/alerts'"
-// - Or configure alert diagnostic settings (Wave 2) to send firing events to AlertEvidence table
+// - Or configure alert diagnostic settings to send firing events to a queryable table
 //
-// For Wave 1 UAT: Verify query syntax runs without error. Results show rule configuration changes only.
+// Verify query syntax and remember that results show rule configuration changes only.

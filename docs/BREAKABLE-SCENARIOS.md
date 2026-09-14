@@ -572,6 +572,6 @@ Some scenarios benefit from running longer to gather metrics:
 - ✅ Document what you did and when for demos
 - ✅ Keep fix commands ready
 - ✅ If public LoadBalancer IPs stop responding, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md#-public-loadbalancer-not-responding) before assuming a scenario broke it
-- ✅ For Kubernetes service issues (endpoints empty, selectors wrong, port mismatches), see [KUBERNETES-SERVICE-TROUBLESHOOTING.md](KUBERNETES-SERVICE-TROUBLESHOOTING.md)
+- ✅ For Kubernetes service issues (endpoints empty, selectors wrong, port mismatches), see [Troubleshooting → Kubernetes Service Issues](TROUBLESHOOTING.md#kubernetes-service-issues)
 - ❌ Don't apply multiple breaking scenarios simultaneously (except the explicit `complete-failure-bundle` scenario)
 - ❌ Don't leave scenarios running unattended

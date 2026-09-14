@@ -16,9 +16,11 @@ Azure SRE Agent (GA) is an AI-powered site reliability engineering automation to
 Before creating an SRE Agent, ensure you have:
 
 - ✅ Deployed the demo lab infrastructure (`scripts/deploy.ps1`)
-- ✅ Access to a supported Azure region (East US 2, Sweden Central, Australia East)
+- ✅ A region permitted by this lab (`East US 2`, `Sweden Central`, or `Australia East`)
 - ✅ `Microsoft.Authorization/roleAssignments/write` permission
-- ✅ Firewall allows access to `*.azuresre.ai`
+- ✅ Firewall/proxy rules that satisfy the complete [Azure SRE Agent network requirements](https://learn.microsoft.com/azure/sre-agent/network-requirements)
+
+> Azure SRE Agent supports more regions than this repository currently allows. The three-region list above is the lab's validated deployment allowlist, not the service's complete region list. See [Supported regions for Azure SRE Agent](https://learn.microsoft.com/azure/sre-agent/supported-regions).
 
 ## Step 1: Create an SRE Agent
 
@@ -49,7 +51,7 @@ You can also create the agent manually:
    - **Subscription**: Select your subscription
    - **Resource Group**: Create new or use existing (separate from demo resources)
    - **Name**: `sre-agent-demo` (or your preferred name)
-   - **Region**: Must match one of: `East US 2`, `Sweden Central`, `Australia East`
+   - **Region**: For parity with the automated lab, use `East US 2`, `Sweden Central`, or `Australia East`. For other service-supported regions, consult the [official region list](https://learn.microsoft.com/azure/sre-agent/supported-regions) and validate this repository's IaC before use.
 
 5. Click **Review + Create**, then **Create**
 
@@ -302,7 +304,7 @@ kubectl run -n energy test --image=curlimages/curl --rm -it -- \
   curl -sI http://grid-dashboard:80/
 
 # Both work? It's a VNet subnet NSG issue, not your scenario.
-# For detailed K8s service diagnostics, see [KUBERNETES-SERVICE-TROUBLESHOOTING.md](KUBERNETES-SERVICE-TROUBLESHOOTING.md)
+# For detailed Kubernetes service diagnostics, see TROUBLESHOOTING.md#kubernetes-service-issues
 ```
 
 ## Supportability and troubleshooting summary
@@ -317,7 +319,7 @@ For symptom-first diagnosis and setup validation, use these links:
 | SRE Agent setup issues | [Troubleshooting → SRE Agent Issues](TROUBLESHOOTING.md#sre-agent-issues) |
 | Mission Control MCP investigations | [Troubleshooting → Mission Control → Azure SRE Agent (MCP)](TROUBLESHOOTING.md#mission-control--azure-sre-agent-mcp-issues) |
 | Public LoadBalancer not responding | [Troubleshooting → Public LoadBalancer](TROUBLESHOOTING.md#public-loadbalancer-not-responding) |
-| Kubernetes service diagnostics | [Kubernetes Service Troubleshooting](KUBERNETES-SERVICE-TROUBLESHOOTING.md) |
+| Kubernetes service diagnostics | [Troubleshooting → Kubernetes Service Issues](TROUBLESHOOTING.md#kubernetes-service-issues) |
 | Cost planning | [Cost Breakdown](COSTS.md) |
 
 ## Step 5 (optional): Investigate from Mission Control

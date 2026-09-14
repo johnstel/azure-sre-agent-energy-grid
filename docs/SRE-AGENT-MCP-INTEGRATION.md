@@ -2,9 +2,9 @@
 
 > **Issue**: [#77 — Embed real SRE Agent investigations in Mission Control via MCP](https://github.com/johnstel/azure-sre-agent-energy-grid/issues/77)
 > **Status**: Implemented against the supported Azure MCP Server `sreagent` tool surface. **Not yet live-validated against an Energy Grid SRE Agent resource** — see [Live validation status](#live-validation-status).
-> **Related docs**: [SRE Agent API Research](SRE-AGENT-API-RESEARCH.md), [Local Analyst Governance](LOCAL-ANALYST-GOVERNANCE.md), [Safe Language Guardrails](SAFE-LANGUAGE-GUARDRAILS.md), [SRE Agent Setup](SRE-AGENT-SETUP.md), [Supportability](SUPPORTABILITY.md)
+> **Related docs**: [Local Analyst Governance](LOCAL-ANALYST-GOVERNANCE.md), [Safe Language Guardrails](SAFE-LANGUAGE-GUARDRAILS.md), [SRE Agent Setup](SRE-AGENT-SETUP.md), [Supportability](SUPPORTABILITY.md)
 
-Mission Control can now start and continue a **real Azure SRE Agent investigation** without leaving the dashboard. This supersedes the "portal handoff only" verdict in [SRE-AGENT-API-RESEARCH.md](SRE-AGENT-API-RESEARCH.md), which predates the SRE Agent MCP server.
+Mission Control can start and continue a **real Azure SRE Agent investigation** without leaving the dashboard by using the supported Azure MCP Server SRE Agent tools.
 
 ---
 
@@ -330,10 +330,10 @@ curl -s -X POST localhost:3333/api/sre-agent/investigations/continue \
 curl -s localhost:3333/api/sre-agent/config | jq '.target.allowedTools, .target.blockedTools'
 
 # 10. Audit correlation (Evidence 4): match metadata.correlationId to the SRE Agent
-#     Application Insights customEvents / TraceId per docs/SRE-AGENT-API-RESEARCH.md §3.
+#     Application Insights customEvents / TraceId when the deployed schema exposes them.
 ```
 
-Record results in [`docs/EXTERNAL-DEMO-HARDENING.md`](EXTERNAL-DEMO-HARDENING.md) and keep the portal validation workflow authoritative until this runbook has been completed.
+Record results with the demo evidence package and keep the portal validation workflow authoritative until this runbook has been completed.
 
 ---
 

@@ -2,7 +2,7 @@ flowchart TB
     subgraph profiles["Azure SRE Agent access profiles"]
         readonly["review-readonly\nmode: Review\naccessLevel: Low"]
         remediate["review-remediate\nmode: Review\naccessLevel: High\ncurrent demo default"]
-        auto["auto-remediate\nmode: Auto\nout of Wave 1 scope"]
+        auto["auto-remediate\nmode: Automatic\nnot demonstrated"]
     end
 
     subgraph permissions["Permission envelope"]
@@ -16,7 +16,7 @@ flowchart TB
         diagnose["Diagnose and hypothesize"]
         recommend["Recommend remediation"]
         human["Human approval / operator action"]
-        noAuto["No autonomous remediation claim in Wave 1"]
+        noAuto["No autonomous remediation claim"]
     end
 
     readonly --> reader

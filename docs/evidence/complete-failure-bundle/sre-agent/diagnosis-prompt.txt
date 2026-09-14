@@ -1,3 +1,0 @@
-The energy grid platform is experiencing a broad outage.
-Multiple services are failing in the energy namespace.
-Can you investigate and tell me what's wrong?

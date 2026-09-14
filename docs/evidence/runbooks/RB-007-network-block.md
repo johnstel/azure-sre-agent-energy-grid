@@ -61,7 +61,6 @@
 - Scenario manifest: `docs/evidence/scenarios/scenario-manifest.yaml`
 - Scenario K8s manifest: `k8s/scenarios/network-block.yaml`
 - Pod lifecycle KQL: `docs/evidence/kql/stable/pod-lifecycle.kql`
-- Wave 4 change-correlation evidence: `docs/evidence/wave4-live/CHANGE-CORRELATION.md`
 
 ## Execution Boundary
 

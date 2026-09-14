@@ -113,7 +113,7 @@ Use Portal Validation, not Scenario Narration, for real Azure SRE Agent diagnosi
 
 ## Portal Validation Workflow
 
-The **Portal Evidence Confirmation** section in Mission Control provides a local workflow for tracking human validation of Azure SRE Agent portal evidence. This supports safe language compliance: you cannot claim "Azure SRE Agent diagnosed" a scenario until portal evidence is captured, redacted, and locally confirmed; Dallas approval is still required before external use.
+The **Portal Evidence Confirmation** section in Mission Control provides a local workflow for tracking human validation of Azure SRE Agent portal evidence. This supports safe language compliance: you cannot claim "Azure SRE Agent diagnosed" a scenario until portal evidence is captured, redacted, and locally confirmed; owner review is still required before external use.
 
 Portal Validation remains limited to OOMKilled, MongoDBDown, and ServiceMismatch. Its prompt and description text is served from the shared scenario narration metadata, so updates to `docs/scenario-narration.json` are checked by backend tests before the portal validation copy can drift.
 
@@ -131,22 +131,22 @@ Portal Validation remains limited to OOMKilled, MongoDBDown, and ServiceMismatch
   - Exact transcript copied (no paraphrasing)
   - Subscription ID, tenant ID, resource IDs redacted
   - Evidence path recorded in notes
-- **Evidence Path** — Local path to saved evidence (e.g., `docs/evidence/wave1-live/oom-killed/sre-agent/...`)
+- **Evidence Path** — Local path to saved run evidence outside the repository
 - **Notes** — Optional notes about the evidence capture
 - **Status** — `Pending` or `Confirmed`
 
 ### Gate Status
 
 - **PASS_WITH_PENDING_HUMAN_PORTAL** — Default state. Indicates automated evidence is complete but human portal validation is pending.
-- **PASS** — All three scenarios have complete local checklist fields, evidence paths, and are marked confirmed. This is not customer-ready approval; Dallas approval is still required before external use.
+- **PASS** — All three scenarios have complete local checklist fields, evidence paths, and are marked confirmed. This is not customer-ready approval; owner review is still required before external use.
 
 ### Safe Language Compliance
 
 The validation section includes a reminder:
 
-> **Safe language reminder:** Do not claim "Azure SRE Agent diagnosed" until real portal evidence is captured, redacted, and validated below. Do not treat Mission Control confirmation as Dallas approval for customer use.
+> **Safe language reminder:** Do not claim "Azure SRE Agent diagnosed" until real portal evidence is captured, redacted, and validated below. Do not treat Mission Control confirmation as approval for customer use.
 
-This aligns with `docs/SAFE-LANGUAGE-GUARDRAILS.md` and `docs/evidence/wave5-live/CHECKLISTS-AND-VERDICT.md`.
+This aligns with `docs/SAFE-LANGUAGE-GUARDRAILS.md` and the repository evidence policy in `docs/evidence/README.md`.
 
 ## Ask Copilot vs. Azure SRE Agent
 

@@ -59,8 +59,6 @@
 - Scenario manifest: `docs/evidence/scenarios/scenario-manifest.yaml`
 - Scenario KQL: `docs/evidence/kql/stable/scenario-oom-killed.kql`
 - Pod lifecycle KQL: `docs/evidence/kql/stable/pod-lifecycle.kql`
-- Wave 2 status: `docs/evidence/wave2-live/WAVE2-FINAL-VERDICT.md`
-- Wave 4 status: `docs/evidence/wave4-live/STATUS.md`
 
 ## Execution Boundary
 

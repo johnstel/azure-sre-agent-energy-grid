@@ -18,7 +18,7 @@
 - `meter-service` pods are Running/Ready.
 - `meter-service` Service has zero endpoints.
 - Service selector is `app=meter-service-v2` while pods are labeled `app=meter-service`.
-- Traditional pod-health alerts do not fire; Wave 2 explicitly documented `NO_ALERT_FIRED` for this silent configuration failure.
+- Traditional pod-health alerts may remain quiet because the pods are healthy while the Service selector is wrong.
 
 ## Diagnosis Steps
 
@@ -58,8 +58,6 @@
 
 - Scenario manifest: `docs/evidence/scenarios/scenario-manifest.yaml`
 - Scenario KQL: `docs/evidence/kql/stable/scenario-service-mismatch.kql`
-- Wave 2 evidence: `docs/evidence/wave2-live/service-mismatch/EVIDENCE-STATUS-FINAL.md`
-- Wave 4 alert noise narrative: `docs/evidence/wave4-live/ALERT-NOISE-REDUCTION.md`
 
 ## Execution Boundary
 

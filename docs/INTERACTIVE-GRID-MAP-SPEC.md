@@ -1,9 +1,7 @@
 # Interactive Grid Map — Design Specification
 
-> **Version**: 0.2 · **Status**: Draft — Retargeted to Cloud Demo Surface
-> **Branch**: `grid-map-design-spec`
-> **Authors**: Technical Writer (spec), with inputs from Outside UI Designer, Outside SRE/Energy Operations Expert, and Workflow Architect
-> **Date**: July 2025
+> **Version**: 1.0 · **Status**: Implemented reference for the cloud demo surface
+> **Implementation**: `k8s/base/ops-console.html`, `k8s/base/grid-map-helpers.js`, `k8s/base/grid-map-topology.json`, and `k8s/base/grid-status-api.py`
 
 ---
 

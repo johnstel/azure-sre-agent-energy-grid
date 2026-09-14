@@ -63,7 +63,7 @@ Every future governed-read tool must be:
 7. Citation-producing so every answer can name the data source and collection time.
 8. Fail-closed when policy, RBAC, validation, data collection, or redaction fails.
 
-The governed-read layer still must not expose arbitrary shell, unrestricted `az`, unrestricted `kubectl`, filesystem reads, secret access, arbitrary KQL, write/remediation operations, or direct Azure SRE Agent Preview API automation.
+The governed-read layer still must not expose arbitrary shell, unrestricted `az`, unrestricted `kubectl`, filesystem reads, secret access, arbitrary KQL, write/remediation operations, or undocumented Azure SRE Agent API automation.
 
 ### Implemented governed-read endpoints
 
@@ -90,7 +90,7 @@ Each successful response includes source, collection timestamp, limitations, con
 | Arbitrary shell execution | `bash`, `pwsh`, `cmd`, unrestricted `az`, unrestricted `kubectl` | Reject. Do not request the command output as a workaround. |
 | Secret or identity material | kubeconfig, tokens, passwords, Key Vault secret values, environment variables, raw credentials | Reject and remind the operator to redact sensitive material. |
 | Arbitrary file access | source files, hidden logs, local filesystem browsing outside the bounded snapshot | Reject. Use documented state sources only. |
-| Direct Azure SRE Agent automation | private Preview APIs, unverified approval APIs, assumed remediation endpoints | Reject unless there is verified product evidence and a separate governance review. |
+| Direct Azure SRE Agent automation | private or undocumented APIs, unverified approval APIs, assumed remediation endpoints | Reject unless there is verified product evidence and a separate governance review. |
 
 > [!NOTE]
 > **Azure SRE Agent is now reachable from Mission Control through a separate, governed surface.**
@@ -252,11 +252,3 @@ Before approving Local Analyst changes, verify:
 - [ ] Every query can produce the required audit fields.
 - [ ] Future write/remediation behavior is behind human approval and a separate governance review.
 - [ ] Language aligns with [Analyst Safe Language](ANALYST-SAFE-LANGUAGE.md) and [Safe Language Guardrails](SAFE-LANGUAGE-GUARDRAILS.md).
-
----
-
-## Document history
-
-| Date | Version | Change | Author |
-|------|---------|--------|--------|
-| 2026-04-27 | 0.1 | Initial Local Analyst governance and RBAC model | Lambert (QA/Docs) |

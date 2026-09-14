@@ -84,6 +84,8 @@ id_ed25519
 *credential*
 *secret*
 !**/scenarios/*.yaml
+# Key Vault projection template: placeholders only, contains no credential values
+!k8s/base/keyvault-secrets.yaml
 
 # =============================================================================
 # IDE & Editor

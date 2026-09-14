@@ -125,9 +125,8 @@ The combination creates broad platform unavailability: the consumer dashboard, o
 ## Evidence
 
 - Scenario manifest: `docs/evidence/scenarios/scenario-manifest.yaml` (footnote entry)
-- Evidence capture template: `docs/evidence/scenarios/complete-failure-bundle/run-notes.md`
 - Related runbooks: `RB-009-mongodb-down.md`, `RB-007-network-block.md`, `RB-010-service-mismatch.md`
 
 ## Execution Boundary
 
-SRE Agent portal evidence for the complete-failure-bundle guided recovery session is **`PENDING_HUMAN_PORTAL`**. See `docs/evidence/scenarios/complete-failure-bundle/run-notes.md` for the evidence capture template and blocker notes format. Lambert validates safe-language compliance; Dallas approves before external/customer presentation.
+Do not claim SRE Agent guided recovery unless a real portal or MCP investigation is visible live or supported by current, redacted evidence. External presentation requires owner review.

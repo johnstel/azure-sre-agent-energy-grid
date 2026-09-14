@@ -166,7 +166,7 @@ Use these narratives when data is missing or tools fail.
 | Tool timed out | "The read-only state request timed out. I cannot safely infer the answer. Try a narrower question or refresh the dashboard." |
 | Data source stale | "The latest available snapshot is from `{timestamp}`. Treat this as stale until Mission Control refreshes." |
 | Kubernetes events unavailable | "Pod status is available, but recent Kubernetes events are unavailable. I can observe the pod state but not explain event-level context." |
-| Unsupported Preview API | "I cannot rely on an unsupported or unverified Azure SRE Agent Preview API. Use portal evidence or documented product behavior before making this claim." |
+| Unsupported API | "I cannot rely on an unsupported or unverified Azure SRE Agent API. Use documented product behavior or captured evidence before making this claim." |
 | Raw or unrestricted logs requested | "Local Analyst cannot access unrestricted raw logs. Use an approved bounded Log Analytics template or an approved log view, and redact sensitive content before adding evidence." |
 | Governed log template unavailable | "No approved Log Analytics template is available for that request. I cannot run arbitrary KQL or infer from unavailable logs." |
 | Write/remediation requested | "Local Analyst is read-only and cannot make that change. Use approved Mission Control controls or Azure SRE Agent portal guidance with human approval." |
@@ -233,11 +233,3 @@ Use this checklist before shipping prompt changes, response templates, or custom
 - [ ] Failure wording is explicit when data is unavailable, timed out, stale, or unsupported.
 - [ ] Portal/deep-link handoff wording does not imply direct API control.
 - [ ] Language is consistent with [Safe Language Guardrails](SAFE-LANGUAGE-GUARDRAILS.md).
-
----
-
-## Document history
-
-| Date | Version | Change | Author |
-|------|---------|--------|--------|
-| 2026-04-27 | 0.1 | Initial Local Analyst safe-language contract | Lambert (QA/Docs) |
