@@ -44,22 +44,59 @@ data:
   enabled_plugins: "[rabbitmq_management,rabbitmq_prometheus,rabbitmq_amqp1_0]."
 
 ---
-# SECURITY (Issue #52 / H-4): Demo-static credentials stored as a K8s Secret.
-# All service deployments consume these via secretKeyRef — no plaintext in env.value.
-# Values are accepted for dev-lab use; for external demos see docs/EXTERNAL-DEMO-HARDENING.md.
-apiVersion: v1
-kind: Secret
+# SECURITY (Issue #100): RabbitMQ credentials live in Azure Key Vault and are
+# projected into the `rabbitmq-credentials` Secret by the Secrets Store CSI
+# driver through Azure Workload Identity. The SecretProviderClass and the
+# federated ServiceAccount are rendered from k8s/base/keyvault-secrets.yaml by
+# scripts/deploy.ps1 — no credential value is stored in Git.
+#
+# The deployment below keeps the CSI volume mounted so the synchronized Secret
+# exists (and keeps rotating) independently of the breakable scenarios that
+# replace the meter-service deployment. Consumers that resolve the Secret via
+# secretKeyRef (rabbitmq, meter-service, dispatch-service and scenario
+# workloads) retry until the first successful sync completes.
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: rabbitmq-credentials
+  name: rabbitmq-secret-sync
   namespace: energy
   labels:
-    app: rabbitmq
-    sre-demo: breakable
-type: Opaque
-stringData:
-  rabbitmq-username: "energy-grid-mq"
-  rabbitmq-password: "energy-grid-mq-demo"
-  rabbitmq-amqp-uri: "amqp://energy-grid-mq:energy-grid-mq-demo@rabbitmq:5672/"
+    app: rabbitmq-secret-sync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq-secret-sync
+  template:
+    metadata:
+      labels:
+        app: rabbitmq-secret-sync
+        azure.workload.identity/use: "true"
+    spec:
+      nodeSelector:
+        nodepool-type: user
+      serviceAccountName: meter-service
+      containers:
+        - name: secret-sync
+          image: registry.k8s.io/pause:3.9
+          resources:
+            requests:
+              memory: "16Mi"
+              cpu: "10m"
+            limits:
+              memory: "32Mi"
+              cpu: "50m"
+          volumeMounts:
+            - name: rabbitmq-credentials-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
+      volumes:
+        - name: rabbitmq-credentials-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: rabbitmq-credentials
 
 ---
 apiVersion: v1

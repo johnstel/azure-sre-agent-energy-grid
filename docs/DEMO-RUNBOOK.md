@@ -61,6 +61,16 @@ param aksApiServerAuthorizedIpRanges = [
 
 RabbitMQ credentials are bootstrapped at deploy time into Azure Key Vault as the deployment source of truth. The values are not committed to Git and are rotated with `deploy.ps1 -RotateRabbitMqSecrets` only when required. The management UI (port 15672) is not exposed outside the cluster.
 
+In the cluster, the credentials are consumed through Azure Workload Identity and the Secrets Store CSI driver. `scripts/deploy.ps1` renders `k8s/base/keyvault-secrets.yaml` (service account client ID, Key Vault name and tenant ID come from the deployment outputs) and applies it before `k8s/base/application.yaml`. The `SecretProviderClass` synchronizes the Key Vault secrets into the existing `rabbitmq-credentials` Secret, keeping the `rabbitmq-username`, `rabbitmq-password` and `rabbitmq-amqp-uri` keys used by RabbitMQ, meter-service, dispatch-service and the breakable scenarios. The `rabbitmq-secret-sync` deployment keeps the CSI volume mounted so the Secret stays present and keeps rotating even while a scenario replaces the meter-service deployment.
+
+Verify the projection without reading any secret value:
+```bash
+kubectl get secretproviderclass rabbitmq-credentials -n energy
+kubectl describe secret rabbitmq-credentials -n energy   # key names and sizes only
+kubectl rollout status deployment/rabbitmq-secret-sync -n energy
+```
+Rotation is applied by the CSI driver after `deploy.ps1 -RotateRabbitMqSecrets`; never edit the Kubernetes Secret data by hand.
+
 For external demos where the cluster LoadBalancer IP is shared with attendees, confirm that port `15672` is **not** in any exposed Service spec before the session:
 ```bash
 kubectl get svc -n energy | grep 15672

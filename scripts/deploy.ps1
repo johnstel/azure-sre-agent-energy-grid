@@ -1426,6 +1426,40 @@ catch {
     throw "RabbitMQ Key Vault secret bootstrapping failed: $($_.Exception.Message)"
 }
 
+# Publish the Workload Identity service account and the SecretProviderClass that
+# projects the Key Vault RabbitMQ secrets into the `rabbitmq-credentials` Secret.
+Write-Host "`n🔗 Applying Key Vault SecretProviderClass and workload identity service account..." -ForegroundColor Yellow
+$keyVaultManifestPath = Join-Path $PSScriptRoot "..\k8s\base\keyvault-secrets.yaml"
+if (-not (Test-Path $keyVaultManifestPath)) {
+    throw "Key Vault secret manifest '$keyVaultManifestPath' was not found."
+}
+
+$workloadIdentityClientId = $outputs.energyWorkloadIdentityClientId.value
+if ([string]::IsNullOrWhiteSpace($workloadIdentityClientId)) {
+    throw "The deployment did not return 'energyWorkloadIdentityClientId'; the RabbitMQ SecretProviderClass cannot be rendered."
+}
+
+$workloadIdentityServiceAccount = $outputs.energyWorkloadIdentityServiceAccountName.value
+if ($workloadIdentityServiceAccount -and $workloadIdentityServiceAccount -ne 'meter-service') {
+    throw "The federated service account '$workloadIdentityServiceAccount' does not match the service account declared in k8s/base/keyvault-secrets.yaml ('meter-service')."
+}
+
+$tenantId = az account show --query tenantId --output tsv 2>$null
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($tenantId)) {
+    throw "Unable to resolve the Azure tenant ID required by the RabbitMQ SecretProviderClass."
+}
+
+$renderedKeyVaultManifest = (Get-Content -Path $keyVaultManifestPath -Raw).
+    Replace('__ENERGY_WORKLOAD_IDENTITY_CLIENT_ID__', $workloadIdentityClientId.Trim()).
+    Replace('__KEY_VAULT_NAME__', $outputs.keyVaultName.value.Trim()).
+    Replace('__AZURE_TENANT_ID__', $tenantId.Trim())
+
+$renderedKeyVaultManifest | kubectl apply -f -
+if ($LASTEXITCODE -ne 0) {
+    throw "Failed to apply the Key Vault secret manifest '$keyVaultManifestPath'."
+}
+Write-Host "  ✅ Key Vault secret projection configured (no credential values are stored in Git)" -ForegroundColor Green
+
 # Deploy application
 Write-Host "`n📦 Deploying demo application to AKS..." -ForegroundColor Yellow
 $k8sPath = Join-Path $PSScriptRoot "..\k8s\base\application.yaml"
