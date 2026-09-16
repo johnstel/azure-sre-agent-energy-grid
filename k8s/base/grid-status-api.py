@@ -52,6 +52,7 @@ class GridStatusAPI:
         self.request_timeout = request_timeout
         self.ssl_context = ssl_context
         self.request_errors = {}
+        self._list_cache = {}
 
     def _build_ssl_context(self):
         if self.ssl_context is not None:
@@ -80,12 +81,18 @@ class GridStatusAPI:
             return {'error': error_message, 'sourceStatus': 'error'}
 
     def _list_items(self, path):
+        if path in self._list_cache:
+            return self._list_cache[path]
         if hasattr(self, 'items') and self.items is not None and path in self.items:
-            return self.items[path]
-        payload = self._request(path)
-        if isinstance(payload, dict) and payload.get('sourceStatus') == 'error':
-            return []
-        return payload.get('items', []) if isinstance(payload, dict) else []
+            items = self.items[path]
+        else:
+            payload = self._request(path)
+            if isinstance(payload, dict) and payload.get('sourceStatus') == 'error':
+                items = []
+            else:
+                items = payload.get('items', []) if isinstance(payload, dict) else []
+        self._list_cache[path] = items
+        return items
 
     def _request_error_for(self, *paths):
         for path in paths:
@@ -286,6 +293,8 @@ class GridStatusAPI:
         return events
 
     def aggregate(self, activeScenario=None, max_nodes=None, max_events=None, max_output_bytes=None, window_seconds=None, namespace=None):
+        self.request_errors = {}
+        self._list_cache = {}
         timestamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         requested_namespace = namespace or ALLOWED_NAMESPACE
         if requested_namespace != ALLOWED_NAMESPACE:
@@ -297,10 +306,13 @@ class GridStatusAPI:
         nodes = []
         events = []
         for resource_name, spec in sorted(ALLOWED_RESOURCES.items()):
-            resource = self._resource_items(resource_name, spec['kind'])[0] if self._resource_items(resource_name, spec['kind']) else None
+            resources = self._resource_items(resource_name, spec['kind'])
+            resource = resources[0] if resources else None
             pods = self._pod_items(resource_name)
-            service = self._service_items(resource_name)[0] if self._service_items(resource_name) else None
-            endpoint = self._endpoint_items(resource_name)[0] if self._endpoint_items(resource_name) else None
+            services = self._service_items(resource_name)
+            service = services[0] if services else None
+            endpoints = self._endpoint_items(resource_name)
+            endpoint = endpoints[0] if endpoints else None
             warning_events = [event for event in self._event_items(resource_name) if event.get('type') == 'Warning']
             request_error = self._request_error_for(
                 self._resource_path(spec['kind'], ALLOWED_NAMESPACE),
