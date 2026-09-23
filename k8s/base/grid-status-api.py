@@ -52,6 +52,7 @@ class GridStatusAPI:
         self.request_timeout = request_timeout
         self.ssl_context = ssl_context
         self.request_errors = {}
+        self._list_cache = None
 
     def _build_ssl_context(self):
         if self.ssl_context is not None:
@@ -82,10 +83,16 @@ class GridStatusAPI:
     def _list_items(self, path):
         if hasattr(self, 'items') and self.items is not None and path in self.items:
             return self.items[path]
+        if self._list_cache is not None and path in self._list_cache:
+            return self._list_cache[path]
         payload = self._request(path)
         if isinstance(payload, dict) and payload.get('sourceStatus') == 'error':
-            return []
-        return payload.get('items', []) if isinstance(payload, dict) else []
+            items = []
+        else:
+            items = payload.get('items', []) if isinstance(payload, dict) else []
+        if self._list_cache is not None:
+            self._list_cache[path] = items
+        return items
 
     def _request_error_for(self, *paths):
         for path in paths:
@@ -286,6 +293,8 @@ class GridStatusAPI:
         return events
 
     def aggregate(self, activeScenario=None, max_nodes=None, max_events=None, max_output_bytes=None, window_seconds=None, namespace=None):
+        self._list_cache = {}
+        self.request_errors = {}
         timestamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         requested_namespace = namespace or ALLOWED_NAMESPACE
         if requested_namespace != ALLOWED_NAMESPACE:

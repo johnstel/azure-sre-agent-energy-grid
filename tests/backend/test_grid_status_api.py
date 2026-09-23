@@ -43,6 +43,17 @@ class FakeGridStatusAPI(module.GridStatusAPI):
         return self.items.get(path, [])
 
 
+class CountingGridStatusAPI(module.GridStatusAPI):
+    def __init__(self, items):
+        super().__init__()
+        self.items_by_path = items
+        self.request_counts = {}
+
+    def _request(self, path):
+        self.request_counts[path] = self.request_counts.get(path, 0) + 1
+        return {'items': self.items_by_path.get(path, [])}
+
+
 class GridStatusAPITests(unittest.TestCase):
     def test_allowlisted_resources_are_present(self):
         api = module.GridStatusAPI()
@@ -58,6 +69,22 @@ class GridStatusAPITests(unittest.TestCase):
         self.assertIn('nodes', payload)
         self.assertIn('events', payload)
         self.assertEqual(payload['allowlistedNamespaces'], ['energy'])
+
+    def test_aggregate_fetches_each_kubernetes_collection_once(self):
+        api = CountingGridStatusAPI({})
+
+        api.aggregate(max_output_bytes=50000)
+
+        expected_paths = {
+            '/apis/apps/v1/namespaces/energy/deployments',
+            '/apis/apps/v1/namespaces/energy/statefulsets',
+            '/api/v1/namespaces/energy/pods',
+            '/api/v1/namespaces/energy/services',
+            '/api/v1/namespaces/energy/endpoints',
+            '/api/v1/namespaces/energy/events',
+        }
+        self.assertEqual(set(api.request_counts), expected_paths)
+        self.assertTrue(all(count == 1 for count in api.request_counts.values()))
 
     def test_bounded_payload_and_sanitizes_secret_like_text(self):
         fake_items = {
