@@ -2,6 +2,7 @@ import importlib.util
 import pathlib
 import tempfile
 import unittest
+from collections import Counter
 from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -58,6 +59,33 @@ class GridStatusAPITests(unittest.TestCase):
         self.assertIn('nodes', payload)
         self.assertIn('events', payload)
         self.assertEqual(payload['allowlistedNamespaces'], ['energy'])
+
+    def test_aggregate_fetches_each_kubernetes_collection_once(self):
+        api = module.GridStatusAPI()
+        requested_paths = []
+
+        def fake_request(path):
+            requested_paths.append(path)
+            return {'items': []}
+
+        api._request = fake_request
+        api.aggregate(max_output_bytes=50000)
+
+        counts = Counter(requested_paths)
+        self.assertEqual(len(requested_paths), 6)
+        self.assertEqual(set(counts.values()), {1})
+        self.assertEqual(set(counts), {
+            '/apis/apps/v1/namespaces/energy/deployments',
+            '/apis/apps/v1/namespaces/energy/statefulsets',
+            '/api/v1/namespaces/energy/pods',
+            '/api/v1/namespaces/energy/services',
+            '/api/v1/namespaces/energy/endpoints',
+            '/api/v1/namespaces/energy/events',
+        })
+
+        api.aggregate(max_output_bytes=50000)
+        self.assertEqual(len(requested_paths), 12)
+        self.assertEqual(set(Counter(requested_paths).values()), {2})
 
     def test_bounded_payload_and_sanitizes_secret_like_text(self):
         fake_items = {
