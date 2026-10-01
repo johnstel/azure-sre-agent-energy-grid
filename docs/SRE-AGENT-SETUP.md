@@ -16,7 +16,7 @@ Azure SRE Agent (GA) is an AI-powered site reliability engineering automation to
 Before creating an SRE Agent, ensure you have:
 
 - ✅ Deployed the demo lab infrastructure (`scripts/deploy.ps1`)
-- ✅ A region permitted by this lab (`East US 2`, `Sweden Central`, or `Australia East`)
+- ✅ An SRE Agent region permitted by this lab (`East US 2`, `Sweden Central`, or `Australia East`); the workload may be in Central US
 - ✅ `Microsoft.Authorization/roleAssignments/write` permission
 - ✅ Firewall/proxy rules that satisfy the complete [Azure SRE Agent network requirements](https://learn.microsoft.com/azure/sre-agent/network-requirements)
 
@@ -26,7 +26,7 @@ Before creating an SRE Agent, ensure you have:
 
 ### Automated via Bicep (Default)
 
-The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using the `Microsoft.App/agents@2026-01-01` resource type and `upgradeChannel: 'Stable'`. The deployment:
+The SRE Agent is deployed automatically as part of `scripts/deploy.ps1` using the `Microsoft.App/agents@2026-01-01` resource type and `upgradeChannel: 'Stable'`. `-SreAgentLocation` can place the agent independently from the workload `-Location`; when omitted, it defaults to the workload region for backward compatibility, or East US 2 for a Central US workload. The deployment:
 
 - Creates the SRE Agent resource
 - Creates a user-assigned managed identity
@@ -131,10 +131,10 @@ To deploy with explicit access level control:
 
 ```powershell
 # External demo — diagnosis only (default):
-.\scripts\deploy.ps1 -Location eastus2 -Yes
+.\scripts\deploy.ps1 -Location centralus -SreAgentLocation eastus2 -Yes
 
 # Internal remediation demo:
-.\scripts\deploy.ps1 -Location eastus2 -SreAgentAccessLevel High -Yes
+.\scripts\deploy.ps1 -Location centralus -SreAgentLocation eastus2 -SreAgentAccessLevel High -Yes
 ```
 
 Or standalone RBAC configuration:

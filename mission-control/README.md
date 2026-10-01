@@ -5,7 +5,7 @@ A local single-page application for managing the Azure SRE Agent Energy Grid dem
 ## Features
 
 - **Preflight Checks** — Verify CLI tools (pwsh, az, kubectl), Azure login, and K8s context
-- **Deploy** — Launch full Azure infrastructure via `deploy.ps1` with streaming logs
+- **Deploy** — Launch full Azure infrastructure via `deploy.ps1` with independent workload and SRE Agent regions plus streaming logs
 - **Destroy** — Tear down infrastructure with safety confirmation gate (type "DELETE")
 - **Monitor** — Live pod status grid with auto-refresh and K8s event stream
 - **Ask Copilot** — Local, read-only Copilot SDK explainer for point-in-time Mission Control state snapshots
@@ -59,7 +59,7 @@ mission-control/
 |--------|------|-------------|
 | GET | `/api/health` | Health check |
 | GET | `/api/preflight` | Tool/auth/context checks |
-| POST | `/api/deploy` | Start deployment job |
+| POST | `/api/deploy` | Start deployment job (`location` for workload resources, optional `sreAgentLocation` for the agent; defaults to `location`, or `eastus2` for `centralus`) |
 | POST | `/api/destroy` | Start destruction job (requires DELETE confirmation) |
 | GET | `/api/pods` | List pods in energy namespace |
 | GET | `/api/pods/:name/logs` | Get pod logs (query: `?lines=N`) |

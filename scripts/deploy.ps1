@@ -9,7 +9,12 @@
     It uses device code authentication by default for dev container support.
 
 .PARAMETER Location
-    Azure region for deployment. Must be an SRE Agent supported region.
+    Azure region for the workload resource group and resources.
+    Valid values: eastus2, swedencentral, australiaeast, centralus
+
+.PARAMETER SreAgentLocation
+    Azure region for SRE Agent. Defaults to the workload Location for backward compatibility,
+    except Central US workloads default to East US 2 because the agent is not supported in Central US.
     Valid values: eastus2, swedencentral, australiaeast
 
 .PARAMETER WorkloadName
@@ -37,10 +42,10 @@
     Explicitly rotate the RabbitMQ Key Vault secret versions. Existing values are preserved by default.
 
 .EXAMPLE
-    .\deploy.ps1 -Location eastus2
+    .\deploy.ps1 -Location centralus -SreAgentLocation eastus2
 
 .EXAMPLE
-    .\deploy.ps1 -Location eastus2 -WhatIf
+    .\deploy.ps1 -Location centralus -SreAgentLocation eastus2 -WhatIf
 
 .NOTES
     Author: Azure SRE Agent Energy Grid Demo Lab
@@ -50,8 +55,12 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [ValidateSet('eastus2', 'swedencentral', 'australiaeast')]
+    [ValidateSet('eastus2', 'swedencentral', 'australiaeast', 'centralus')]
     [string]$Location = 'eastus2',
+
+    [Parameter()]
+    [ValidateSet('eastus2', 'swedencentral', 'australiaeast')]
+    [string]$SreAgentLocation = $(if ($Location -eq 'centralus') { 'eastus2' } else { $Location }),
 
     [Parameter()]
     [ValidateLength(3, 10)]
@@ -879,6 +888,7 @@ if ($deploySreAgent) {
     }
     else {
         Write-Host "  ✅ Microsoft.App/agents is available (API: $SreAgentTargetApiVersion, Stable channel)" -ForegroundColor Green
+        Write-Host "      Agent upgrade channel: Stable (automatically receives the latest stable service release)" -ForegroundColor Green
         if ($sreAgentProvider.DefaultApiVersion -and $sreAgentProvider.DefaultApiVersion -ne $SreAgentTargetApiVersion) {
             Write-Host "      Provider default API is $($sreAgentProvider.DefaultApiVersion); deployment remains pinned to $SreAgentTargetApiVersion." -ForegroundColor Gray
         }
@@ -990,11 +1000,14 @@ else {
 }
 
 Write-Host "`n📦 Deployment Configuration:" -ForegroundColor Cyan
-Write-Host "  • Location:        $Location" -ForegroundColor White
-Write-Host "  • Workload Name:   $WorkloadName" -ForegroundColor White
+Write-Host "  • Workload Location:  $Location" -ForegroundColor White
+Write-Host "  • SRE Agent Location: $SreAgentLocation$(if (-not $deploySreAgent) { ' (agent skipped)' })" -ForegroundColor White
+Write-Host "  • Workload Name:      $WorkloadName" -ForegroundColor White
 Write-Host "  • Resource Group:  $resourceGroupName" -ForegroundColor White
 Write-Host "  • Deployment Name: $deploymentName" -ForegroundColor White
 Write-Host "  • SRE Agent:       $(if ($deploySreAgent) { 'Enabled' } else { 'Disabled' })" -ForegroundColor White
+Write-Host "  • SRE Agent API:   $SreAgentTargetApiVersion" -ForegroundColor White
+Write-Host "  • Upgrade Channel: Stable" -ForegroundColor White
 Write-Host "  • Agent Access:    $SreAgentAccessLevel$(if ($SreAgentAccessLevel -eq 'High') { ' ⚠️  (remediation; internal use only)' } else { ' ✅ (diagnosis-only)' })" -ForegroundColor White
 Write-Host "  • AKS API CIDRs:   $(if ($AksApiServerAuthorizedIpRanges.Count -gt 0) { $AksApiServerAuthorizedIpRanges -join ', ' } else { '(none - unrestricted public API endpoint)' })" -ForegroundColor White
 Write-Host "  • RabbitMQ secret bootstrap: $(if ($RotateRabbitMqSecrets) { 'rotate-on-deploy' } else { 'preserve-existing' })" -ForegroundColor White
@@ -1011,6 +1024,7 @@ if ($WhatIf) {
     $whatIfParameterArgs = @(
         $parametersFile
         "location=$Location"
+        "sreAgentLocation=$SreAgentLocation"
         "workloadName=$WorkloadName"
         "deploySreAgent=$deploySreAgentValue"
         "sreAgentAccessLevel=$SreAgentAccessLevel"
@@ -1065,6 +1079,7 @@ try {
     $deployParameterArgs = @(
         $parametersFile
         "location=$Location"
+        "sreAgentLocation=$SreAgentLocation"
         "workloadName=$WorkloadName"
         "deploySreAgent=$deploySreAgentValue"
         "sreAgentAccessLevel=$SreAgentAccessLevel"
@@ -1265,22 +1280,42 @@ function Publish-RepoOwnedServiceImages {
         [pscustomobject]@{ Name = 'dispatch-service'; DockerFile = 'services/dispatch-service/Dockerfile'; Context = 'services/dispatch-service' }
     )
 
-    foreach ($service in $services) {
-        Write-Host "  🐳 Building $($service.Name) image ($ImageTag)..." -ForegroundColor Yellow
-        $imageRef = "$AcrLoginServer/$($service.Name):$ImageTag"
-        $latestRef = "$AcrLoginServer/$($service.Name):latest"
-        az acr build `
-            --registry $acrName `
-            --image "$($service.Name):$ImageTag" `
-            --image "$($service.Name):latest" `
-            --file $service.DockerFile `
-            $service.Context 2>$null | Out-Null
+    Push-Location $repoRoot
+    try {
+        foreach ($service in $services) {
+            Write-Host "  🐳 Building $($service.Name) image ($ImageTag)..." -ForegroundColor Yellow
+            $imageRef = "$AcrLoginServer/$($service.Name):$ImageTag"
+            $latestRef = "$AcrLoginServer/$($service.Name):latest"
+            $buildSucceeded = $false
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+                az acr build `
+                    --registry $acrName `
+                    --image "$($service.Name):$ImageTag" `
+                    --image "$($service.Name):latest" `
+                    --file $service.DockerFile `
+                    $service.Context
 
-        if ($LASTEXITCODE -ne 0) {
-            throw "Failed to build and push image for $($service.Name) to ACR '$acrName'."
+                if ($LASTEXITCODE -eq 0) {
+                    $buildSucceeded = $true
+                    break
+                }
+
+                if ($attempt -lt 3) {
+                    $retryDelaySeconds = 10 * $attempt
+                    Write-Host "  ⚠️  ACR build attempt $attempt failed for $($service.Name). Retrying in $retryDelaySeconds seconds..." -ForegroundColor Yellow
+                    Start-Sleep -Seconds $retryDelaySeconds
+                }
+            }
+
+            if (-not $buildSucceeded) {
+                throw "Failed to build and push image for $($service.Name) to ACR '$acrName' after 3 attempts."
+            }
+
+            Write-Host "  ✅ Published $imageRef and $latestRef" -ForegroundColor Green
         }
-
-        Write-Host "  ✅ Published $imageRef and $latestRef" -ForegroundColor Green
+    }
+    finally {
+        Pop-Location
     }
 }
 
@@ -1356,7 +1391,39 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Convert kubeconfig to use Azure CLI auth so kubelogin doesn't prompt for a client ID
-kubelogin convert-kubeconfig -l azurecli
+$kubeloginInstallDirectory = Join-Path $HOME '.azure-kubelogin'
+$kubeloginExecutableName = if ($IsWindows) { 'kubelogin.exe' } else { 'kubelogin' }
+$kubectlExecutableName = if ($IsWindows) { 'kubectl.exe' } else { 'kubectl' }
+$kubeloginInstallPath = Join-Path $kubeloginInstallDirectory $kubeloginExecutableName
+$kubeloginCommand = Get-Command kubelogin -ErrorAction SilentlyContinue
+$kubeloginExecutable = if ($kubeloginCommand) {
+    $kubeloginCommand.Source
+}
+elseif (Test-Path $kubeloginInstallPath) {
+    $kubeloginInstallPath
+}
+else {
+    ''
+}
+
+if (-not $kubeloginExecutable) {
+    $kubectlInstallPath = Join-Path $kubeloginInstallDirectory $kubectlExecutableName
+
+    Write-Host "  ℹ️  kubelogin is not installed. Installing the latest release with Azure CLI..." -ForegroundColor Yellow
+    New-Item -ItemType Directory -Path $kubeloginInstallDirectory -Force | Out-Null
+    az aks install-cli `
+        --install-location $kubectlInstallPath `
+        --kubelogin-install-location $kubeloginInstallPath `
+        --only-show-errors
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $kubeloginInstallPath)) {
+        throw "Failed to install kubelogin with 'az aks install-cli'. Install kubelogin and retry the deployment."
+    }
+
+    $kubeloginExecutable = $kubeloginInstallPath
+    Write-Host "  ✅ kubelogin installed at $kubeloginInstallPath" -ForegroundColor Green
+}
+
+& $kubeloginExecutable convert-kubeconfig -l azurecli
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to convert the kubeconfig for Azure CLI authentication."
 }

@@ -18,7 +18,7 @@ This document is the starting point for anyone supporting the Azure SRE Agent En
 | **Scenarios** | 10 individual breakable scenarios + the complete-failure bundle (see [Breakable Scenarios](BREAKABLE-SCENARIOS.md)) |
 | **SRE Agent mode** | Review mode only (`mode: 'Review'`) |
 | **Access levels** | `Low` (Reader + Log Analytics Reader) for diagnosis; `High` (adds Contributor) for internal remediation demos |
-| **Regions** | Lab allowlist: East US 2, Sweden Central, Australia East. The service supports additional [officially documented regions](https://learn.microsoft.com/azure/sre-agent/supported-regions). |
+| **Regions** | Workloads may also deploy to Central US. The independently selected SRE Agent region uses the lab allowlist: East US 2, Sweden Central, Australia East. The service supports additional [officially documented regions](https://learn.microsoft.com/azure/sre-agent/supported-regions). |
 | **Observability** | Log Analytics, Application Insights, Container Insights, Managed Grafana |
 
 ### Supported SRE Agent Interactions
@@ -211,7 +211,7 @@ For the complete guardrail table, see [Safe Language Guardrails](SAFE-LANGUAGE-G
 | `maxPods=30` on existing node pools | Pod scheduling pressure at scale | Maintenance-window node pool replacement | [AKS maxPods Runbook](AKS-MAXPODS-MAINTENANCE-RUNBOOK.md) |
 | `SCHEMA_TBD` telemetry fields | SRE Agent App Insights dimensions may change | Do not build production dashboards against these fields | [Capability Contracts §8](CAPABILITY-CONTRACTS.md) |
 | Private AKS path is not validated by this lab | The repository deploys a public API endpoint and its operational guidance assumes that topology | Use the checked-in public/authorized-IP design, or separately design and validate private connectivity | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
-| Lab region allowlist | Deployment scripts allow only East US 2, Sweden Central, and Australia East even though the service supports more regions | Use a lab-supported region or update and validate the IaC allowlist against the [official region list](https://learn.microsoft.com/azure/sre-agent/supported-regions) | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
+| Lab region allowlist | Workloads may deploy to Central US, but SRE Agent placement remains limited to East US 2, Sweden Central, and Australia East even though the service supports more regions | Set `-SreAgentLocation` to a lab-supported agent region, or update and validate the IaC allowlist against the [official region list](https://learn.microsoft.com/azure/sre-agent/supported-regions) | [SRE Agent Setup](SRE-AGENT-SETUP.md) |
 | Firewall requirements | SRE Agent needs several portal, identity, ARM, telemetry, and agent endpoints | Apply the complete [official network requirements](https://learn.microsoft.com/azure/sre-agent/network-requirements) | [Troubleshooting → SRE Agent](TROUBLESHOOTING.md#sre-agent-issues) |
 | Demo RBAC overprovisioning | Broad roles for convenience, not production-ready | See demo vs. production matrix | [Capability Contracts §10](CAPABILITY-CONTRACTS.md) |
 | Reinvestigation cooldown and custom-agent routing are portal-only | Not exposed by the ARM schema or current Azure MCP Server response-plan tool | Confirm/set in Builder → Incident response plans after running the setup script | [SRE Agent Setup → Step 3b](SRE-AGENT-SETUP.md), [Capability Contracts §16](CAPABILITY-CONTRACTS.md) |

@@ -374,6 +374,7 @@ export interface IncidentHandoffReconcileResponse {
 
 export interface DeployParams {
   location: string;
+  sreAgentLocation?: string;
   workloadName?: string;
   skipRbac?: boolean;
   skipSreAgent?: boolean;
@@ -441,6 +442,7 @@ export interface AssistantClientContext {
   };
   activeControls?: {
     deployLocation?: string;
+    deploySreAgentLocation?: string;
     deployWorkload?: string;
     deploySkipRbac?: boolean;
     deploySkipSreAgent?: boolean;

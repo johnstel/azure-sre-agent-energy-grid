@@ -333,9 +333,10 @@ if ($namespace) {
             $phase = $pod.status.phase
             $ready = ($pod.status.containerStatuses | Where-Object { $_.ready -eq $true }).Count
             $total = $pod.status.containerStatuses.Count
+            $isCompletedJobPod = $phase -eq "Succeeded" -and @($pod.metadata.ownerReferences | Where-Object { $_.kind -eq "Job" }).Count -gt 0
             
             $totalChecks++
-            $isHealthy = ($phase -eq "Running") -and ($ready -eq $total)
+            $isHealthy = (($phase -eq "Running") -and ($ready -eq $total)) -or $isCompletedJobPod
             
             $statusIcon = if ($isHealthy) { "✅" } else { "❌" }
             $statusColor = if ($isHealthy) { "Green" } else { "Red" }
@@ -348,8 +349,11 @@ if ($namespace) {
         }
         
         # Summary
-        $runningPods = ($pods.items | Where-Object { $_.status.phase -eq "Running" }).Count
-        Write-Host "`n  Summary: $runningPods/$($pods.items.Count) pods running" -ForegroundColor $(if ($runningPods -eq $pods.items.Count) { "Green" } else { "Yellow" })
+        $healthyPods = @($pods.items | Where-Object {
+            (($_.status.phase -eq "Running") -and (($_.status.containerStatuses | Where-Object { $_.ready -eq $true }).Count -eq $_.status.containerStatuses.Count)) -or
+            (($_.status.phase -eq "Succeeded") -and @($_.metadata.ownerReferences | Where-Object { $_.kind -eq "Job" }).Count -gt 0)
+        }).Count
+        Write-Host "`n  Summary: $healthyPods/$($pods.items.Count) pods healthy" -ForegroundColor $(if ($healthyPods -eq $pods.items.Count) { "Green" } else { "Yellow" })
     }
     else {
         Write-Host "  ⚠️  No pods found in 'energy' namespace" -ForegroundColor Yellow
@@ -438,7 +442,7 @@ if ($la) {
         $requestQuery = @'
 AppRequests
 | where TimeGenerated > ago(15m)
-| extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"])
+| extend namespace = tostring(Properties["sre.namespace"]), service = tostring(Properties["sre.service"])
 | where namespace == "energy"
 | where service in ("meter-service", "asset-service", "dispatch-service")
 | summarize Requests = count()
@@ -446,7 +450,7 @@ AppRequests
         $dependencyQuery = @'
 AppDependencies
 | where TimeGenerated > ago(15m)
-| extend namespace = tostring(customDimensions["sre.namespace"]), service = tostring(customDimensions["sre.service"]), dependencyType = tostring(Type)
+| extend namespace = tostring(Properties["sre.namespace"]), service = tostring(Properties["sre.service"]), dependencyType = tostring(DependencyType)
 | where namespace == "energy"
 | where service in ("meter-service", "asset-service", "dispatch-service")
 | where dependencyType in ("RabbitMQ", "MongoDB")

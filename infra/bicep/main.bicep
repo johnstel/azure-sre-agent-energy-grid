@@ -17,13 +17,23 @@ targetScope = 'subscription'
 @maxLength(10)
 param workloadName string = 'srelab'
 
-@description('Azure region for deployment. Must be a region supporting SRE Agent (East US 2, Sweden Central, Australia East)')
+@description('Azure region for the workload resource group and resources')
 @allowed([
   'eastus2'
   'swedencentral'
   'australiaeast'
+  'centralus'
 ])
 param location string = 'eastus2'
+
+@description('Azure region for SRE Agent. Must be a supported SRE Agent region')
+@allowed([
+  ''
+  'eastus2'
+  'swedencentral'
+  'australiaeast'
+])
+param sreAgentLocation string = ''
 
 @description('Deploy full observability stack (Managed Grafana, Prometheus)')
 param deployObservability bool = true
@@ -148,6 +158,7 @@ param tags object = {
 
 var resourceGroupName = 'rg-${workloadName}-${location}'
 var uniqueSuffix = uniqueString(subscription().subscriptionId, resourceGroupName)
+var effectiveSreAgentLocation = empty(sreAgentLocation) ? (location == 'centralus' ? 'eastus2' : location) : sreAgentLocation
 
 // Naming convention for resources
 var names = {
@@ -203,7 +214,7 @@ module appInsights 'modules/app-insights.bicep' = {
 
 // Activity Log Diagnostics (Wave 1: observable foundation)
 module activityLogDiagnostics 'modules/activity-log-diagnostics.bicep' = {
-  name: 'deploy-activity-log-diagnostics'
+  name: 'deploy-activity-log-diagnostics-${location}'
   params: {
     diagnosticSettingName: 'activity-log-${workloadName}'
     logAnalyticsWorkspaceId: logAnalytics.outputs.workspaceId
@@ -293,7 +304,7 @@ module sreAgent 'modules/sre-agent.bicep' = if (deploySreAgent) {
   name: 'deploy-sre-agent'
   params: {
     agentName: names.sreAgent
-    location: location
+    location: effectiveSreAgentLocation
     tags: tags
     accessLevel: sreAgentAccessLevel
     appInsightsAppId: appInsights.outputs.appId
