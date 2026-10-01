@@ -58,8 +58,9 @@ The platform simulates an electric energy producer with grid management and reta
 ### Prerequisites
 
 - Azure subscription with Owner/Contributor access
-- A lab-supported region: `East US 2`, `Sweden Central`, or `Australia East`
-  - Azure SRE Agent supports additional regions. This repository intentionally validates and permits only these three; see the [current service region list](https://learn.microsoft.com/azure/sre-agent/supported-regions).
+- A workload region supported by the lab; `Central US` is supported when the SRE Agent is placed separately
+- An SRE Agent region permitted by the lab: `East US 2`, `Sweden Central`, or `Australia East`
+  - Azure SRE Agent supports additional regions. This repository intentionally validates and permits only these three agent regions; see the [current service region list](https://learn.microsoft.com/azure/sre-agent/supported-regions).
 - [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli) installed
 - [VS Code](https://code.visualstudio.com/) with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) (optional but recommended)
 
@@ -72,7 +73,7 @@ The platform simulates an electric energy producer with grid management and reta
 az login --use-device-code
 
 # 2. Deploy infrastructure (~15-25 minutes)
-.\scripts\deploy.ps1 -Location eastus2 -Yes
+.\scripts\deploy.ps1 -Location centralus -SreAgentLocation eastus2 -Yes
 ```
 
 > 💡 **Tip**: Type `menu` in the terminal to see all available commands including break scenarios, fix commands, and kubectl shortcuts.
@@ -151,14 +152,15 @@ The full demo lab is the default when SRE Agent deployment is available; use `.\
 
 | Command | Description |
 |---------|-------------|
-| `.\scripts\deploy.ps1 -Location eastus2` | Deploy all infrastructure to Azure |
+| `.\scripts\deploy.ps1 -Location centralus -SreAgentLocation eastus2` | Deploy the workload to Central US and SRE Agent to East US 2 |
 | `.\scripts\deploy.ps1 -WhatIf` | Preview what would be deployed |
 | `.\scripts\check-sre-agent-api-rollout.ps1 -ResourceGroupName <rg>` | Check whether the subscription exposes `Microsoft.App/agents@2026-01-01` |
 | `.\scripts\validate-deployment.ps1 -ResourceGroupName <rg>` | Verify resources and app are healthy |
 | `.\scripts\destroy.ps1 -ResourceGroupName <rg>` | Tear down all infrastructure |
 
 **Deploy script parameters:**
-- `-Location`: Azure region (`eastus2`, `swedencentral`, `australiaeast`) - Default: `eastus2`
+- `-Location`: Workload/resource-group region (`eastus2`, `swedencentral`, `australiaeast`, `centralus`) - Default: `eastus2`
+- `-SreAgentLocation`: SRE Agent region (`eastus2`, `swedencentral`, `australiaeast`) - Defaults to `-Location`, or `eastus2` when `-Location centralus`
 - `-WorkloadName`: Resource prefix - Default: `srelab`
 - `-AksApiServerAuthorizedIpRanges`: Optional AKS API server CIDR allowlist (for external demos). Example: `-AksApiServerAuthorizedIpRanges @('203.0.113.10/32')`
 - `-SkipRbac`: Skip RBAC assignments if subscription policies block them
@@ -206,6 +208,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 **⚠️ Important Notes:**
 
 - SRE Agent docs use GA-language; this lab pins the ARM API to `Microsoft.App/agents@2026-01-01` with `upgradeChannel: 'Stable'`.
-- This lab's deployment scripts currently allow **East US 2**, **Sweden Central**, and **Australia East**. Azure SRE Agent supports additional regions; check the [official region list](https://learn.microsoft.com/azure/sre-agent/supported-regions).
+- This lab allows workload deployment to **Central US**, **East US 2**, **Sweden Central**, and **Australia East**. The independently selected SRE Agent region remains limited to **East US 2**, **Sweden Central**, and **Australia East**; check the [official region list](https://learn.microsoft.com/azure/sre-agent/supported-regions).
 - This lab uses a public AKS API endpoint with optional authorized IP ranges. Do not generalize that demo design into a service-wide private-cluster limitation.
 - Follow the complete [Azure SRE Agent network requirements](https://learn.microsoft.com/azure/sre-agent/network-requirements), not only the `*.azuresre.ai` domain.

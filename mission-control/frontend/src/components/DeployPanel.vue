@@ -5,7 +5,7 @@
         <span class="panel-eyebrow">02 · Provision</span>
         <h2 class="panel-title">Deploy Infrastructure</h2>
         <p class="panel-description">
-          Launch the Azure SRE lab footprint with clear regional intent and live job output for operator confidence.
+          Launch the Azure SRE lab footprint with independent regions, the latest stable SRE Agent, and live job output.
         </p>
       </div>
       <div class="panel-actions">
@@ -15,13 +15,29 @@
 
     <div class="card card--control mb-4">
       <div class="control-grid mb-4">
-        <!-- Location -->
+        <!-- Workload location -->
         <div>
-          <label class="field-label">Location</label>
+          <label class="field-label">Workload Region</label>
           <select
             v-model="location"
             class="field-control w-full rounded-lg px-3 py-2 text-sm"
             style="background: var(--surface); color: var(--text); border: 1px solid var(--card-border);"
+          >
+            <option value="eastus2">East US 2</option>
+            <option value="centralus">Central US</option>
+            <option value="swedencentral">Sweden Central</option>
+            <option value="australiaeast">Australia East</option>
+          </select>
+        </div>
+
+        <!-- SRE Agent location -->
+        <div>
+          <label class="field-label">SRE Agent Region</label>
+          <select
+            v-model="sreAgentLocation"
+            class="field-control w-full rounded-lg px-3 py-2 text-sm"
+            style="background: var(--surface); color: var(--text); border: 1px solid var(--card-border);"
+            :disabled="skipSreAgent"
           >
             <option value="eastus2">East US 2</option>
             <option value="swedencentral">Sweden Central</option>
@@ -99,6 +115,7 @@ import Terminal from './Terminal.vue';
 const { deploy } = useApi();
 
 const location = ref('eastus2');
+const sreAgentLocation = ref('eastus2');
 const workloadName = ref('srelab');
 const skipRbac = ref(false);
 const skipSreAgent = ref(false);
@@ -147,7 +164,7 @@ watch(wsData, (msg: unknown) => {
 
 async function startDeploy() {
   terminalLines.value = [
-    `[Mission Control] Submitting deploy request for ${workloadName.value || 'srelab'} in ${location.value}...`,
+    `[Mission Control] Submitting deploy request for ${workloadName.value || 'srelab'} in ${location.value}; SRE Agent region ${sreAgentLocation.value}...`,
   ];
   jobRunning.value = true;
   jobStatus.value = 'pending';
@@ -155,6 +172,7 @@ async function startDeploy() {
   try {
     const res = await deploy({
       location: location.value,
+      sreAgentLocation: sreAgentLocation.value,
       workloadName: workloadName.value || 'srelab',
       skipRbac: skipRbac.value,
       skipSreAgent: skipSreAgent.value,

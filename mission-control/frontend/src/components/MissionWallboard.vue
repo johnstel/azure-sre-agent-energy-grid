@@ -74,8 +74,17 @@
         </div>
         <div class="control-row">
           <label>
-            <span>Location</span>
+            <span>Workload region</span>
             <select v-model="deployLocation" class="field-control">
+              <option value="eastus2">East US 2</option>
+              <option value="centralus">Central US</option>
+              <option value="swedencentral">Sweden Central</option>
+              <option value="australiaeast">Australia East</option>
+            </select>
+          </label>
+          <label>
+            <span>SRE Agent region</span>
+            <select v-model="deploySreAgentLocation" class="field-control" :disabled="deploySkipSreAgent">
               <option value="eastus2">East US 2</option>
               <option value="swedencentral">Sweden Central</option>
               <option value="australiaeast">Australia East</option>
@@ -94,6 +103,9 @@
             Skip SRE Agent
           </label>
         </div>
+        <p class="control-help-copy">
+          Workload resources can deploy to Central US while the latest stable SRE Agent is placed in a supported region.
+        </p>
         <button class="command-button command-button--primary" type="button" :disabled="deployRunning" @click="startDeploy">
           {{ deployRunning ? 'Deploying…' : 'Deploy' }}
         </button>
@@ -115,7 +127,7 @@
           </label>
         </div>
         <p class="destroy-gate-copy">
-          Second gate required after typing DELETE. Arm opens a final non-destructive confirmation.
+          Three gates are required after entering the resource group: type DELETE, arm the modal, then approve the final browser confirmation.
         </p>
         <button class="danger-button" type="button" :disabled="!destroyCanArm" @click="openDestroyConfirm">
           {{ destroyRunning ? 'Destroying…' : 'Arm destroy' }}
@@ -514,7 +526,7 @@
         </div>
         <p id="destroy-confirm-description">
           This will request destruction of <strong>{{ destroyResourceGroup }}</strong>. Type DELETE stays required;
-          this final gate is intentionally off by default.
+          this checkbox is intentionally off by default, and a final browser confirmation follows.
         </p>
         <label class="confirm-check">
           <input v-model="destroyFinalConfirmed" type="checkbox" />
@@ -524,8 +536,8 @@
           <button class="command-button command-button--neutral" type="button" @click="closeDestroyConfirm">
             Cancel
           </button>
-          <button class="danger-button" type="button" :disabled="!destroyCanConfirm" @click="startDestroy">
-            {{ destroyCountdown > 0 ? `Confirm in ${destroyCountdown}s` : 'Confirm destroy' }}
+          <button class="danger-button" type="button" :disabled="!destroyCanConfirm" @click="confirmAndStartDestroy">
+            {{ destroyCountdown > 0 ? `Confirm in ${destroyCountdown}s` : 'Continue to final confirmation' }}
           </button>
         </div>
       </section>
@@ -643,6 +655,7 @@ const controlPanelOpen = ref(false);
 
 const preflightLoading = ref(false);
 const deployLocation = ref('eastus2');
+const deploySreAgentLocation = ref('eastus2');
 const deployWorkload = ref('srelab');
 const deploySkipRbac = ref(false);
 const deploySkipSreAgent = ref(false);
@@ -983,10 +996,13 @@ async function startDeploy() {
   deployJobStatus.value = 'pending';
   deployRequestId.value = null;
   jobStreamKind.value = 'deploy';
-  jobLines.value = [`[Mission Control] Deploy requested for ${deployWorkload.value || 'srelab'} in ${deployLocation.value}.`];
+  jobLines.value = [
+    `[Mission Control] Deploy requested for ${deployWorkload.value || 'srelab'} in ${deployLocation.value}; SRE Agent region ${deploySreAgentLocation.value}.`,
+  ];
   try {
     const response = await deploy({
       location: deployLocation.value,
+      sreAgentLocation: deploySreAgentLocation.value,
       workloadName: deployWorkload.value || 'srelab',
       skipRbac: deploySkipRbac.value,
       skipSreAgent: deploySkipSreAgent.value,
@@ -1026,6 +1042,17 @@ async function startDestroy() {
   } finally {
     destroyConfirmation.value = '';
   }
+}
+
+async function confirmAndStartDestroy() {
+  if (!destroyCanConfirm.value) return;
+
+  const confirmed = window.confirm(
+    `Final confirmation: permanently destroy Azure resource group "${destroyResourceGroup.value}"?\n\nThis starts the destroy job immediately.`,
+  );
+  if (!confirmed) return;
+
+  await startDestroy();
 }
 
 function openDestroyConfirm() {
@@ -1220,6 +1247,7 @@ function buildAnalystClientContext(): AssistantClientContext {
     },
     activeControls: {
       deployLocation: deployLocation.value,
+      deploySreAgentLocation: deploySreAgentLocation.value,
       deployWorkload: deployWorkload.value,
       deploySkipRbac: deploySkipRbac.value,
       deploySkipSreAgent: deploySkipSreAgent.value,
@@ -1888,7 +1916,8 @@ defineExpose({
   border-color: var(--danger-border);
 }
 
-.destroy-gate-copy {
+.destroy-gate-copy,
+.control-help-copy {
   margin: 0.4rem 0 0.55rem;
   color: var(--muted);
   font-size: 0.82rem;

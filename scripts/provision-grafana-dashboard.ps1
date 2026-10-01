@@ -118,7 +118,7 @@ $tempDashboardPath = Join-Path ([System.IO.Path]::GetTempPath()) ("energy-grid-i
 try {
     Set-Content -Path $tempDashboardPath -Value $dashboardJson -Encoding utf8
     Write-Host "📊 Provisioning Grafana dashboard '$($dashboardDefinition.title)' into '$GrafanaName'..." -ForegroundColor Yellow
-    $importOutput = az grafana dashboard import --resource-group $ResourceGroupName --name $GrafanaName --definition "@$tempDashboardPath" --overwrite --output json 2>&1
+    $importOutput = az grafana dashboard import --resource-group $ResourceGroupName --name $GrafanaName --definition $tempDashboardPath --overwrite --output json 2>&1
     if ($LASTEXITCODE -ne 0) {
         $message = if ($importOutput) { ($importOutput | Out-String).Trim() } else { 'No import output was returned.' }
         throw "Grafana dashboard import failed: $message"
