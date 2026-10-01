@@ -26,6 +26,7 @@ const MAX_LOG_LINES = 2_000;
 
 const DNS_LABEL_PATTERN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
 const POD_NAME_PATTERN = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/;
+type KubectlJsonExecutor = (args: string[], timeout?: number) => Promise<any>;
 
 export class KubeClientError extends Error {
   constructor(message: string, public readonly statusCode = 503) {
@@ -45,18 +46,20 @@ export class KubeInputError extends Error {
  * Kubernetes client that wraps kubectl JSON output into typed objects.
  */
 export class KubeClient {
+  constructor(private readonly executeJson: KubectlJsonExecutor = kubectlJson) {}
+
   async getPods(namespace = ENERGY_NAMESPACE): Promise<Pod[]> {
-    const data = await kubectlJson(['get', 'pods', '-n', namespace, '-o', 'json']);
+    const data = await this.executeJson(['get', 'pods', '-n', namespace, '-o', 'json']);
     return (data.items ?? []).map(toPod);
   }
 
   async getServices(namespace = ENERGY_NAMESPACE): Promise<Service[]> {
-    const data = await kubectlJson(['get', 'services', '-n', namespace, '-o', 'json']);
+    const data = await this.executeJson(['get', 'services', '-n', namespace, '-o', 'json']);
     return (data.items ?? []).map(toService);
   }
 
   async getEvents(namespace = ENERGY_NAMESPACE): Promise<KubeEvent[]> {
-    const data = await kubectlJson([
+    const data = await this.executeJson([
       'get', 'events', '-n', namespace, '-o', 'json',
     ]);
 
@@ -66,18 +69,20 @@ export class KubeClient {
   }
 
   async getDeployments(namespace = ENERGY_NAMESPACE): Promise<Deployment[]> {
-    const data = await kubectlJson(['get', 'deployments', '-n', namespace, '-o', 'json']);
+    const data = await this.executeJson(['get', 'deployments', '-n', namespace, '-o', 'json']);
     return (data.items ?? []).map(toDeployment);
   }
 
   async getInventory(): Promise<InventoryResponse> {
-    const [deployments, pods, services, events, endpoints] = await Promise.all([
-      this.getDeployments(ENERGY_NAMESPACE),
-      this.getPods(ENERGY_NAMESPACE),
-      this.getServices(ENERGY_NAMESPACE),
-      this.getEvents(ENERGY_NAMESPACE),
-      getEndpointSummaries(),
+    const data = await this.executeJson([
+      'get',
+      'deployments,pods,services,events,endpoints',
+      '-n',
+      ENERGY_NAMESPACE,
+      '-o',
+      'json',
     ]);
+    const { deployments, pods, services, events, endpoints } = inventoryResources(data.items ?? []);
 
     const endpointByService = new Map(endpoints.map((endpoint) => [endpoint.serviceName, endpoint]));
     const deploymentItems = deployments.map((deployment) => {
@@ -345,6 +350,43 @@ function toKubeEvent(item: any): KubeEvent {
     firstTimestamp,
     lastTimestamp,
   } satisfies KubeEvent;
+}
+
+function inventoryResources(items: any[]): {
+  deployments: Deployment[];
+  pods: Pod[];
+  services: Service[];
+  events: KubeEvent[];
+  endpoints: ServiceEndpointSummary[];
+} {
+  const deployments: Deployment[] = [];
+  const pods: Pod[] = [];
+  const services: Service[] = [];
+  const events: KubeEvent[] = [];
+  const endpoints: ServiceEndpointSummary[] = [];
+
+  for (const item of items) {
+    switch (item.kind) {
+      case 'Deployment':
+        deployments.push(toDeployment(item));
+        break;
+      case 'Pod':
+        pods.push(toPod(item));
+        break;
+      case 'Service':
+        services.push(toService(item));
+        break;
+      case 'Event':
+        events.push(toKubeEvent(item));
+        break;
+      case 'Endpoints':
+        endpoints.push(toEndpointSummary(item));
+        break;
+    }
+  }
+
+  events.sort((a, b) => timestampMillis(b.timestamp) - timestampMillis(a.timestamp));
+  return { deployments, pods, services, events, endpoints };
 }
 
 async function getEndpointSummaries(): Promise<ServiceEndpointSummary[]> {
